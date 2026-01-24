@@ -2,6 +2,7 @@ package com.novel.splitter.repository.api;
 
 import com.novel.splitter.domain.model.Scene;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Scene 存储仓库接口
@@ -14,4 +15,14 @@ public interface SceneRepository {
      * @param scenes Scene 列表
      */
     void saveScenes(String novelName, String version, List<Scene> scenes);
+
+    /**
+     * 根据 ID 查找 Scene
+     * <p>
+     * RAG 检索回溯时使用。
+     * </p>
+     * @param id Scene ID
+     * @return Scene 对象
+     */
+    Optional<Scene> findById(String id);
 }

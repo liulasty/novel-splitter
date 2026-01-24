@@ -11,7 +11,7 @@ import java.util.Map;
 /**
  * Scene 元数据
  * <p>
- * 存储关于 Scene 的辅助信息，如涉及的人物、地点、时间等。
+ * 存储关于 Scene 的辅助信息，符合 RAG Chunk 标准形态。
  * </p>
  */
 @Data
@@ -19,23 +19,38 @@ import java.util.Map;
 @NoArgsConstructor
 @AllArgsConstructor
 public class SceneMetadata {
-    /**
-     * 出现的人物列表（预留）
-     */
+    // === RAG 核心字段 ===
+    /** 小说名称 */
+    private String novel;
+    
+    /** 章节标题 */
+    private String chapterTitle;
+    
+    /** 章节索引 */
+    private Integer chapterIndex;
+    
+    /** 起始段落 */
+    private Integer startParagraph;
+    
+    /** 结束段落 */
+    private Integer endParagraph;
+    
+    /** Chunk 类型 (e.g., "scene", "summary") */
+    private String chunkType;
+    
+    /** 角色/功能 (e.g., "narration", "dialogue") */
+    private String role;
+
+    // === 语义分析字段 (预留) ===
+    /** 出现的人物列表 */
     private List<String> characters;
 
-    /**
-     * 场景地点（预留）
-     */
+    /** 场景地点 */
     private String location;
 
-    /**
-     * 时间信息（预留）
-     */
+    /** 时间信息 */
     private String time;
 
-    /**
-     * 扩展字段
-     */
+    /** 扩展字段 */
     private Map<String, Object> extra;
 }

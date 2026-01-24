@@ -1,6 +1,10 @@
 server:
   port: 8080
 
+assembler:
+  max-chunks: 3
+  max-chunk-length: 900
+
 splitter:
   storage:
     root-path: "data/novel-storage"

@@ -28,6 +28,29 @@
             <groupId>com.novel.splitter</groupId>
             <artifactId>novelDownloader</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.novel.splitter</groupId>
+            <artifactId>embedding</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.novel.splitter</groupId>
+            <artifactId>retrieval</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.novel.splitter</groupId>
+            <artifactId>context-assembler</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.novel.splitter</groupId>
+            <artifactId>llm-client</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

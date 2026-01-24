@@ -17,7 +17,7 @@ public class ChapterRecognizer {
 
     // 匹配 "第1章", "第一章", "第100回", "Chapter 1" 等常见格式
     // 宽松模式：允许前面有空白，允许后面有标题内容
-    private static final Pattern CHAPTER_PATTERN = Pattern.compile("^\\s*第[0-9一二三四五六七八九十百千]+[章回节卷].*|^\\s*Chapter\\s*\\d+.*");
+    private static final Pattern CHAPTER_PATTERN = Pattern.compile("^\\s*第[0-9零一二三四五六七八九十百千两]+[章回节卷].*|^\\s*Chapter\\s*\\d+.*");
 
     // 标题最大长度限制，防止将长句误判为标题
     private static final int MAX_TITLE_LENGTH = 50;

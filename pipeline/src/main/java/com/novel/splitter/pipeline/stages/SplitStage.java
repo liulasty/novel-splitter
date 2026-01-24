@@ -34,8 +34,8 @@ public class SplitStage implements Stage {
         context.setChapters(chapters);
         log.info("Recognized {} chapters", chapters.size());
 
-        // 3. Scene 组装
-        List<Scene> scenes = sceneAssembler.assemble(chapters, paragraphs);
+        // 3. Scene 组装 (传入 novelName 用于元数据填充)
+        List<Scene> scenes = sceneAssembler.assemble(chapters, paragraphs, context.getNovelName());
         context.setScenes(scenes);
         log.info("Assembled {} scenes", scenes.size());
     }

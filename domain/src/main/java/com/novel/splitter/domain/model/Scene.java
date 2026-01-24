@@ -49,6 +49,12 @@ public class Scene {
      * 字数
      */
     private final int wordCount;
+    
+    /**
+     * 是否可再切分
+     * <p>如果是长文本，建议为 true；如果已经很短，为 false。</p>
+     */
+    private final boolean canSplit;
 
     /**
      * 元数据

@@ -1,0 +1,6 @@
+com\novel\splitter\embedding\api\VectorRecord.class
+com\novel\splitter\embedding\mock\MockVectorStore.class
+com\novel\splitter\embedding\api\EmbeddingService.class
+com\novel\splitter\embedding\config\EmbeddingConfig.class
+com\novel\splitter\embedding\mock\MockEmbeddingService.class
+com\novel\splitter\embedding\api\VectorStore.class

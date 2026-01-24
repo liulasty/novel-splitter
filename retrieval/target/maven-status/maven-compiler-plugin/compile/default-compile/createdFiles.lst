@@ -1,0 +1,4 @@
+com\novel\splitter\retrieval\api\RetrievalService.class
+com\novel\splitter\retrieval\api\RetrievalQuery$RetrievalQueryBuilder.class
+com\novel\splitter\retrieval\api\RetrievalQuery.class
+com\novel\splitter\retrieval\impl\VectorRetrievalService.class
