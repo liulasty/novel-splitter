@@ -2,19 +2,19 @@
 
 ## 1.1 项目目标
 
-构建一个**完全离线、本地运行**的小说文本切分系统，用于：
+构建一个**完全离线、本地运行**的小说文本切分与结构化系统，用于：
 
 - 将单部 5MB～百万字级中文小说
 - 稳定、可复现地切分为 **Scene（语义场景单元）**
 - 为后续：向量化、检索、问答、分析提供**长期可靠的结构化语料**
+- **RAG 预处理**：提供标准的上下文组装与检索能力，衔接 LLM 应用。
 
-> 本项目**只解决“切分与结构化”问题**，不包含：
+> 本项目**主要解决“切分与结构化”及“检索准备”问题**，不包含：
 >
-> - LLM 推理
-> - 向量召回
-> - 问答编排
-
-这是整个系统中**最底层、最不可返工的一层**。
+> - 生产级 LLM 推理（仅提供 Mock 客户端与接口）
+> - 复杂的问答编排逻辑
+>
+> 这是整个系统中**最底层、最不可返工的一层**。
 
 ------
 
@@ -22,8 +22,9 @@
 
 1. **工程优先，不赌模型能力**
 2. **切分结果必须可审计、可回滚、可重建**
-3. **不引入数据库、不引入外部服务**
+3. **不引入数据库、不引入外部服务（除 LLM API 外）**
 4. **所有中间产物都是“稳定文件”**
+5. **RAG 模块化**：检索、向量化、上下文组装各司其职。
 
 ------
 
@@ -34,7 +35,7 @@ novel-splitter
 │
 ├─ application        ← Spring Boot 启动 & 任务编排
 │
-├─ domain             ← 核心业务模型（Scene / Chapter / Segment）
+├─ domain             ← 核心业务模型（Scene / Chapter / Segment / ContextBlock）
 │
 ├─ splitter           ← 切分规则引擎（纯业务核心）
 │
@@ -44,16 +45,24 @@ novel-splitter
 │
 ├─ validation         ← 切分质量校验
 │
-└─ infrastructure     ← JSON / 文件 / 配置实现
+├─ infrastructure     ← JSON / 文件 / 配置实现
 │
-└─ novelDownload     ← 小说文件下载，为项目提供原始材料
-
+├─ novelDownloader    ← 小说文件下载 (Factory + Jsoup)
+│
+├─ embedding          ← 向量化服务 (EmbeddingService + Mock)
+│
+├─ retrieval          ← 向量检索服务 (RetrievalService)
+│
+├─ context-assembler  ← LLM 上下文组装 (ContextAssembler)
+│
+└─ llm-client         ← LLM 客户端抽象 (LlmClient + Mock)
 ```
 
 > **注意**：
 >
 > - 没有 DAO / Entity / Mapper
 > - Repository 不是数据库概念，而是“文件产物管理器”
+> - RAG 相关模块（retrieval, embedding, context-assembler）遵循 Clean Architecture
 
 ------
 
@@ -65,6 +74,7 @@ novel-splitter
 
 - 提供 CLI / REST 触发入口
 - 串联切分 Pipeline
+- 集成 RAG 服务
 - 不包含任何切分规则
 
 ### 示例结构
@@ -73,16 +83,8 @@ novel-splitter
 application
 ├─ NovelSplitApplication.java
 ├─ SplitCommandRunner.java
-└─ SplitController.java（可选）
-
+└─ SplitController.java
 ```
-
-### 示例职责说明
-
-- `SplitCommandRunner`
-  - 接收小说路径
-  - 选择切分策略版本
-  - 启动流水线
 
 ------
 
@@ -96,13 +98,13 @@ domain
 ├─ SemanticSegment
 ├─ Scene
 ├─ Chapter
-└─ SceneMetadata
-
+├─ SceneMetadata
+└─ ContextBlock (RAG 用)
 ```
 
 ### Scene 示例（核心对象）
 
-```
+```java
 public class Scene {
     String sceneId;
     String chapterTitle;
@@ -110,16 +112,9 @@ public class Scene {
     int startParagraph;
     int endParagraph;
     String text;
-    SceneMetadata metadata;
+    SceneMetadata metadata; // 包含 RAG 所需元数据
 }
-
 ```
-
-> domain 层：
->
-> - **不依赖 Spring**
-> - 不依赖 Jackson
-> - 不关心存储形式
 
 ------
 
@@ -139,22 +134,6 @@ Raw Text
 语义段落合并（时间 / 视角 / 场景）
   ↓
 Scene 构建
-
-```
-
-### 目录结构
-
-```
-splitter
-├─ ParagraphSplitter
-├─ SemanticSegmentBuilder
-├─ SceneAssembler
-├─ rule
-│   ├─ TimeShiftRule
-│   ├─ LocationShiftRule
-│   ├─ POVShiftRule
-│   └─ DialogueDensityRule
-
 ```
 
 ### 规则特点
@@ -175,22 +154,7 @@ splitter
 pipeline
 ├─ SplitPipeline
 ├─ PipelineContext
-└─ PipelineStage
-
-```
-
-### Pipeline 示例
-
-```
-pipeline.run(
-  loadRawText,
-  splitParagraphs,
-  buildSemanticSegments,
-  assembleScenes,
-  validateScenes,
-  persistScenes
-);
-
+└─ PipelineStage (Load, Split, Validation, Save)
 ```
 
 ------
@@ -209,29 +173,14 @@ pipeline.run(
 novel-storage/
 ├─ raw/
 │   └─ novel.txt
-│
 ├─ scene/
 │   ├─ v1-rule-basic/
 │   │   └─ scenes.json
 │   └─ v2-rule-enhanced/
 │       └─ scenes.json
-│
 └─ meta/
     └─ split-report.json
-
 ```
-
-### Repository 接口示例
-
-```
-public interface SceneRepository {
-    void save(List<Scene> scenes);
-    List<Scene> load();
-}
-
-```
-
-实现：`JsonSceneRepository`
 
 ------
 
@@ -248,293 +197,87 @@ public interface SceneRepository {
 - 是否跨章节异常
 - Scene 连续性是否断裂
 
-```
-validation
-├─ SceneLengthValidator
-├─ ChapterBoundaryValidator
-└─ ContinuityValidator
+------
 
+## 3.7 novelDownloader 层（爬虫）
+
+### 职责
+
+提供可扩展的小说下载能力，支持多站点规则配置。
+
+### 架构
+
+- **DownloaderFactory**: 根据配置创建下载器实例。
+- **AbstractDownloader**: 提供通用模板方法（多线程、重试、文件合并）。
+- **GeneralJsoupDownloader**: 基于 Jsoup 和规则配置的通用实现。
+
+### 配置示例
+
+```yaml
+downloader:
+  sites:
+    - domain: "www.example.com"
+      catalog-url: "..."
+      rule:
+        chapter-list-selector: "..."
+        content-selector: "..."
 ```
 
 ------
-## 3.6 novelDownload 层
 
+## 3.8 RAG 相关模块 (Embedding, Retrieval, Context-Assembler, LLM-Client)
 
-### 1. 项目包结构
+为了支持下游的 RAG 应用，系统扩展了以下模块：
 
-```
-com.example.demo.util.novel/
-├── config/                 # 配置相关
-│   ├── DownloadConfig.java
-│   └── RequestHeaders.java
-├── model/                  # 数据模型
-│   ├── Chapter.java
-│   ├── Stats.java
-│   └── DownloadResult.java
-├── service/                # 业务逻辑
-│   ├── NovelDownloaderService.java
-│   ├── ContentExtractionService.java
-│   └── FileGenerationService.java
-├── util/                   # 工具类
-│   ├── ContentCleaner.java
-│   ├── TextProcessor.java
-│   └── NetworkUtil.java
-├── exception/              # 自定义异常
-│   └── DownloadException.java
-└── controller/             # 主控制器
-    └── NovelDownloadController.java
-```
+### Embedding
+- **职责**: 将文本转换为向量。
+- **实现**: 定义 `EmbeddingService` 接口，目前提供 `MockEmbeddingService` (固定维度随机向量) 用于测试。
 
+### Retrieval
+- **职责**: 基于语义相似度检索相关 Scene。
+- **实现**: `VectorRetrievalService`，结合 Embedding 和 Repository 实现内存/向量库检索。
 
-### 2. 各模块详细设计
+### Context-Assembler
+- **职责**: 将检索到的 Scene 组装成符合 LLM 输入窗口限制的 Prompt 上下文。
+- **特性**: 支持 Token 限制、截断策略、格式化输出。
 
-#### 2.1 配置模块 (`config`)
+### LLM-Client
+- **职责**: 与大模型交互的抽象接口。
+- **实现**: `LlmClient` 接口，目前提供 `MockLlmClient` 用于离线验证。
 
-```java
-// DownloadConfig.java
-package com.example.demo.util.novel.config;
+------
 
-public class DownloadConfig {
-    public static final int THREAD_COUNT = 3;
-    public static final long DELAY_MS = 2000;
-    public static final int TIMEOUT = 30000;
-    public static final String OUTPUT_FILE_NAME = "_完整版.txt";
-    public static final String PROGRESS_LOG_FILE = "download_progress.log";
-}
-
-// RequestHeaders.java
-package com.example.demo.util.novel.config;
-
-import java.util.Map;
-import java.util.HashMap;
-
-public class RequestHeaders {
-    public static final Map<String, String> HEADERS = new HashMap<String, String>() {{
-        put("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
-        put("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
-        // ... 其他头部
-    }};
-}
-```
-
-
-#### 2.2 模型模块 (`model`)
-
-```java
-// Chapter.java
-package com.example.demo.util.novel.model;
-
-public class Chapter {
-    private int index;
-    private String title;
-    private String url;
-    private String content;
-    private boolean success;
-
-    // 构造函数、getter、setter 和 toString 方法
-}
-
-// Stats.java
-package com.example.demo.util.novel.model;
-
-public class Stats {
-    private int total = 0;
-    private int success = 0;
-    private int failed = 0;
-    
-    // 统计相关方法
-    public synchronized void addSuccess() { success++; }
-    public synchronized void addFailed() { failed++; }
-    public void print();
-}
-```
-
-
-#### 2.3 服务模块 (`service`)
-
-```java
-// NovelDownloaderService.java
-package com.example.demo.util.novel.service;
-
-public class NovelDownloaderService {
-    private ContentExtractionService contentExtractor;
-    private FileGenerationService fileGenerator;
-    
-    public Stats downloadChapters(List<Chapter> chapters, int startIndex, int endIndex);
-    private String downloadChapter(String url);
-    private String tryDownload(String url);
-}
-
-// ContentExtractionService.java
-package com.example.demo.util.novel.service;
-
-public class ContentExtractionService {
-    public String extractContent(Document doc);
-    public String cleanContent(String html);
-    private int countChinesePunctuation(String text);
-}
-
-// FileGenerationService.java
-package com.example.demo.util.novel.service;
-
-public class FileGenerationService {
-    public String generateNovelFile(List<Chapter> chapters, String filename);
-    public void saveFailedChapters(List<Chapter> chapters);
-    private void createProgressFile(int total);
-    private void updateProgress(int current, int total, String title, boolean success);
-}
-```
-
-
-#### 2.4 工具模块 (`util`)
-
-```java
-// ContentCleaner.java
-package com.example.demo.util.novel.util;
-
-public class ContentCleaner {
-    public static String removeAdsAndJunk(String text);
-    public static String formatParagraphs(String text);
-    public static String normalizeSpaces(String text);
-}
-
-// NetworkUtil.java
-package com.example.demo.util.novel.util;
-
-public class NetworkUtil {
-    public static boolean testConnection(String url);
-    public static Document fetchPage(String url);
-}
-```
-
-
-### 3. 重构后的主控制类
-
-```java
-// NovelDownloadController.java
-package com.example.demo.util.novel.controller;
-
-public class NovelDownloadController {
-    private NovelDownloaderService downloaderService;
-    private FileGenerationService fileService;
-    
-    public static void main(String[] args) {
-        NovelDownloadController controller = new NovelDownloadController();
-        controller.runInteractiveDownload();
-    }
-    
-    private void runInteractiveDownload() {
-        // 主流程控制
-    }
-    
-    private List<Chapter> loadChaptersFromFile(String filename) {
-        // 从文件加载章节
-    }
-}
-```
-
-
-### 4. 优势分析
-
-- **职责分离**：每个类都有单一职责，易于维护
-- **可测试性**：各组件独立，便于单元测试
-- **可扩展性**：新增功能不影响现有代码
-- **可重用性**：服务类可在不同场景中复用
-- **可维护性**：结构清晰，降低维护成本
-
-### 5. 额外改进建议
-
-1. 使用配置文件管理参数，而非硬编码
-
-2. 添加日志框架（如SLF4J）
-
-3. 实现配置的动态加载
-
-4. 添加更完善的异常处理机制
-
-5. 考虑使用Spring Boot框架实现依赖注入
-
-### 6.基本需要下面这样如此的配置即可完成下载准备工作
-```
-  "www.77xs.cn": {
-    "chapterPath":"/html/body/div[8]",
-    "checkUrl":"https://www.77xs.cn/html/70/70159/index.html",
-    "contentPath":"/html/body/div[6]/div[4]",
-    "nextLoop":false,
-    "nextLoopCnt":15
-  },
-  "www.wanben2.com": {
-    "chapterPath": "/html/body/div[1]/div[5]/div/dl",
-    "checkUrl": "https://www.wanben2.com/95276352/",
-    "contentPath": "/html/body/div/div[4]/div/div[3]",
-    "nextLoop": false,
-    "nextLoopCnt": 15
-  },
-  "www.biqugezw.us": 
-  {"chapterPath":"/html/body/section/div[4]/div[2]",
-  "checkUrl":"https://www.biqugezw.us/book/346016/",
-  "contentPath":"/html/body/section/div/article/div[2]",
-  "nextLoop":false,
-  "nextLoopCnt":15
-  },
-  "wap.maxshuku.com": {
-    "chapterPath": "/html/body/div",
-    "checkUrl": "http://wap.maxshuku.com/read/disitianzaicongbuxiangxingangtiehongliu/",
-    "contentPath": "/html/body/div",
-    "nextLoop": false,
-    "nextLoopCnt": 15
- },
- "biquge.my": {
-     "chapterPath":"/html/body/div[6]",
-     "checkUrl":"https://biquge.my/p/d/15705",
-     "contentPath":"/html/body/div[3]/div[6]/div[2]",
-     "nextLoop":false,
-     "nextLoopCnt":15
- },
- "m.cheyil.cc": {"chapterPath":"#clist","checkUrl":"https://m.cheyil.cc/wapbook/book/1183844/1/1/","contentPath":"#chaptercontent","nextLoop":false,"nextLoopCnt":15},
- "www.xinghuowxw.com":
-    {
-        "chapterPath": "/html/body/div[2]/section/div[3]/div/ul",
-        "checkUrl": "https://www.xinghuowxw.com/book/B7KB.html",
-        "contentPath": "/html/body/div[2]/main/section/article",
-        "nextLoop":true,
-        "nextUrlPath":"/html/body/div[2]/main/div/a[3]",
-        "nextPathText":"下一页",
-        "nextLoopCnt":15
-    }
-```
-
-# 四、关键业务流程（一步到位）
+# 四、关键业务流程
 
 ## 4.1 切分完整流程
 
-1. 读取 raw 小说文本
-2. 按换行切为物理段落
-3. 识别章节标题
-4. 基于规则合并为语义段
-5. 聚合为 Scene（500～1500 字）
-6. 校验 Scene 合理性
-7. 写入 JSON（版本化）
+1. **Download**: 下载小说文本 (novelDownloader)
+2. **Load**: 读取 raw 小说文本
+3. **Split**: 按换行切为物理段落 -> 识别章节 -> 合并语义段 -> 聚合 Scene
+4. **Validate**: 校验 Scene 合理性
+5. **Save**: 写入 JSON（版本化）
+
+## 4.2 RAG 准备流程 (未来扩展)
+
+1. **Embedding**: 读取 Scene JSON -> 调用 EmbeddingService -> 生成向量
+2. **Indexing**: 存入向量库 (VectorStore)
 
 ------
 
 # 五、核心依赖（极简）
 
-```
+```groovy
 dependencies {
   implementation 'org.springframework.boot:spring-boot-starter'
   implementation 'com.fasterxml.jackson.core:jackson-databind'
   implementation 'org.apache.commons:commons-lang3'
+  implementation 'org.jsoup:jsoup' // 爬虫
 }
-
 ```
 
 > 没有：
 >
-> - 数据库
+> - 数据库 (使用文件系统)
 > - ORM
 > - 消息队列
-> - Python
-
-------
-
+> - Python 依赖 (纯 Java 实现)
