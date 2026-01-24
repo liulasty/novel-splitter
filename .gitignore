@@ -1,0 +1,23 @@
+# 项目排除路径
+/application/target/
+/domain/target/
+/infrastructure/target/
+/novelDownloader/target/
+/pipeline/target/
+/repository/target/
+/splitter/target/
+/validation/target/
+
+# 忽略文件
+.vscode
+.idea
+.trae
+
+# 下载的文件
+data
+
+# 日志文件
+logs
+
+# target
+ target

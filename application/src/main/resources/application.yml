@@ -1,0 +1,43 @@
+server:
+  port: 8080
+
+splitter:
+  storage:
+    root-path: "data/novel-storage"
+    
+  rule:
+    target-length: 1200
+    min-length: 200
+    max-length: 3000
+    ignore-empty-lines: true
+    
+  downloader:
+    thread-count: 3
+    timeout-ms: 30000
+    retry-count: 3
+    sites:
+      - domain: "www.example.com"
+        catalog-url: "https://www.example.com/book/123"
+        chapter-list-selector: ".chapter-list a"
+        content-selector: "#content"
+        next-page-selector: ".next-page"
+      - domain: "www.test.com"
+        catalog-url: "https://www.test.com/book/456"
+        chapter-list-selector: "div.list > a"
+        content-selector: "div.read-content"
+# "www.xinghuowxw.com":
+      #    {
+      #        "chapterPath": "/html/body/div[2]/section/div[3]/div/ul",
+      #        "checkUrl": "https://www.xinghuowxw.com/book/B7KB.html",
+      #        "contentPath": "/html/body/div[2]/main/section/article",
+      #        "nextLoop":true,
+      #        "nextUrlPath":"/html/body/div[2]/main/div/a[3]",
+      #        "nextPathText":"下一页",
+      #        "nextLoopCnt":15
+      #    }
+      - domain: "https://www.xinghuowxw.com"
+        catalog-url: "https://www.xinghuowxw.com/book/8T77.html"
+        chapter-list-selector: "div.list > a"
+        content-selector: "div.read-content"
+        next-page-selector: "div.page-nav > a.next"
+
