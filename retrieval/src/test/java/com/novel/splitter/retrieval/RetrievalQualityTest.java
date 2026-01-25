@@ -94,7 +94,10 @@ class RetrievalQualityTest {
             System.out.println("\nQuery: " + q);
             
             // 执行检索
-            List<Scene> result = retrievalService.retrieve(new RetrievalQuery(q, 3, null, null));
+            List<Scene> result = retrievalService.retrieve(RetrievalQuery.builder()
+                    .question(q)
+                    .topK(3)
+                    .build());
             
             if (result.isEmpty()) {
                 System.out.println(" [WARN] No results found.");

@@ -43,7 +43,7 @@ public class RagService {
 
         // 1. 检索 (Retrieval)
         RetrievalQuery query = RetrievalQuery.builder()
-                .text(question)
+                .question(question)
                 .topK(topK)
                 .build();
         List<Scene> scenes = retrievalService.retrieve(query);

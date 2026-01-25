@@ -29,10 +29,10 @@ public class VectorRetrievalService implements RetrievalService {
 
     @Override
     public List<Scene> retrieve(RetrievalQuery query) {
-        log.info("Processing retrieval query: '{}' (topK={})", query.getText(), query.getTopK());
+        log.info("Processing retrieval query: '{}' (topK={})", query.getQuestion(), query.getTopK());
 
         // 1. Embedding
-        float[] queryVector = embeddingService.embed(query.getText());
+        float[] queryVector = embeddingService.embed(query.getQuestion());
 
         // 2. Vector Search
         List<VectorRecord> records = vectorStore.search(queryVector, query.getTopK());

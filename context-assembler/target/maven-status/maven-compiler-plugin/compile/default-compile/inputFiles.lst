@@ -1,3 +1,7 @@
+D:\soft\novel-splitter\context-assembler\src\main\java\com\novel\splitter\assembler\model\ContextBlock.java
 D:\soft\novel-splitter\context-assembler\src\main\java\com\novel\splitter\assembler\config\AssemblerConfig.java
-D:\soft\novel-splitter\context-assembler\src\main\java\com\novel\splitter\assembler\impl\DefaultContextAssembler.java
+D:\soft\novel-splitter\context-assembler\src\main\java\com\novel\splitter\assembler\support\SimpleTokenCounter.java
+D:\soft\novel-splitter\context-assembler\src\main\java\com\novel\splitter\assembler\impl\StandardContextAssembler.java
 D:\soft\novel-splitter\context-assembler\src\main\java\com\novel\splitter\assembler\api\ContextAssembler.java
+D:\soft\novel-splitter\context-assembler\src\main\java\com\novel\splitter\assembler\support\TokenCounter.java
+D:\soft\novel-splitter\context-assembler\src\main\java\com\novel\splitter\assembler\model\AssembledContext.java

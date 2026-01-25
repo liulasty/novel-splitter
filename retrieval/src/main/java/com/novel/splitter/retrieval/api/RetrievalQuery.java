@@ -7,9 +7,6 @@ import lombok.NoArgsConstructor;
 
 /**
  * 检索查询对象
- * <p>
- * 封装检索请求参数，为未来扩展过滤条件（如角色、章节范围）做准备。
- * </p>
  */
 @Data
 @Builder
@@ -17,18 +14,22 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class RetrievalQuery {
 
-    /** 用户问题 / 查询文本 */
-    private String text;
+    /** 用户自然语言问题 */
+    private String question;
 
-    /** 返回结果数量 (Top-K) */
-    @Builder.Default
-    private int topK = 5;
-
-    // === 预留过滤字段 ===
-    
-    /** 角色/功能 (e.g., "narration", "dialogue") */
-    private String role;
-    
     /** 小说名称 */
     private String novel;
+
+    /** 起始章节号 (包含) */
+    private Integer chapterFrom;
+
+    /** 结束章节号 (包含) */
+    private Integer chapterTo;
+
+    /** 角色/功能 (e.g., "narration", "dialogue") */
+    private String role;
+
+    /** 返回结果数量 (Top-K) - 辅助字段，不在核心定义列表中，但保留以兼容现有逻辑 */
+    @Builder.Default
+    private int topK = 5;
 }

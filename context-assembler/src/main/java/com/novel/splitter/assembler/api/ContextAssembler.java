@@ -1,5 +1,6 @@
 package com.novel.splitter.assembler.api;
 
+import com.novel.splitter.assembler.model.AssembledContext;
 import com.novel.splitter.domain.model.Scene;
 import java.util.List;
 
@@ -15,7 +16,8 @@ public interface ContextAssembler {
      * 组装 Context
      *
      * @param retrievedChunks 检索到的候选 Chunk 列表
-     * @return 格式化后的纯文本 Context
+     * @param maxTokens       最大 Token 限制
+     * @return 组装后的上下文对象
      */
-    String assemble(List<Scene> retrievedChunks);
+    AssembledContext assemble(List<Scene> retrievedChunks, int maxTokens);
 }

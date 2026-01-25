@@ -1,3 +1,2 @@
-com\novel\splitter\assembler\api\ContextAssembler.class
 com\novel\splitter\assembler\config\AssemblerConfig.class
-com\novel\splitter\assembler\impl\DefaultContextAssembler.class
+com\novel\splitter\assembler\api\ContextAssembler.class
