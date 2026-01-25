@@ -8,6 +8,7 @@ import com.novel.splitter.embedding.api.VectorStore;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
@@ -25,6 +26,7 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Component
+@ConditionalOnProperty(name = "embedding.store.type", havingValue = "memory", matchIfMissing = true)
 public class InMemoryVectorStore implements VectorStore {
 
     private static final String STORE_FILE = "vector_store.json";

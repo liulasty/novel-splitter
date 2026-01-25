@@ -1,7 +1,10 @@
 package com.novel.splitter.llm.client.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.novel.splitter.llm.client.api.LlmClient;
 import com.novel.splitter.llm.client.impl.MockLlmClient;
+import com.novel.splitter.llm.client.impl.OllamaLlmClient;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -22,8 +25,12 @@ public class LlmClientConfig {
         return new MockLlmClient();
     }
 
-    // 未来可以在这里添加 OpenAiLlmClient 等实现
-    // @Bean
-    // @ConditionalOnProperty(name = "novel.llm.provider", havingValue = "openai")
-    // public LlmClient openAiLlmClient() { ... }
+    @Bean
+    @ConditionalOnProperty(name = "novel.llm.provider", havingValue = "ollama")
+    public LlmClient ollamaLlmClient(
+            @Value("${llm.ollama.url:http://localhost:11434}") String ollamaUrl,
+            @Value("${llm.ollama.model:qwen2.5:7b}") String modelName,
+            ObjectMapper objectMapper) {
+        return new OllamaLlmClient(ollamaUrl, modelName, objectMapper);
+    }
 }
