@@ -19,7 +19,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 @Slf4j
-@Component
 public class OnnxModelHolder {
 
     private OrtEnvironment env;
@@ -29,8 +28,11 @@ public class OnnxModelHolder {
     private static final String MODEL_FILE = "model.onnx";
     private static final String MODEL_DATA_FILE = "model.onnx_data";
 
+    public OnnxModelHolder() {
+    }
+
     @PostConstruct
-    public void init() {
+    public void initialize() {
         try {
             log.info("Initializing ONNX Runtime Environment...");
             this.env = OrtEnvironment.getEnvironment();

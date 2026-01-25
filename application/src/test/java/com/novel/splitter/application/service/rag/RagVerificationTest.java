@@ -4,17 +4,13 @@ import com.novel.splitter.domain.model.Answer;
 import com.novel.splitter.domain.model.Scene;
 import com.novel.splitter.domain.model.SceneMetadata;
 import com.novel.splitter.assembler.api.ContextAssembler;
-import com.novel.splitter.assembler.config.AssemblerConfig;
-import com.novel.splitter.assembler.impl.DefaultContextAssembler;
 import com.novel.splitter.embedding.api.EmbeddingService;
 import com.novel.splitter.embedding.api.VectorStore;
-import com.novel.splitter.embedding.mock.MockEmbeddingService;
 import com.novel.splitter.embedding.mock.MockVectorStore;
+import com.novel.splitter.embedding.store.InMemoryVectorStore;
 import com.novel.splitter.llm.client.api.LlmClient;
-import com.novel.splitter.llm.client.impl.MockLlmClient;
 import com.novel.splitter.repository.api.SceneRepository;
 import com.novel.splitter.retrieval.api.RetrievalService;
-import com.novel.splitter.retrieval.impl.VectorRetrievalService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -22,10 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
 
 import java.util.List;
 import java.util.Optional;
@@ -72,6 +65,8 @@ public class RagVerificationTest {
     private void clearVectorStore() {
         if (vectorStore instanceof MockVectorStore) {
             ((MockVectorStore) vectorStore).clear();
+        } else if (vectorStore instanceof InMemoryVectorStore) {
+            ((InMemoryVectorStore) vectorStore).clear();
         }
     }
 

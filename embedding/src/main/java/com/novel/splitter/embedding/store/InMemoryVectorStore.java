@@ -57,6 +57,14 @@ public class InMemoryVectorStore implements VectorStore {
         }
     }
 
+    /**
+     * 清空存储 (用于测试)
+     */
+    public void clear() {
+        vectorMap.clear();
+        log.info("Vector store cleared.");
+    }
+
     @Override
     public void save(Scene scene, float[] embedding) {
         if (scene == null || scene.getId() == null) {
@@ -78,6 +86,9 @@ public class InMemoryVectorStore implements VectorStore {
 
     @Override
     public List<VectorRecord> search(float[] queryEmbedding, int topK) {
+        if (topK <= 0) {
+            return Collections.emptyList();
+        }
         if (vectorMap.isEmpty()) {
             return Collections.emptyList();
         }

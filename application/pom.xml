@@ -32,6 +32,12 @@
             <groupId>com.novel.splitter</groupId>
             <artifactId>embedding</artifactId>
         </dependency>
+        <!-- Explicitly adding onnxruntime to ensure IDE classpath visibility -->
+        <dependency>
+            <groupId>com.microsoft.onnxruntime</groupId>
+            <artifactId>onnxruntime</artifactId>
+            <version>1.18.0</version>
+        </dependency>
         <dependency>
             <groupId>com.novel.splitter</groupId>
             <artifactId>retrieval</artifactId>
