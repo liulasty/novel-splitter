@@ -13,6 +13,10 @@ llm:
 embedding:
   store:
     type: chroma # memory or chroma
+  onnx:
+    # Optional: Configure external model paths
+    # model-path: "D:/path/to/model.onnx"
+    # vocab-path: "D:/path/to/vocab.txt"
 chroma:
   url: http://localhost:8081
   collection: novel-splitter

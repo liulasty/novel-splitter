@@ -18,19 +18,55 @@ public class Vocabulary {
     private final Map<String, Long> tokenToId = new HashMap<>();
     private final Map<Long, String> idToToken = new HashMap<>();
     
+    @org.springframework.beans.factory.annotation.Value("${embedding.onnx.vocab-path:}")
+    private String externalVocabPath;
+
     private static final String VOCAB_PATH = "embedding/vocab.txt"; // It's actually a JSON file
 
     public Vocabulary() {
-        loadVocabulary();
     }
 
+    @jakarta.annotation.PostConstruct
     private void loadVocabulary() {
         try {
-            ClassPathResource resource = new ClassPathResource(VOCAB_PATH);
-            try (InputStream is = resource.getInputStream()) {
+            InputStream is = null;
+            if (externalVocabPath != null && !externalVocabPath.isBlank()) {
+                log.info("Using external vocabulary from: {}", externalVocabPath);
+                java.io.File vocabFile = new java.io.File(externalVocabPath);
+                if (vocabFile.exists()) {
+                    is = new java.io.FileInputStream(vocabFile);
+                } else {
+                    log.error("External vocabulary file not found: {}", externalVocabPath);
+                    throw new java.io.FileNotFoundException("External vocabulary file not found: " + externalVocabPath);
+                }
+            } else {
+                log.info("Using bundled vocabulary from classpath");
+                ClassPathResource resource = new ClassPathResource(VOCAB_PATH);
+                if (resource.exists()) {
+                    is = resource.getInputStream();
+                } else {
+                    log.error("Bundled vocabulary resource not found: {}", VOCAB_PATH);
+                    throw new java.io.FileNotFoundException("Bundled vocabulary resource not found: " + VOCAB_PATH);
+                }
+            }
+
+            try (InputStream inputStream = is) {
                 ObjectMapper mapper = new ObjectMapper();
-                JsonNode root = mapper.readTree(is);
-                JsonNode vocabNode = root.get("model").get("vocab");
+                JsonNode root = mapper.readTree(inputStream);
+                // Handle both simple map format and HuggingFace tokenizer.json format
+                JsonNode vocabNode = null;
+                if (root.has("model") && root.get("model").has("vocab")) {
+                    vocabNode = root.get("model").get("vocab");
+                } else if (root.has("vocab")) {
+                     vocabNode = root.get("vocab"); // Some simple formats
+                } else {
+                    // Maybe it's a flat map?
+                    vocabNode = root;
+                }
+
+                if (vocabNode == null || !vocabNode.isObject()) {
+                     throw new RuntimeException("Invalid vocabulary format");
+                }
                 
                 Iterator<Map.Entry<String, JsonNode>> fields = vocabNode.fields();
                 while (fields.hasNext()) {
@@ -43,7 +79,7 @@ public class Vocabulary {
                 log.info("Loaded vocabulary with {} tokens", tokenToId.size());
             }
         } catch (Exception e) {
-            log.error("Failed to load vocabulary from {}", VOCAB_PATH, e);
+            log.error("Failed to load vocabulary", e);
             throw new RuntimeException("Failed to load vocabulary", e);
         }
     }
