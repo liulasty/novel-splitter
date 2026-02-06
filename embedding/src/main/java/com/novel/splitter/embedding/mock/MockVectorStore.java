@@ -47,8 +47,8 @@ public class MockVectorStore implements VectorStore {
     }
 
     @Override
-    public List<VectorRecord> search(float[] queryEmbedding, int topK) {
-        log.info("Mock search with topK={}", topK);
+    public List<VectorRecord> search(float[] queryEmbedding, int topK, Map<String, Object> filter) {
+        log.info("Mock search with topK={}, filter={}", topK, filter);
         // 简单 Mock：直接返回前 K 个已存储的 ID，分数随机
         List<VectorRecord> results = new ArrayList<>();
         int limit = Math.min(topK, ids.size());

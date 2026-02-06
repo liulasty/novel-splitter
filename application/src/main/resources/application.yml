@@ -3,17 +3,16 @@ server:
 
 novel:
   llm:
-    provider: mock # ollama or mock
+    provider: ollama # ollama or mock
 
 llm:
   ollama:
     url: http://localhost:11434
-    model: qwen2.5:7b
+    model: qwen:7b
 
 embedding:
   store:
     type: chroma # memory or chroma
-
 chroma:
   url: http://localhost:8081
   collection: novel-splitter
@@ -24,7 +23,7 @@ assembler:
 
 splitter:
   storage:
-    root-path: "data/novel-storage"
+    root-path: "d:/soft/novel-splitter/data/novel-storage"
     
   rule:
     target-length: 1200

@@ -1,8 +1,9 @@
 package com.novel.splitter.domain.model;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Getter;
-import lombok.ToString;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
  * 场景 (Scene)
@@ -11,53 +12,54 @@ import lombok.ToString;
  * 通常包含 500~2000 字。
  * </p>
  */
-@Getter
+@Data
 @Builder
-@ToString
+@NoArgsConstructor
+@AllArgsConstructor
 public class Scene {
     /**
      * 唯一标识 (UUID 或 Hash)
      */
-    private final String id;
+    private String id;
 
     /**
      * 所属章节标题
      */
-    private final String chapterTitle;
+    private String chapterTitle;
 
     /**
      * 所属章节索引
      */
-    private final int chapterIndex;
+    private int chapterIndex;
 
     /**
      * 起始段落索引（全局 RawParagraph index）
      */
-    private final int startParagraphIndex;
+    private int startParagraphIndex;
 
     /**
      * 结束段落索引（全局 RawParagraph index）
      */
-    private final int endParagraphIndex;
+    private int endParagraphIndex;
 
     /**
      * 完整文本内容
      */
-    private final String text;
+    private String text;
 
     /**
      * 字数
      */
-    private final int wordCount;
+    private int wordCount;
     
     /**
      * 是否可再切分
      * <p>如果是长文本，建议为 true；如果已经很短，为 false。</p>
      */
-    private final boolean canSplit;
+    private boolean canSplit;
 
     /**
      * 元数据
      */
-    private final SceneMetadata metadata;
+    private SceneMetadata metadata;
 }

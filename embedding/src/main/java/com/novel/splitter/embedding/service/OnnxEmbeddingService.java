@@ -1,20 +1,21 @@
 package com.novel.splitter.embedding.service;
 
 import ai.onnxruntime.OnnxTensor;
-import ai.onnxruntime.OrtException;
 import ai.onnxruntime.OrtSession;
 import com.novel.splitter.embedding.api.EmbeddingService;
 import com.novel.splitter.embedding.onnx.OnnxModelHolder;
-import com.novel.splitter.embedding.tokenizer.Tokenizer;
 import com.novel.splitter.embedding.tokenizer.TokenizedInput;
+import com.novel.splitter.embedding.tokenizer.Tokenizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 
 import java.nio.LongBuffer;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Slf4j
@@ -88,29 +89,27 @@ public class OnnxEmbeddingService implements EmbeddingService {
     }
 
     @Override
-    public java.util.List<float[]> embedBatch(java.util.List<String> texts) {
+    public List<float[]> embedBatch(List<String> texts) {
         if (texts == null || texts.isEmpty()) {
             return Collections.emptyList();
         }
-        java.util.List<float[]> results = new java.util.ArrayList<>(texts.size());
+        List<float[]> results = new ArrayList<>(texts.size());
         for (String text : texts) {
             results.add(embed(text));
         }
         return results;
     }
 
-    private float[] normalize(float[] vector) {
-        double sumSq = 0;
-        for (float v : vector) {
-            sumSq += v * v;
+    private float[] normalize(float[] v) {
+        double norm = 0.0;
+        for (float val : v) {
+            norm += val * val;
         }
-        double norm = Math.sqrt(sumSq);
+        norm = Math.sqrt(norm);
         
-        if (norm < 1e-12) return vector; // Avoid div by zero
-        
-        float[] normalized = new float[vector.length];
-        for (int i = 0; i < vector.length; i++) {
-            normalized[i] = (float) (vector[i] / norm);
+        float[] normalized = new float[v.length];
+        for (int i = 0; i < v.length; i++) {
+            normalized[i] = (float) (v[i] / norm);
         }
         return normalized;
     }

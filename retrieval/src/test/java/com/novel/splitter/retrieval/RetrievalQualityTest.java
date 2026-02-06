@@ -128,5 +128,27 @@ class RetrievalQualityTest {
         public java.util.Optional<Scene> findById(String id) {
             return java.util.Optional.ofNullable(store.get(id));
         }
+
+        @Override
+        public List<Scene> findByNovel(String novelName) {
+            return store.values().stream()
+                    .filter(s -> s.getMetadata() != null && novelName.equals(s.getMetadata().getNovel()))
+                    .collect(java.util.stream.Collectors.toList());
+        }
+
+        @Override
+        public void update(Scene scene) {
+            store.put(scene.getId(), scene);
+        }
+
+        @Override
+        public void delete(String id) {
+            store.remove(id);
+        }
+
+        @Override
+        public List<String> listVersions(String novelName) {
+            return java.util.Collections.emptyList();
+        }
     }
 }

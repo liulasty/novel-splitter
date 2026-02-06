@@ -1,252 +1,249 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Novel Splitter 测试台</title>
+    <title>Novel Splitter RAG</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f5f5f5;
+        .chat-container {
+            height: calc(100vh - 200px);
         }
-        .container {
-            background-color: white;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        h1 {
-            color: #333;
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        .form-group {
-            margin-bottom: 20px;
-        }
-        label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: bold;
-            color: #555;
-        }
-        input[type="text"] {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            box-sizing: border-box; /* 确保 padding 不会增加宽度 */
-        }
-        button {
-            background-color: #007bff;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-            width: 100%;
-            transition: background-color 0.2s;
-        }
-        button:hover {
-            background-color: #0056b3;
-        }
-        button:disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
-        }
-        #result {
-            margin-top: 20px;
-            padding: 15px;
-            border-radius: 4px;
-            display: none;
-            white-space: pre-wrap; /* 保留换行 */
-        }
-        .success {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        .error {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-        .loading {
-            text-align: center;
-            color: #666;
-            display: none;
-            margin-top: 10px;
+        .markdown-body pre {
+            background-color: #f3f4f6;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            overflow-x: auto;
         }
     </style>
 </head>
-<body>
-    <div class="container">
-        <div class="tabs" style="margin-bottom: 20px; border-bottom: 1px solid #ddd;">
-            <button class="tab-btn active" onclick="switchTab('split')" style="width: auto; background: none; color: #333; border-radius: 0; border-bottom: 2px solid #007bff;">切分任务</button>
-            <button class="tab-btn" onclick="switchTab('download')" style="width: auto; background: none; color: #666; border-radius: 0;">下载任务</button>
-        </div>
-
-        <div id="split-section">
-            <div class="form-group">
-                <label for="filePath">小说文件绝对路径</label>
-                <input type="text" id="filePath" placeholder="例如: D:/books/my_novel.txt" value="D:/soft/novel-splitter/novelSplit.md">
-                <small style="color: #666; display: block; margin-top: 5px;">* 请确保服务器(本地)有权限读取该文件</small>
+<body class="bg-gray-100 text-gray-800">
+    <div id="app" class="container mx-auto p-4 max-w-4xl">
+        <header class="mb-6 flex justify-between items-center">
+            <h1 class="text-3xl font-bold text-blue-600">Novel Splitter RAG</h1>
+            <div class="space-x-4">
+                <button @click="currentTab = 'chat'" :class="{'text-blue-600 font-bold': currentTab === 'chat', 'text-gray-500': currentTab !== 'chat'}">Chat</button>
+                <button @click="currentTab = 'ingest'" :class="{'text-blue-600 font-bold': currentTab === 'ingest', 'text-gray-500': currentTab !== 'ingest'}">Ingest</button>
             </div>
+        </header>
 
-            <div class="form-group">
-                <label for="version">切分策略版本</label>
-                <input type="text" id="version" placeholder="例如: v1-test" value="v1-web-test">
-            </div>
-
-            <button id="submitBtn" onclick="submitTask()">开始切分</button>
-        </div>
-
-        <div id="download-section" style="display: none;">
-            <div class="form-group">
-                <label for="downloadUrl">小说目录页 URL</label>
-                <input type="text" id="downloadUrl" placeholder="例如: https://www.example.com/book/123">
-                <small style="color: #666; display: block; margin-top: 5px;">* 必须在 application.yml 中配置了该站点的规则</small>
-            </div>
-
-            <div class="form-group">
-                <label for="downloadName">保存文件名 (不含后缀)</label>
-                <input type="text" id="downloadName" placeholder="例如: 我的小说">
-            </div>
-
-            <button id="downloadBtn" onclick="submitDownload()">开始下载</button>
-        </div>
-        
-        <div id="loading" class="loading">正在处理中，请稍候...</div>
-        <div id="result"></div>
-    </div>
-
-    <script>
-        function switchTab(tab) {
-            const splitSec = document.getElementById('split-section');
-            const dlSec = document.getElementById('download-section');
-            const btns = document.getElementsByClassName('tab-btn');
+        <!-- Ingest Tab -->
+        <div v-if="currentTab === 'ingest'" class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-xl font-semibold mb-4">Novel Ingestion</h2>
             
-            if (tab === 'split') {
-                splitSec.style.display = 'block';
-                dlSec.style.display = 'none';
-                btns[0].style.borderBottom = '2px solid #007bff';
-                btns[0].style.color = '#333';
-                btns[1].style.borderBottom = 'none';
-                btns[1].style.color = '#666';
-            } else {
-                splitSec.style.display = 'none';
-                dlSec.style.display = 'block';
-                btns[1].style.borderBottom = '2px solid #007bff';
-                btns[1].style.color = '#333';
-                btns[0].style.borderBottom = 'none';
-                btns[0].style.color = '#666';
-            }
-            // Clear result
-            document.getElementById('result').style.display = 'none';
-        }
+            <div class="mb-4 flex space-x-2">
+                <button @click="loadNovels" class="bg-gray-200 px-3 py-1 rounded text-sm hover:bg-gray-300">Refresh List</button>
+                <label class="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600 cursor-pointer">
+                    Upload Novel
+                    <input type="file" class="hidden" @change="uploadNovel">
+                </label>
+            </div>
 
-        async function submitDownload() {
-            const url = document.getElementById('downloadUrl').value.trim();
-            const name = document.getElementById('downloadName').value.trim();
-            const resultDiv = document.getElementById('result');
-            const loadingDiv = document.getElementById('loading');
-            const btn = document.getElementById('downloadBtn');
+            <div v-if="loadingNovels" class="text-gray-500">Loading files...</div>
+            
+            <ul v-else class="space-y-2">
+                <li v-for="novel in novels" :key="novel" class="flex justify-between items-center p-3 border rounded hover:bg-gray-50">
+                    <span class="font-medium">{{ novel }}</span>
+                    <div class="flex items-center space-x-2">
+                        <input type="number" v-model="ingestLimits[novel]" placeholder="Max Scenes (0=All)" class="border rounded px-2 py-1 w-24 text-sm">
+                        <button @click="ingestNovel(novel)" :disabled="ingesting" class="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 disabled:bg-blue-300">
+                            {{ ingesting ? 'Processing...' : 'Ingest' }}
+                        </button>
+                    </div>
+                </li>
+            </ul>
+            <div v-if="novels.length === 0 && !loadingNovels" class="text-gray-500 italic">No .txt files found in data directory.</div>
+        </div>
 
-            if (!url || !name) {
-                showResult('请输入 URL 和保存文件名', 'error');
-                return;
-            }
+        <!-- Chat Tab -->
+        <div v-if="currentTab === 'chat'" class="bg-white p-6 rounded-lg shadow-md flex flex-col h-[80vh]">
+            <div class="flex-1 overflow-y-auto mb-4 space-y-4 pr-2" ref="chatContainer">
+                <div v-for="(msg, index) in chatHistory" :key="index" :class="{'text-right': msg.role === 'user'}">
+                    <div :class="{'bg-blue-100': msg.role === 'user', 'bg-gray-100': msg.role === 'assistant', 'bg-red-100': msg.role === 'error'}" 
+                         class="inline-block p-3 rounded-lg max-w-[80%] text-left">
+                        <div class="whitespace-pre-wrap">{{ msg.content }}</div>
+                        
+                        <!-- Citations -->
+                        <div v-if="msg.citations && msg.citations.length > 0" class="mt-2 pt-2 border-t border-gray-300 text-xs text-gray-600">
+                            <div class="font-semibold mb-1">Citations:</div>
+                            <div v-for="(cite, i) in msg.citations" :key="i" class="mb-1">
+                                <span class="font-mono bg-gray-200 px-1 rounded">{{ cite.chunkId.substring(0,8) }}...</span>
+                                <span v-if="cite.reason"> - {{ cite.reason }}</span>
+                            </div>
+                        </div>
+                        <div v-if="msg.confidence" class="mt-1 text-xs text-gray-400 text-right">Confidence: {{ msg.confidence }}</div>
+                    </div>
+                </div>
+                <div v-if="isThinking" class="text-gray-500 text-sm italic">Thinking...</div>
+            </div>
 
-            resultDiv.style.display = 'none';
-            loadingDiv.style.display = 'block';
-            btn.disabled = true;
-
-            try {
-                const response = await fetch('/api/v1/download', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({url: url, name: name})
-                });
-                const data = await response.text();
-                if (response.ok) {
-                    showResult('✅ 下载成功: ' + data, 'success');
-                } else {
-                    showResult('❌ 下载失败: ' + data, 'error');
-                }
-            } catch (error) {
-                showResult('❌ 网络错误: ' + error.message, 'error');
-            } finally {
-                loadingDiv.style.display = 'none';
-                btn.disabled = false;
-            }
-        }
-
-        async function submitTask() {
-        
-        <div id="loading" class="loading">正在处理中，请稍候...</div>
-        <div id="result"></div>
+            <div class="flex space-x-2">
+                <input 
+                    v-model="questionInput" 
+                    @keyup.enter="sendMessage"
+                    type="text" 
+                    placeholder="Ask about the novel..." 
+                    class="flex-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    :disabled="isThinking"
+                >
+                <button 
+                    @click="sendMessage" 
+                    :disabled="isThinking || !questionInput.trim()"
+                    class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:bg-blue-300 font-semibold"
+                >
+                    Send
+                </button>
+            </div>
+        </div>
     </div>
 
     <script>
-        async function submitTask() {
-            const filePath = document.getElementById('filePath').value.trim();
-            const version = document.getElementById('version').value.trim();
-            const resultDiv = document.getElementById('result');
-            const loadingDiv = document.getElementById('loading');
-            const btn = document.getElementById('submitBtn');
+        const { createApp, ref, onMounted, nextTick } = Vue;
 
-            if (!filePath) {
-                showResult('请输入文件路径', 'error');
-                return;
-            }
+        createApp({
+            setup() {
+                const currentTab = ref('chat');
+                const novels = ref([]);
+                const loadingNovels = ref(false);
+                const ingestLimits = ref({});
+                const ingesting = ref(false);
 
-            // Reset UI
-            resultDiv.style.display = 'none';
-            resultDiv.className = '';
-            loadingDiv.style.display = 'block';
-            btn.disabled = true;
+                const questionInput = ref('');
+                const chatHistory = ref([
+                    { role: 'assistant', content: 'Hello! I am your Novel RAG assistant. Ask me anything about the ingested novels.' }
+                ]);
+                const isThinking = ref(false);
+                const chatContainer = ref(null);
 
-            try {
-                const response = await fetch('/api/v1/split', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        filePath: filePath,
-                        version: version
-                    })
+                // --- Ingest Logic ---
+                const loadNovels = async () => {
+                    loadingNovels.value = true;
+                    try {
+                        const res = await fetch('/api/novels');
+                        novels.value = await res.json();
+                        novels.value.forEach(n => ingestLimits.value[n] = 0); // Default 0
+                    } catch (e) {
+                        alert('Failed to load novels: ' + e.message);
+                    } finally {
+                        loadingNovels.value = false;
+                    }
+                };
+
+                const uploadNovel = async (event) => {
+                    const file = event.target.files[0];
+                    if (!file) return;
+
+                    const formData = new FormData();
+                    formData.append('file', file);
+
+                    try {
+                        const res = await fetch('/api/novels/upload', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                            alert(data.message);
+                            loadNovels(); // Refresh list
+                        } else {
+                            alert('Upload failed: ' + data.error);
+                        }
+                    } catch (e) {
+                        alert('Upload failed: ' + e.message);
+                    }
+                };
+
+                const ingestNovel = async (fileName) => {
+                    if (!confirm(`Start ingestion for ${fileName}? This might take a while.`)) return;
+                    
+                    ingesting.value = true;
+                    try {
+                        const maxScenes = ingestLimits.value[fileName] || 0;
+                        const res = await fetch('/api/novels/ingest', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ fileName, maxScenes })
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                            alert('Ingestion started! Check server logs for progress.');
+                        } else {
+                            alert('Error: ' + data.error);
+                        }
+                    } catch (e) {
+                        alert('Failed to start ingestion: ' + e.message);
+                    } finally {
+                        ingesting.value = false;
+                    }
+                };
+
+                // --- Chat Logic ---
+                const sendMessage = async () => {
+                    const q = questionInput.value.trim();
+                    if (!q || isThinking.value) return;
+
+                    // Add User Message
+                    chatHistory.value.push({ role: 'user', content: q });
+                    questionInput.value = '';
+                    isThinking.value = true;
+                    scrollToBottom();
+
+                    try {
+                        const res = await fetch('/api/chat', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ question: q, topK: 3 })
+                        });
+
+                        if (!res.ok) throw new Error('Network response was not ok');
+
+                        const data = await res.json();
+                        
+                        // Add Assistant Message
+                        chatHistory.value.push({
+                            role: 'assistant',
+                            content: data.answer,
+                            citations: data.citations,
+                            confidence: data.confidence
+                        });
+                    } catch (e) {
+                        chatHistory.value.push({ role: 'error', content: 'Error: ' + e.message });
+                    } finally {
+                        isThinking.value = false;
+                        scrollToBottom();
+                    }
+                };
+
+                const scrollToBottom = () => {
+                    nextTick(() => {
+                        if (chatContainer.value) {
+                            chatContainer.value.scrollTop = chatContainer.value.scrollHeight;
+                        }
+                    });
+                };
+
+                onMounted(() => {
+                    loadNovels();
                 });
 
-                const data = await response.text();
-                
-                if (response.ok) {
-                    showResult('✅ 成功: ' + data, 'success');
-                } else {
-                    let errorMsg = data;
-                    try {
-                        const jsonError = JSON.parse(data);
-                        errorMsg = jsonError.message || jsonError.error || data;
-                    } catch(e) {}
-                    showResult('❌ 失败 (' + response.status + '): ' + errorMsg, 'error');
-                }
-            } catch (error) {
-                showResult('❌ 网络或系统错误: ' + error.message, 'error');
-            } finally {
-                loadingDiv.style.display = 'none';
-                btn.disabled = false;
+                return {
+                    currentTab,
+                    novels,
+                    loadingNovels,
+                    ingestLimits,
+                    ingesting,
+                    loadNovels,
+                    uploadNovel,
+                    ingestNovel,
+                    questionInput,
+                    chatHistory,
+                    isThinking,
+                    sendMessage,
+                    chatContainer
+                };
             }
-        }
-
-        function showResult(msg, type) {
-            const resultDiv = document.getElementById('result');
-            resultDiv.textContent = msg;
-            resultDiv.className = type;
-            resultDiv.style.display = 'block';
-        }
+        }).mount('#app');
     </script>
 </body>
 </html>

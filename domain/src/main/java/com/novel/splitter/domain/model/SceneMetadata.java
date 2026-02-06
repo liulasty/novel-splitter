@@ -23,6 +23,9 @@ public class SceneMetadata {
     /** 小说名称 */
     private String novel;
     
+    /** 版本号 */
+    private String version;
+    
     /** 章节标题 */
     private String chapterTitle;
     

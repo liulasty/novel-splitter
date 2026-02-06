@@ -25,4 +25,30 @@ public interface SceneRepository {
      * @return Scene 对象
      */
     Optional<Scene> findById(String id);
+
+    /**
+     * 查找指定小说的所有 Scene
+     * @param novelName 小说名称
+     * @return Scene 列表
+     */
+    List<Scene> findByNovel(String novelName);
+
+    /**
+     * 更新 Scene
+     * @param scene 更新后的 Scene 对象
+     */
+    void update(Scene scene);
+
+    /**
+     * 删除 Scene
+     * @param id Scene ID
+     */
+    void delete(String id);
+
+    /**
+     * 获取指定小说的所有版本列表
+     * @param novelName 小说名称
+     * @return 版本列表
+     */
+    List<String> listVersions(String novelName);
 }

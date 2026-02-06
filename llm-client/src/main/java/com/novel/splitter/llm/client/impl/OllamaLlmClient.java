@@ -102,7 +102,15 @@ public class OllamaLlmClient implements LlmClient {
             }
 
             String content = response.getMessage().getContent();
-            log.debug("Ollama raw response: {}", content);
+            log.info("Ollama raw response: {}", content); // Changed to INFO for debugging
+
+            // Clean up Markdown code blocks if present
+            if (content.contains("```json")) {
+                content = content.replace("```json", "").replace("```", "");
+            } else if (content.contains("```")) {
+                content = content.replace("```", "");
+            }
+            content = content.trim();
 
             // 4. Parse Response to Answer object
             return objectMapper.readValue(content, Answer.class);
@@ -120,6 +128,8 @@ public class OllamaLlmClient implements LlmClient {
 
     @Data
     @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class OllamaRequest {
         private String model;
         private List<Message> messages;
@@ -130,6 +140,8 @@ public class OllamaLlmClient implements LlmClient {
 
     @Data
     @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class Message {
         private String role;
         private String content;
@@ -137,6 +149,8 @@ public class OllamaLlmClient implements LlmClient {
 
     @Data
     @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class Options {
         private Double temperature;
     }

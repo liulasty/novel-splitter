@@ -32,19 +32,30 @@ public class RagService {
     private final LlmClient llmClient;
 
     /**
+     * 提出问题并获取回答 (兼容旧接口)
+     */
+    public Answer ask(String question, int topK) {
+        return ask(question, topK, null, null);
+    }
+
+    /**
      * 提出问题并获取回答
      *
      * @param question 用户问题
      * @param topK     检索数量
+     * @param novel    小说名称 (可选)
+     * @param version  版本 (可选)
      * @return 结构化的回答
      */
-    public Answer ask(String question, int topK) {
-        log.info("Processing RAG request: query='{}', topK={}", question, topK);
+    public Answer ask(String question, int topK, String novel, String version) {
+        log.info("Processing RAG request: query='{}', topK={}, novel={}, version={}", question, topK, novel, version);
 
         // 1. 检索 (Retrieval)
         RetrievalQuery query = RetrievalQuery.builder()
                 .question(question)
                 .topK(topK)
+                .novel(novel)
+                .version(version)
                 .build();
         List<Scene> scenes = retrievalService.retrieve(query);
         log.info("Retrieved {} scenes", scenes.size());
@@ -65,6 +76,7 @@ public class RagService {
         Prompt prompt = Prompt.builder()
                 .systemInstruction("You are a helpful assistant specialized in analyzing novel content. " +
                         "Answer the user's question based ONLY on the provided context blocks. " +
+                        "Provide a detailed and comprehensive answer. " +
                         "If the answer is not in the context, strictly state that you don't know.")
                 .userQuestion(question)
                 .contextBlocks(contextBlocks)

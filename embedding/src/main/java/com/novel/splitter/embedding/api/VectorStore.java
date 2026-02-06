@@ -30,7 +30,15 @@ public interface VectorStore {
      *
      * @param queryEmbedding 查询向量
      * @param topK           返回结果数量
+     * @param filter         元数据过滤条件 (Key -> Value)
      * @return 匹配的向量记录列表 (ID + Score)
      */
-    List<VectorRecord> search(float[] queryEmbedding, int topK);
+    List<VectorRecord> search(float[] queryEmbedding, int topK, java.util.Map<String, Object> filter);
+
+    /**
+     * 相似度检索 (无过滤)
+     */
+    default List<VectorRecord> search(float[] queryEmbedding, int topK) {
+        return search(queryEmbedding, topK, java.util.Collections.emptyMap());
+    }
 }

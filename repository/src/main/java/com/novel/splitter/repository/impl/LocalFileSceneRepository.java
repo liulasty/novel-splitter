@@ -9,6 +9,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -28,9 +30,9 @@ public class LocalFileSceneRepository implements SceneRepository {
     private final Path storageRoot;
     
     // 简单的内存缓存：SceneID -> Scene
-    // 注意：在分布式或多实例环境下，这种缓存是不可靠的。但对于本地单机工具足够了。
-    // 如果数据量巨大，需要换成数据库或按需读取。
     private final Map<String, Scene> cache = new ConcurrentHashMap<>();
+    // 简单的文件映射：SceneID -> FilePath
+    private final Map<String, Path> sceneFileMap = new ConcurrentHashMap<>();
 
     public LocalFileSceneRepository(String storageRootPath) {
         this.storageRoot = Paths.get(storageRootPath);
@@ -49,6 +51,7 @@ public class LocalFileSceneRepository implements SceneRepository {
             // 更新缓存
             for (Scene scene : scenes) {
                 cache.put(scene.getId(), scene);
+                sceneFileMap.put(scene.getId(), file);
             }
         } catch (IOException e) {
             throw new RuntimeException("Failed to save scenes to " + dir, e);
@@ -62,16 +65,113 @@ public class LocalFileSceneRepository implements SceneRepository {
             return Optional.of(cache.get(id));
         }
 
-        // 2. 如果缓存未命中（例如服务重启），尝试扫描磁盘并加载
-        // 警告：这是一个非常重的操作，实际生产环境应该使用数据库
+        // 2. 如果缓存未命中，尝试扫描磁盘
         log.warn("Scene cache miss for id: {}. Scanning disk...", id);
         scanAndLoadCache();
         
         return Optional.ofNullable(cache.get(id));
     }
 
+    @Override
+    public List<Scene> findByNovel(String novelName) {
+        try {
+            scanAndLoadCache(); // 确保缓存已加载
+            return cache.values().stream()
+                    .filter(s -> s.getMetadata() != null && novelName.equals(s.getMetadata().getNovel()))
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            log.error("Error finding scenes for novel: " + novelName, e);
+            throw new RuntimeException("Error finding scenes for novel: " + novelName, e);
+        }
+    }
+
+    @Override
+    public synchronized void update(Scene scene) {
+        try {
+            if (!cache.containsKey(scene.getId())) {
+                 // 尝试加载
+                 scanAndLoadCache();
+                 if (!cache.containsKey(scene.getId())) {
+                     throw new RuntimeException("Scene not found: " + scene.getId());
+                 }
+            }
+    
+            Path file = sceneFileMap.get(scene.getId());
+            if (file == null) {
+                 throw new RuntimeException("Scene file not found for: " + scene.getId());
+            }
+    
+            // 这是一个低效实现：读取文件，替换，写回
+            Scene[] sceneArray = JsonUtils.readFromFile(file, Scene[].class);
+            List<Scene> scenes = new ArrayList<>(Arrays.asList(sceneArray));
+            
+            boolean found = false;
+            for (int i = 0; i < scenes.size(); i++) {
+                if (scenes.get(i).getId().equals(scene.getId())) {
+                    scenes.set(i, scene);
+                    found = true;
+                    break;
+                }
+            }
+            
+            if (found) {
+                JsonUtils.writeToFile(file, scenes);
+                cache.put(scene.getId(), scene);
+            }
+        } catch (Exception e) {
+            log.error("Error updating scene: " + scene.getId(), e);
+            throw new RuntimeException("Error updating scene: " + scene.getId(), e);
+        }
+    }
+
+    @Override
+    public synchronized void delete(String id) {
+        try {
+            if (!cache.containsKey(id)) {
+                 scanAndLoadCache();
+                 if (!cache.containsKey(id)) {
+                     return; // Already deleted or not exist
+                 }
+            }
+    
+            Path file = sceneFileMap.get(id);
+            if (file == null) {
+                 throw new RuntimeException("Scene file not found for: " + id);
+            }
+    
+            Scene[] sceneArray = JsonUtils.readFromFile(file, Scene[].class);
+            List<Scene> scenes = new ArrayList<>(Arrays.asList(sceneArray));
+            
+            boolean removed = scenes.removeIf(s -> s.getId().equals(id));
+            
+            if (removed) {
+                JsonUtils.writeToFile(file, scenes);
+                cache.remove(id);
+                sceneFileMap.remove(id);
+            }
+        } catch (Exception e) {
+            log.error("Error deleting scene: " + id, e);
+            throw new RuntimeException("Error deleting scene: " + id, e);
+        }
+    }
+
+    @Override
+    public List<String> listVersions(String novelName) {
+        Path novelDir = storageRoot.resolve("scene").resolve(novelName);
+        if (!Files.exists(novelDir) || !Files.isDirectory(novelDir)) {
+            return new ArrayList<>();
+        }
+        try (Stream<Path> stream = Files.list(novelDir)) {
+            return stream.filter(Files::isDirectory)
+                    .map(p -> p.getFileName().toString())
+                    .collect(Collectors.toList());
+        } catch (IOException e) {
+            log.error("Failed to list versions for novel: " + novelName, e);
+            return new ArrayList<>();
+        }
+    }
+
     private synchronized void scanAndLoadCache() {
-        // 防止并发重复扫描
         if (!cache.isEmpty()) {
             return;
         }
@@ -86,16 +186,19 @@ public class LocalFileSceneRepository implements SceneRepository {
                 .forEach(this::loadScenesFromFile);
         } catch (IOException e) {
             log.error("Failed to scan scene directory", e);
+            // We don't throw here to allow partial functionality
+        } catch (Exception e) {
+            log.error("Unexpected error during cache scan", e);
         }
     }
 
     private void loadScenesFromFile(Path path) {
         try {
-            // 使用数组方式读取，绕过泛型擦除问题
             Scene[] sceneArray = JsonUtils.readFromFile(path, Scene[].class);
             if (sceneArray != null) {
                 for (Scene scene : sceneArray) {
                     cache.put(scene.getId(), scene);
+                    sceneFileMap.put(scene.getId(), path);
                 }
             }
         } catch (Exception e) {

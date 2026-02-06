@@ -19,6 +19,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.ArrayList;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -60,6 +61,14 @@ public class ChromaVectorStore implements VectorStore {
                             map.put("chapter_index", s.getChapterIndex());
                             map.put("chapter_title", s.getChapterTitle());
                             map.put("start_paragraph_index", s.getStartParagraphIndex());
+                            if (s.getMetadata() != null) {
+                                if (s.getMetadata().getNovel() != null) {
+                                    map.put("novel", s.getMetadata().getNovel());
+                                }
+                                if (s.getMetadata().getVersion() != null) {
+                                    map.put("version", s.getMetadata().getVersion());
+                                }
+                            }
                             return map;
                         })
                         .collect(Collectors.toList());
@@ -91,7 +100,7 @@ public class ChromaVectorStore implements VectorStore {
     }
 
     @Override
-    public List<VectorRecord> search(float[] queryEmbedding, int topK) {
+    public List<VectorRecord> search(float[] queryEmbedding, int topK, Map<String, Object> filter) {
         ensureCollectionExists();
 
         List<Double> embeddingList = IntStream.range(0, queryEmbedding.length)
@@ -104,6 +113,16 @@ public class ChromaVectorStore implements VectorStore {
         request.put("n_results", topK);
         // We only need ids and distances
         request.put("include", Collections.singletonList("distances")); 
+        
+        if (filter != null && !filter.isEmpty()) {
+            if (filter.size() == 1) {
+                request.put("where", filter);
+            } else {
+                List<Map<String, Object>> andList = new ArrayList<>();
+                filter.forEach((k, v) -> andList.add(Collections.singletonMap(k, v)));
+                request.put("where", Collections.singletonMap("$and", andList));
+            }
+        }
 
         ChromaQueryResponse response = restClient.post()
                 .uri(chromaUrl + "/api/v2/tenants/" + DEFAULT_TENANT + "/databases/" + DEFAULT_DATABASE + "/collections/" + collectionId + "/query")

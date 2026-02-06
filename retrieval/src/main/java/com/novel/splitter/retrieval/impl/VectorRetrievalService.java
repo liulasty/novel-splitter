@@ -14,6 +14,8 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Map;
+import java.util.HashMap;
 
 /**
  * 基于向量的检索服务实现
@@ -35,7 +37,15 @@ public class VectorRetrievalService implements RetrievalService {
         float[] queryVector = embeddingService.embed(query.getQuestion());
 
         // 2. Vector Search
-        List<VectorRecord> records = vectorStore.search(queryVector, query.getTopK());
+        Map<String, Object> filter = new HashMap<>();
+        if (query.getNovel() != null && !query.getNovel().isBlank()) {
+            filter.put("novel", query.getNovel());
+        }
+        if (query.getVersion() != null && !query.getVersion().isBlank()) {
+            filter.put("version", query.getVersion());
+        }
+
+        List<VectorRecord> records = vectorStore.search(queryVector, query.getTopK(), filter);
         log.debug("Found {} vector matches", records.size());
 
         // 3. Hydrate (Vector -> Scene)

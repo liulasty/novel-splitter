@@ -19,6 +19,9 @@ public class RetrievalQuery {
 
     /** 小说名称 */
     private String novel;
+    
+    /** 版本号 */
+    private String version;
 
     /** 起始章节号 (包含) */
     private Integer chapterFrom;

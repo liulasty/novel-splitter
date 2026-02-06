@@ -87,12 +87,16 @@ public class InMemoryVectorStore implements VectorStore {
     }
 
     @Override
-    public List<VectorRecord> search(float[] queryEmbedding, int topK) {
+    public List<VectorRecord> search(float[] queryEmbedding, int topK, Map<String, Object> filter) {
         if (topK <= 0) {
             return Collections.emptyList();
         }
         if (vectorMap.isEmpty()) {
             return Collections.emptyList();
+        }
+        
+        if (filter != null && !filter.isEmpty()) {
+            log.warn("InMemoryVectorStore does not support filtering yet. Filter ignored: {}", filter);
         }
 
         // 使用最小堆维护 TopK (按分数升序，堆顶是最小的)

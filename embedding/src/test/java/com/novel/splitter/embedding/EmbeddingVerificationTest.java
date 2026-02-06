@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.util.Arrays;
 
 @Slf4j
-@SpringBootTest(classes = com.novel.splitter.embedding.EmbeddingTestConfig.class)
+@SpringBootTest(classes = EmbeddingTestConfig.class)
 public class EmbeddingVerificationTest {
 
     @Autowired

@@ -19,6 +19,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 @Slf4j
+@Component
 public class OnnxModelHolder {
 
     private OrtEnvironment env;
@@ -79,8 +80,12 @@ public class OnnxModelHolder {
     @PreDestroy
     public void close() {
         try {
-            if (session != null) session.close();
-            if (env != null) env.close();
+            if (session != null) {
+                session.close();
+            }
+            if (env != null) {
+                env.close();
+            }
         } catch (OrtException e) {
             log.error("Error closing ONNX resources", e);
         }
