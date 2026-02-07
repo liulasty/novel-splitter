@@ -66,7 +66,7 @@ public class RagVerificationTest {
         if (vectorStore instanceof MockVectorStore) {
             ((MockVectorStore) vectorStore).clear();
         } else if (vectorStore instanceof InMemoryVectorStore) {
-            ((InMemoryVectorStore) vectorStore).clear();
+            ((InMemoryVectorStore) vectorStore).reset();
         }
     }
 

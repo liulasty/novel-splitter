@@ -30,7 +30,9 @@ import java.util.stream.Collectors;
 public class InMemoryVectorStore implements VectorStore {
 
     private static final String STORE_FILE = "vector_store.json";
+    private static final String METADATA_FILE = "vector_metadata.json";
     private final Map<String, float[]> vectorMap = new ConcurrentHashMap<>();
+    private final Map<String, com.novel.splitter.domain.model.SceneMetadata> metadataMap = new ConcurrentHashMap<>();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @PostConstruct
@@ -47,6 +49,17 @@ public class InMemoryVectorStore implements VectorStore {
         } else {
             log.info("No existing vector store found at {}, starting fresh.", STORE_FILE);
         }
+
+        File metaFile = new File(METADATA_FILE);
+        if (metaFile.exists()) {
+            try {
+                Map<String, com.novel.splitter.domain.model.SceneMetadata> loadedMeta = objectMapper.readValue(metaFile, new TypeReference<Map<String, com.novel.splitter.domain.model.SceneMetadata>>() {});
+                metadataMap.putAll(loadedMeta);
+                log.info("Loaded {} metadata entries from {}", metadataMap.size(), METADATA_FILE);
+            } catch (IOException e) {
+                log.error("Failed to load metadata store from file", e);
+            }
+        }
     }
 
     @PreDestroy
@@ -54,6 +67,9 @@ public class InMemoryVectorStore implements VectorStore {
         try {
             objectMapper.writeValue(new File(STORE_FILE), vectorMap);
             log.info("Persisted {} vectors to {}", vectorMap.size(), STORE_FILE);
+            
+            objectMapper.writeValue(new File(METADATA_FILE), metadataMap);
+            log.info("Persisted {} metadata entries to {}", metadataMap.size(), METADATA_FILE);
         } catch (IOException e) {
             log.error("Failed to persist vector store", e);
         }
@@ -62,9 +78,55 @@ public class InMemoryVectorStore implements VectorStore {
     /**
      * 清空存储 (用于测试)
      */
-    public void clear() {
+    @Override
+    public void reset() {
         vectorMap.clear();
+        metadataMap.clear();
         log.info("Vector store cleared.");
+    }
+
+    @Override
+    public long count() {
+        return vectorMap.size();
+    }
+
+    @Override
+    public void delete(Map<String, Object> filter) {
+        if (filter == null || filter.isEmpty()) {
+            return;
+        }
+        
+        List<String> toRemove = new ArrayList<>();
+        
+        for (Map.Entry<String, com.novel.splitter.domain.model.SceneMetadata> entry : metadataMap.entrySet()) {
+            String id = entry.getKey();
+            com.novel.splitter.domain.model.SceneMetadata meta = entry.getValue();
+            
+            boolean match = true;
+            for (Map.Entry<String, Object> f : filter.entrySet()) {
+                String key = f.getKey();
+                Object expected = f.getValue();
+                Object actual = null;
+                
+                if ("novel".equals(key)) actual = meta.getNovel();
+                else if ("version".equals(key)) actual = meta.getVersion();
+                
+                if (!Objects.equals(actual, expected)) {
+                    match = false;
+                    break;
+                }
+            }
+            
+            if (match) {
+                toRemove.add(id);
+            }
+        }
+        
+        for (String id : toRemove) {
+            vectorMap.remove(id);
+            metadataMap.remove(id);
+        }
+        log.info("Deleted {} vectors matching filter {}", toRemove.size(), filter);
     }
 
     @Override
@@ -74,6 +136,9 @@ public class InMemoryVectorStore implements VectorStore {
             return;
         }
         vectorMap.put(scene.getId(), embedding);
+        if (scene.getMetadata() != null) {
+            metadataMap.put(scene.getId(), scene.getMetadata());
+        }
     }
 
     @Override
@@ -94,16 +159,39 @@ public class InMemoryVectorStore implements VectorStore {
         if (vectorMap.isEmpty()) {
             return Collections.emptyList();
         }
-        
-        if (filter != null && !filter.isEmpty()) {
-            log.warn("InMemoryVectorStore does not support filtering yet. Filter ignored: {}", filter);
-        }
 
         // 使用最小堆维护 TopK (按分数升序，堆顶是最小的)
         PriorityQueue<VectorRecord> topKQueue = new PriorityQueue<>(Comparator.comparingDouble(VectorRecord::getScore));
 
         for (Map.Entry<String, float[]> entry : vectorMap.entrySet()) {
             String id = entry.getKey();
+            
+            // Filter Logic
+            if (filter != null && !filter.isEmpty()) {
+                com.novel.splitter.domain.model.SceneMetadata meta = metadataMap.get(id);
+                if (meta == null) {
+                    // Metadata missing but filter required -> skip
+                    continue;
+                }
+                
+                boolean match = true;
+                for (Map.Entry<String, Object> f : filter.entrySet()) {
+                    String key = f.getKey();
+                    Object expected = f.getValue();
+                    Object actual = null;
+                    
+                    // Simple field mapping
+                    if ("novel".equals(key)) actual = meta.getNovel();
+                    else if ("version".equals(key)) actual = meta.getVersion();
+                    
+                    if (!Objects.equals(actual, expected)) {
+                        match = false;
+                        break;
+                    }
+                }
+                if (!match) continue;
+            }
+
             float[] vector = entry.getValue();
             
             double similarity = cosineSimilarity(queryEmbedding, vector);

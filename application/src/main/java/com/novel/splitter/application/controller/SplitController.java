@@ -1,6 +1,7 @@
 package com.novel.splitter.application.controller;
 
 import com.novel.splitter.application.service.SplitService;
+import com.novel.splitter.domain.model.dto.SplitRequest;
 import lombok.Data;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -22,11 +23,5 @@ public class SplitController {
         // 异步执行推荐使用线程池，这里为了简单演示同步执行
         splitService.executeSplit(request.getFilePath(), request.getVersion());
         return "Task completed for " + request.getFilePath();
-    }
-
-    @Data
-    public static class SplitRequest {
-        private String filePath;
-        private String version = "v1-rest";
     }
 }

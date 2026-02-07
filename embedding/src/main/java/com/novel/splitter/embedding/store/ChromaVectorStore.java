@@ -3,6 +3,8 @@ package com.novel.splitter.embedding.store;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.novel.splitter.domain.model.Scene;
+import com.novel.splitter.domain.model.embedding.chroma.ChromaCollection;
+import com.novel.splitter.domain.model.embedding.chroma.ChromaQueryResponse;
 import com.novel.splitter.embedding.api.VectorRecord;
 import com.novel.splitter.embedding.api.VectorStore;
 import lombok.Builder;
@@ -100,6 +102,72 @@ public class ChromaVectorStore implements VectorStore {
     }
 
     @Override
+    public void delete(Map<String, Object> filter) {
+        ensureCollectionExists();
+        
+        if (filter == null || filter.isEmpty()) {
+            log.warn("Delete called with empty filter, ignoring to avoid accidental data loss. Use reset() to clear all.");
+            return;
+        }
+
+        Map<String, Object> request = new HashMap<>();
+        
+        if (filter.size() == 1) {
+            request.put("where", filter);
+        } else {
+            List<Map<String, Object>> andList = new ArrayList<>();
+            filter.forEach((k, v) -> andList.add(Collections.singletonMap(k, v)));
+            request.put("where", Collections.singletonMap("$and", andList));
+        }
+
+        restClient.post()
+                .uri(chromaUrl + "/api/v2/tenants/" + DEFAULT_TENANT + "/databases/" + DEFAULT_DATABASE + "/collections/" + collectionId + "/delete")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(request)
+                .retrieve()
+                .toBodilessEntity();
+        
+        log.info("Deleted documents from ChromaDB collection '{}' with filter: {}", collectionName, filter);
+    }
+
+    @Override
+    public void reset() {
+        if (collectionId == null) {
+            ensureCollectionExists();
+        }
+        
+        // Delete the collection
+        try {
+            restClient.delete()
+                    .uri(chromaUrl + "/api/v2/tenants/" + DEFAULT_TENANT + "/databases/" + DEFAULT_DATABASE + "/collections/" + collectionName)
+                    .retrieve()
+                    .toBodilessEntity();
+            log.info("Deleted ChromaDB collection: {}", collectionName);
+        } catch (Exception e) {
+            log.warn("Failed to delete collection (might not exist): {}", e.getMessage());
+        }
+        
+        // Clear ID to force recreation
+        this.collectionId = null;
+        ensureCollectionExists();
+        log.info("Reset ChromaDB collection: {}", collectionName);
+    }
+
+    @Override
+    public long count() {
+        ensureCollectionExists();
+        try {
+            return restClient.get()
+                    .uri(chromaUrl + "/api/v2/tenants/" + DEFAULT_TENANT + "/databases/" + DEFAULT_DATABASE + "/collections/" + collectionId + "/count")
+                    .retrieve()
+                    .body(Long.class);
+        } catch (Exception e) {
+            log.error("Failed to get count from ChromaDB", e);
+            return -1;
+        }
+    }
+
+    @Override
     public List<VectorRecord> search(float[] queryEmbedding, int topK, Map<String, Object> filter) {
         ensureCollectionExists();
 
@@ -184,18 +252,5 @@ public class ChromaVectorStore implements VectorStore {
         } else {
             throw new RuntimeException("Failed to create ChromaDB collection");
         }
-    }
-
-    @Data
-    private static class ChromaCollection {
-        private String id;
-        private String name;
-    }
-
-    @Data
-    private static class ChromaQueryResponse {
-        private List<List<String>> ids;
-        private List<List<Double>> distances;
-        private List<List<Object>> metadatas;
     }
 }

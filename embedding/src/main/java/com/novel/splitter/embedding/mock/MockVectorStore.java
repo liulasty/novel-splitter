@@ -25,6 +25,22 @@ public class MockVectorStore implements VectorStore {
     // 为了 Mock 搜索返回，我们需要知道 ID 列表
     private final List<String> ids = new ArrayList<>();
 
+    @Override
+    public void delete(Map<String, Object> filter) {
+        // Mock delete
+    }
+
+    @Override
+    public void reset() {
+        index.clear();
+        ids.clear();
+    }
+
+    @Override
+    public long count() {
+        return index.size();
+    }
+
     // 清空数据，用于测试隔离
     public void clear() {
         index.clear();

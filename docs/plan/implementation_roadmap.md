@@ -56,19 +56,20 @@
 *   `Phase3IngestionTest`：端到端集成测试，验证入库与 RAG 检索。
 *   **成熟度**: **RC** (核心业务逻辑完备，已验证《九阳帝尊》前20场景的入库与检索)。
 
-### Phase 4: 应用交互层 (UI & API) (进行中 - 80%)
+### Phase 4: 应用交互层 (UI & API) (进行中 - 90%)
 **目标**: 提供用户界面，方便非技术人员使用。
 
-*   [x] **API 标准化**: 定义 RESTful API (`ChatController`, `NovelController`) 用于前端调用 (Ingest, Chat, Upload)。
-*   [x] **Web UI 开发**: 开发简单的单页应用 (Vue + Tailwind)。
+*   [x] **API 标准化**: 定义 RESTful API (`ChatController`, `NovelController`) 用于前端调用 。
+*   [x] **Web UI 开发**: 开发简单的单页应用 (Vue)。
     *   [x] **任务管理**: 支持上传小说原本 txt 格式文件，并触发入库。
-    *   [x] **知识库问答**: 类似 ChatGPT 的对话界面，展示引用的原文片段。
-*   [ ] **SSE 流式响应**: 支持打字机效果的流式回答 (暂未实现，当前为同步返回)。
+    *   [x] **知识库管理**: 新增多页面模块，支持版本查看与管理。
+    *   [x] **版本化问答**: Chat 界面支持选择特定小说及版本进行问答。
+    *   [ ] **SSE 流式响应**: 支持打字机效果的流式回答 (暂未实现，当前为同步返回)。
 
 **交付产物**:
-*   `index.html`：位于 `src/main/resources/static`，集成了 Chat 和 Ingest 功能。
+*   `index.html`：位于 `src/main/resources/static`，集成了 Chat、Ingest 和 Knowledge Base 管理功能。
 *   `NovelController` & `ChatController`：后端 API 接口。
-*   **成熟度**: **Beta** (UI 功能完备，暂不支持流式输出)。
+*   **成熟度**: **Beta** (UI 功能完备，支持多版本管理，暂不支持流式输出)。
 
 ### Phase 5: 系统优化与交付
 **目标**: 提升稳定性与易用性。

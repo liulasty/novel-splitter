@@ -1,11 +1,17 @@
 package com.novel.splitter.llm.client.impl;
 
+import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.novel.splitter.domain.model.Answer;
 import com.novel.splitter.domain.model.ContextBlock;
 import com.novel.splitter.domain.model.Prompt;
+import com.novel.splitter.domain.model.llm.ollama.Message;
+import com.novel.splitter.domain.model.llm.ollama.OllamaRequest;
+import com.novel.splitter.domain.model.llm.ollama.OllamaResponse;
+import com.novel.splitter.domain.model.llm.ollama.Options;
 import com.novel.splitter.llm.client.api.LlmClient;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -112,8 +118,32 @@ public class OllamaLlmClient implements LlmClient {
             }
             content = content.trim();
 
+            // Handle cases where LLM outputs extra text after the JSON object
+            // We use JsonParser to read only the first valid JSON object and ignore the rest
+            int firstBrace = content.indexOf('{');
+            if (firstBrace != -1) {
+                content = content.substring(firstBrace);
+            }
+
             // 4. Parse Response to Answer object
-            return objectMapper.readValue(content, Answer.class);
+            try (JsonParser parser = objectMapper.createParser(content)) {
+                Answer answer = parser.readValueAs(Answer.class);
+                
+                // Validate parsed answer
+                if (answer.getAnswer() == null) {
+                    log.warn("Parsed answer content is null. Raw response might not match Answer schema. Raw: {}", content);
+                    // Fallback: if the raw content looks like a simple string or the model failed to format, 
+                    // we might want to wrap the whole content as the answer?
+                    // For now, let's trust the schema enforcement in prompt, but maybe throw exception if strict.
+                    // Or if it parsed valid JSON but wrong fields (like chunk_id), we should error out.
+                    
+                    // If content has "chunk_id", it means model returned a chunk.
+                    if (content.contains("\"chunk_id\"")) {
+                         throw new RuntimeException("LLM returned a Chunk object instead of Answer object. Prompt instructions ignored.");
+                    }
+                }
+                return answer;
+            }
 
         } catch (JsonProcessingException e) {
             log.error("Failed to parse Ollama response JSON", e);
@@ -122,53 +152,5 @@ public class OllamaLlmClient implements LlmClient {
             log.error("Error calling Ollama API", e);
             throw new RuntimeException("LLM communication failed: " + e.getMessage(), e);
         }
-    }
-
-    // --- Inner DTOs ---
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class OllamaRequest {
-        private String model;
-        private List<Message> messages;
-        private String format;
-        private Boolean stream;
-        private Options options;
-    }
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class Message {
-        private String role;
-        private String content;
-    }
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class Options {
-        private Double temperature;
-    }
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class OllamaResponse {
-        private String model;
-        private String created_at;
-        private Message message;
-        private String done_reason;
-        private Boolean done;
-        private Long total_duration;
-        private Long load_duration;
-        private Long prompt_eval_count;
-        private Long prompt_eval_duration;
-        private Long eval_count;
-        private Long eval_duration;
     }
 }

@@ -1,14 +1,14 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Novel Splitter RAG</title>
+    <title>小说 RAG 系统</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <style>
         .chat-container {
-            height: calc(100vh - 200px);
+            height: calc(100vh - 250px);
         }
         .markdown-body pre {
             background-color: #f3f4f6;
@@ -19,117 +19,417 @@
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800">
-    <div id="app" class="container mx-auto p-4 max-w-4xl">
+    <div id="app" class="container mx-auto p-4 max-w-7xl">
         <header class="mb-6 flex justify-between items-center">
-            <h1 class="text-3xl font-bold text-blue-600">Novel Splitter RAG</h1>
+            <h1 class="text-3xl font-bold text-blue-600">小说 RAG 系统</h1>
             <div class="space-x-4">
-                <button @click="currentTab = 'chat'" :class="{'text-blue-600 font-bold': currentTab === 'chat', 'text-gray-500': currentTab !== 'chat'}">Chat</button>
-                <button @click="currentTab = 'ingest'" :class="{'text-blue-600 font-bold': currentTab === 'ingest', 'text-gray-500': currentTab !== 'ingest'}">Ingest</button>
+                <button @click="currentTab = 'chat'" :class="{'text-blue-600 font-bold border-b-2 border-blue-600': currentTab === 'chat', 'text-gray-500 hover:text-blue-500': currentTab !== 'chat'}" class="px-3 py-2">对话问答</button>
+                <button @click="currentTab = 'knowledge'" :class="{'text-blue-600 font-bold border-b-2 border-blue-600': currentTab === 'knowledge', 'text-gray-500 hover:text-blue-500': currentTab !== 'knowledge'}" class="px-3 py-2">知识库管理</button>
+                <button @click="currentTab = 'ingest'" :class="{'text-blue-600 font-bold border-b-2 border-blue-600': currentTab === 'ingest', 'text-gray-500 hover:text-blue-500': currentTab !== 'ingest'}" class="px-3 py-2">入库处理</button>
+                <button @click="currentTab = 'system'" :class="{'text-blue-600 font-bold border-b-2 border-blue-600': currentTab === 'system', 'text-gray-500 hover:text-blue-500': currentTab !== 'system'}" class="px-3 py-2">系统管理</button>
             </div>
         </header>
 
-        <!-- Ingest Tab -->
-        <div v-if="currentTab === 'ingest'" class="bg-white p-6 rounded-lg shadow-md">
-            <h2 class="text-xl font-semibold mb-4">Novel Ingestion</h2>
-            
-            <div class="mb-4 flex space-x-2">
-                <button @click="loadNovels" class="bg-gray-200 px-3 py-1 rounded text-sm hover:bg-gray-300">Refresh List</button>
-                <label class="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600 cursor-pointer">
-                    Upload Novel
-                    <input type="file" class="hidden" @change="uploadNovel">
-                </label>
-            </div>
-
-            <div v-if="loadingNovels" class="text-gray-500">Loading files...</div>
-            
-            <ul v-else class="space-y-2">
-                <li v-for="novel in novels" :key="novel" class="flex justify-between items-center p-3 border rounded hover:bg-gray-50">
-                    <span class="font-medium">{{ novel }}</span>
-                    <div class="flex items-center space-x-2">
-                        <input type="number" v-model="ingestLimits[novel]" placeholder="Max Scenes (0=All)" class="border rounded px-2 py-1 w-24 text-sm">
-                        <button @click="ingestNovel(novel)" :disabled="ingesting" class="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 disabled:bg-blue-300">
-                            {{ ingesting ? 'Processing...' : 'Ingest' }}
-                        </button>
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <!-- Main Content Area -->
+            <div class="lg:col-span-3">
+                <!-- System Tab -->
+                <div v-if="currentTab === 'system'" class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-xl font-semibold mb-4">系统管理 (ChromaDB)</h2>
+                    
+                    <!-- Stats -->
+                    <div class="mb-6 p-4 bg-gray-50 rounded border">
+                        <h3 class="font-medium text-gray-700 mb-2">数据库状态</h3>
+                        <div v-if="systemStats" class="grid grid-cols-2 gap-4 text-sm">
+                            <div><span class="text-gray-500">类型:</span> <span class="font-mono">{{ systemStats.storeType }}</span></div>
+                            <div><span class="text-gray-500">文档总数:</span> <span class="font-bold text-blue-600 text-lg">{{ systemStats.count }}</span></div>
+                        </div>
+                        <div v-else class="text-gray-400">加载中...</div>
+                        <button @click="loadSystemStats" class="mt-3 text-blue-500 text-sm hover:underline">刷新状态</button>
                     </div>
-                </li>
-            </ul>
-            <div v-if="novels.length === 0 && !loadingNovels" class="text-gray-500 italic">No .txt files found in data directory.</div>
-        </div>
 
-        <!-- Chat Tab -->
-        <div v-if="currentTab === 'chat'" class="bg-white p-6 rounded-lg shadow-md flex flex-col h-[80vh]">
-            <div class="flex-1 overflow-y-auto mb-4 space-y-4 pr-2" ref="chatContainer">
-                <div v-for="(msg, index) in chatHistory" :key="index" :class="{'text-right': msg.role === 'user'}">
-                    <div :class="{'bg-blue-100': msg.role === 'user', 'bg-gray-100': msg.role === 'assistant', 'bg-red-100': msg.role === 'error'}" 
-                         class="inline-block p-3 rounded-lg max-w-[80%] text-left">
-                        <div class="whitespace-pre-wrap">{{ msg.content }}</div>
-                        
-                        <!-- Citations -->
-                        <div v-if="msg.citations && msg.citations.length > 0" class="mt-2 pt-2 border-t border-gray-300 text-xs text-gray-600">
-                            <div class="font-semibold mb-1">Citations:</div>
-                            <div v-for="(cite, i) in msg.citations" :key="i" class="mb-1">
-                                <span class="font-mono bg-gray-200 px-1 rounded">{{ cite.chunkId.substring(0,8) }}...</span>
-                                <span v-if="cite.reason"> - {{ cite.reason }}</span>
+                    <!-- Actions -->
+                    <div class="space-y-6">
+                        <!-- Delete by Novel -->
+                        <div class="border-t pt-4">
+                            <h3 class="font-medium text-gray-800 mb-2">按小说清理</h3>
+                            <p class="text-sm text-gray-500 mb-3">删除指定小说的所有向量数据 (仅删除向量，不删文件)。</p>
+                            <div class="flex space-x-2">
+                                <input v-model="deleteNovelName" type="text" placeholder="输入小说名称 (如: jydz)" class="border rounded px-3 py-2 text-sm flex-1">
+                                <button @click="deleteByNovel" :disabled="!deleteNovelName" class="bg-red-500 text-white px-4 py-2 rounded text-sm hover:bg-red-600 disabled:bg-red-300">删除</button>
                             </div>
                         </div>
-                        <div v-if="msg.confidence" class="mt-1 text-xs text-gray-400 text-right">Confidence: {{ msg.confidence }}</div>
+
+                        <!-- Reset All -->
+                        <div class="border-t pt-4">
+                            <h3 class="font-medium text-red-800 mb-2">危险操作</h3>
+                            <div class="flex items-center justify-between bg-red-50 p-4 rounded border border-red-100">
+                                <div>
+                                    <span class="font-bold text-red-600 block">清空数据库</span>
+                                    <span class="text-xs text-red-500">这将永久删除所有向量数据，无法恢复。</span>
+                                </div>
+                                <button @click="resetDatabase" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 shadow-sm">确认清空</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div v-if="isThinking" class="text-gray-500 text-sm italic">Thinking...</div>
+
+                <!-- Ingest Tab -->
+                <div v-if="currentTab === 'ingest'" class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-xl font-semibold mb-4">小说入库</h2>
+                    
+                    <div class="mb-4 flex space-x-2">
+                        <button @click="loadNovels" class="bg-gray-200 px-3 py-1 rounded text-sm hover:bg-gray-300">刷新列表</button>
+                        <label class="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600 cursor-pointer">
+                            上传小说
+                            <input type="file" class="hidden" @change="uploadNovel">
+                        </label>
+                    </div>
+
+                    <div v-if="loadingNovels" class="text-gray-500">加载文件列表中...</div>
+                    
+                    <ul v-else class="space-y-4">
+                        <li v-for="novel in novels" :key="novel" class="flex flex-col p-3 border rounded hover:bg-gray-50">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="font-medium text-lg">{{ novel }}</span>
+                            </div>
+                            <div class="flex items-center space-x-2 bg-gray-50 p-2 rounded">
+                                <div class="flex-1">
+                                    <label class="block text-xs text-gray-500 mb-1">版本标签</label>
+                                    <input type="text" v-model="ingestConfigs[novel].version" placeholder="例如: v1" class="border rounded px-2 py-1 w-full text-sm">
+                                </div>
+                                <div class="flex-1">
+                                    <label class="block text-xs text-gray-500 mb-1">最大场景数 (0=全部)</label>
+                                    <input type="number" v-model="ingestConfigs[novel].maxScenes" placeholder="0" class="border rounded px-2 py-1 w-full text-sm">
+                                </div>
+                                <div class="flex-none self-end">
+                                    <button @click="ingestNovel(novel)" :disabled="ingesting" class="bg-blue-500 text-white px-4 py-1.5 rounded text-sm hover:bg-blue-600 disabled:bg-blue-300 transition-colors">
+                                        {{ ingesting ? '处理中...' : '开始入库' }}
+                                    </button>
+                                </div>
+                            </div>
+                        </li>
+                    </ul>
+                    <div v-if="novels.length === 0 && !loadingNovels" class="text-gray-500 italic">未找到 txt 文件。请上传文件开始。</div>
+                </div>
+
+                <!-- Knowledge Base Tab (Versions) -->
+                <div v-if="currentTab === 'knowledge'" class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-xl font-semibold mb-4">知识库版本管理</h2>
+                    <div class="mb-4">
+                         <p class="text-gray-600 text-sm">查看每本小说的可用版本。在对话界面选择版本进行问答。</p>
+                    </div>
+
+                    <div v-if="loadingVersions" class="text-gray-500">加载版本中...</div>
+                    
+                    <div v-else class="space-y-6">
+                        <div v-for="novel in novels" :key="novel" class="border rounded-lg p-4">
+                            <div class="flex justify-between items-center mb-3">
+                                <h3 class="font-bold text-lg">{{ novel }}</h3>
+                                <button @click="fetchVersions(novel)" class="text-blue-500 text-sm hover:underline">刷新版本</button>
+                            </div>
+                            
+                            <div v-if="novelVersions[novel] && novelVersions[novel].length > 0">
+                                <table class="min-w-full text-sm text-left text-gray-500">
+                                    <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+                                        <tr>
+                                            <th scope="col" class="px-4 py-2">版本标签</th>
+                                            <th scope="col" class="px-4 py-2">状态</th>
+                                            <th scope="col" class="px-4 py-2">操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="ver in novelVersions[novel]" :key="ver" class="bg-white border-b hover:bg-gray-50">
+                                            <td class="px-4 py-2 font-medium text-gray-900">{{ ver }}</td>
+                                            <td class="px-4 py-2"><span class="bg-green-100 text-green-800 text-xs font-medium mr-2 px-2.5 py-0.5 rounded">就绪</span></td>
+                                            <td class="px-4 py-2">
+                                                <button @click="selectForChat(novel, ver)" class="text-blue-600 hover:underline">以此版本对话</button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div v-else class="text-gray-400 italic text-sm p-2 bg-gray-50 rounded">
+                                未找到已入库版本。请前往“入库处理”标签页处理。
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chat Tab -->
+                <div v-if="currentTab === 'chat'" class="bg-white p-6 rounded-lg shadow-md flex flex-col h-[85vh]">
+                    <!-- Chat Config Bar -->
+                    <div class="flex space-x-4 mb-4 border-b pb-4 items-end">
+                        <div class="flex-1">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">选择小说</label>
+                            <select v-model="selectedNovel" @change="onNovelSelect" class="block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm focus:ring-blue-500 focus:border-blue-500">
+                                <option value="" disabled>-- 请选择小说 --</option>
+                                <option v-for="n in novels" :key="n" :value="n">{{ n }}</option>
+                            </select>
+                        </div>
+                        <div class="flex-1">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">选择版本</label>
+                            <select v-model="selectedVersion" :disabled="!selectedNovel" class="block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100">
+                                <option value="" disabled>-- 请选择版本 --</option>
+                                <option v-for="v in currentNovelVersions" :key="v" :value="v">{{ v }}</option>
+                            </select>
+                        </div>
+                        <div class="w-32">
+                             <label class="block text-sm font-medium text-gray-700 mb-1" title="检索的上下文片段数量">引用数量 (TopK)</label>
+                             <input type="number" v-model="topK" min="1" max="20" class="block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div class="text-sm text-gray-500 pb-2">
+                            <span v-if="selectedNovel && selectedVersion" class="text-green-600 font-medium">准备就绪！</span>
+                            <span v-else class="text-amber-600">请选择小说和版本</span>
+                        </div>
+                    </div>
+
+                    <!-- Chat History -->
+                    <div class="flex-1 overflow-y-auto mb-4 space-y-4 pr-2" ref="chatContainer">
+                        <div v-if="chatHistory.length === 0" class="text-center text-gray-400 mt-10">
+                            请在上方选择小说和版本以开始对话。
+                        </div>
+                        <div v-for="(msg, index) in chatHistory" :key="index" :class="{'text-right': msg.role === 'user'}">
+                            <div :class="{'bg-blue-100': msg.role === 'user', 'bg-gray-100': msg.role === 'assistant', 'bg-red-100': msg.role === 'error'}" 
+                                 class="inline-block p-3 rounded-lg max-w-[80%] text-left shadow-sm">
+                                <div class="whitespace-pre-wrap text-sm leading-relaxed">{{ msg.content }}</div>
+                                
+                                <!-- Citations -->
+                                <div v-if="msg.citations && msg.citations.length > 0" class="mt-2 pt-2 border-t border-gray-300 text-xs text-gray-600">
+                                    <div class="font-semibold mb-1 text-gray-700">参考来源：</div>
+                                    <div v-for="(cite, i) in msg.citations" :key="i" class="mb-1 flex items-start">
+                                        <span class="font-mono bg-white border px-1 rounded mr-2 text-blue-600 shrink-0">{{ cite.chunkId }}</span>
+                                        <span v-if="cite.reason" class="text-gray-500">{{ cite.reason }}</span>
+                                    </div>
+                                </div>
+                                <div v-if="msg.confidence" class="mt-1 text-xs text-gray-400 text-right">置信度：{{ msg.confidence }}</div>
+                            </div>
+                        </div>
+                        <div v-if="isThinking" class="flex items-center space-x-2 text-gray-500 text-sm italic">
+                            <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                            <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+                            <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.4s"></div>
+                            <span>思考中...</span>
+                        </div>
+                    </div>
+
+                    <!-- Input Area -->
+                    <div class="flex space-x-2">
+                        <input 
+                            v-model="questionInput" 
+                            @keyup.enter="sendMessage"
+                            type="text" 
+                            placeholder="请输入问题..." 
+                            class="flex-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                            :disabled="isThinking || !selectedVersion"
+                        >
+                        <button 
+                            @click="sendMessage" 
+                            :disabled="isThinking || !questionInput.trim() || !selectedVersion"
+                            class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:bg-blue-300 font-semibold shadow-sm transition-colors"
+                        >
+                            发送
+                        </button>
+                    </div>
+                </div>
             </div>
 
-            <div class="flex space-x-2">
-                <input 
-                    v-model="questionInput" 
-                    @keyup.enter="sendMessage"
-                    type="text" 
-                    placeholder="Ask about the novel..." 
-                    class="flex-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    :disabled="isThinking"
-                >
-                <button 
-                    @click="sendMessage" 
-                    :disabled="isThinking || !questionInput.trim()"
-                    class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:bg-blue-300 font-semibold"
-                >
-                    Send
-                </button>
+            <!-- Sidebar -->
+            <div class="lg:col-span-1">
+                <div class="bg-white p-6 rounded-lg shadow-md h-full">
+                    <h3 class="font-bold text-lg mb-4 text-gray-700 border-b pb-2">功能说明</h3>
+                    
+                    <div v-if="currentTab === 'chat'" class="space-y-4 text-sm text-gray-600">
+                        <div>
+                            <h4 class="font-semibold text-gray-900 mb-1">🔍 对话问答</h4>
+                            <p>基于 RAG 技术，针对选定的小说内容进行精准回答。</p>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold text-gray-900 mb-1">💡 使用技巧</h4>
+                            <ul class="list-disc list-inside space-y-1">
+                                <li>必须先选择<b>小说</b>和<b>版本</b></li>
+                                <li>提问具体的情节、人物或细节</li>
+                                <li>系统会列出回答依据的原文片段</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold text-gray-900 mb-1">📝 示例问题</h4>
+                            <ul class="list-disc list-inside space-y-1 bg-gray-50 p-2 rounded">
+                                <li>"主角第一次遇到女主角是在哪里？"</li>
+                                <li>"这次战斗的结果是什么？"</li>
+                                <li>"那个神秘人到底是谁？"</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div v-if="currentTab === 'knowledge'" class="space-y-4 text-sm text-gray-600">
+                        <div>
+                            <h4 class="font-semibold text-gray-900 mb-1">📚 知识库管理</h4>
+                            <p>查看和管理已入库的小说版本。</p>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold text-gray-900 mb-1">🔧 功能介绍</h4>
+                            <ul class="list-disc list-inside space-y-1">
+                                <li><b>版本列表</b>：展示该小说所有已处理的知识库版本</li>
+                                <li><b>状态</b>：显示版本是否可用</li>
+                                <li><b>以此版本对话</b>：一键跳转到对话页面并选中该版本</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div v-if="currentTab === 'ingest'" class="space-y-4 text-sm text-gray-600">
+                        <div>
+                            <h4 class="font-semibold text-gray-900 mb-1">📥 入库处理</h4>
+                            <p>将小说文本文件处理为向量知识库。</p>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold text-gray-900 mb-1">🚀 操作步骤</h4>
+                            <ol class="list-decimal list-inside space-y-1">
+                                <li>点击<b>上传小说</b>添加 txt 文件</li>
+                                <li>输入<b>版本标签</b> (如 v1, test)</li>
+                                <li>点击<b>开始入库</b></li>
+                                <li>等待处理完成 (可在控制台查看日志)</li>
+                            </ol>
+                        </div>
+                        <div class="bg-yellow-50 p-2 rounded border border-yellow-200">
+                            <span class="font-semibold text-yellow-800">注意：</span>
+                            <p class="text-xs text-yellow-700 mt-1">入库过程可能较慢，取决于小说长度和硬件性能。请耐心等待。</p>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
+
     <script>
-        const { createApp, ref, onMounted, nextTick } = Vue;
+        const { createApp, ref, onMounted, computed, nextTick, watch } = Vue;
 
         createApp({
             setup() {
                 const currentTab = ref('chat');
-                const novels = ref([]);
+                const novels = ref([]); // List of novel filenames
                 const loadingNovels = ref(false);
-                const ingestLimits = ref({});
+                const loadingVersions = ref(false);
+                
+                // Ingest State
+                const ingestConfigs = ref({}); // { 'novel.txt': { maxScenes: 0, version: 'v1' } }
                 const ingesting = ref(false);
 
+                // Knowledge Base State
+                const novelVersions = ref({}); // { 'novel.txt': ['v1', 'v2'] }
+
+                // Chat State
+                const selectedNovel = ref('');
+                const selectedVersion = ref('');
+                const topK = ref(8); // Default increased to 8
+                const currentNovelVersions = computed(() => {
+                    return selectedNovel.value ? (novelVersions.value[selectedNovel.value] || []) : [];
+                });
+
                 const questionInput = ref('');
-                const chatHistory = ref([
-                    { role: 'assistant', content: 'Hello! I am your Novel RAG assistant. Ask me anything about the ingested novels.' }
-                ]);
+                const chatHistory = ref([]);
                 const isThinking = ref(false);
                 const chatContainer = ref(null);
 
-                // --- Ingest Logic ---
+                // --- Common Logic ---
                 const loadNovels = async () => {
                     loadingNovels.value = true;
                     try {
                         const res = await fetch('/api/novels');
-                        novels.value = await res.json();
-                        novels.value.forEach(n => ingestLimits.value[n] = 0); // Default 0
+                        const list = await res.json();
+                        novels.value = list;
+                        
+                        // Initialize configs
+                        list.forEach(n => {
+                            if (!ingestConfigs.value[n]) {
+                                ingestConfigs.value[n] = { maxScenes: 0, version: 'v1' };
+                            }
+                            // Pre-fetch versions for knowledge base
+                            fetchVersions(n); 
+                        });
                     } catch (e) {
-                        alert('Failed to load novels: ' + e.message);
+                        console.error('Failed to load novels:', e);
                     } finally {
                         loadingNovels.value = false;
                     }
                 };
 
+                const fetchVersions = async (novelName) => {
+                    try {
+                        // Strip .txt extension for Knowledge Base API calls
+                        const kbName = novelName.replace(/\.txt$/i, '');
+                        const res = await fetch(`/api/knowledge/${encodeURIComponent(kbName)}/versions`);
+                        if (res.ok) {
+                            const versions = await res.json();
+                            novelVersions.value[novelName] = versions;
+                        } else {
+                            novelVersions.value[novelName] = [];
+                        }
+                    } catch (e) {
+                        console.error(`Failed to load versions for ${novelName}`, e);
+                        novelVersions.value[novelName] = [];
+                    }
+                };
+
+                // --- System Management Logic ---
+                const systemStats = ref(null);
+                const deleteNovelName = ref('');
+
+                const loadSystemStats = async () => {
+                    try {
+                        const res = await fetch('/api/admin/chroma/stats');
+                        if (res.ok) {
+                            systemStats.value = await res.json();
+                        }
+                    } catch (e) {
+                        console.error('Failed to load system stats:', e);
+                    }
+                };
+
+                const deleteByNovel = async () => {
+                    const name = deleteNovelName.value.trim();
+                    if (!name) return;
+                    if (!confirm(`确定要删除小说 "${name}" 的所有向量数据吗？此操作不可撤销。`)) return;
+
+                    try {
+                        const res = await fetch('/api/admin/chroma/delete', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ novel: name })
+                        });
+                        if (res.ok) {
+                            alert(`已删除 "${name}" 的相关数据。`);
+                            deleteNovelName.value = '';
+                            loadSystemStats();
+                        } else {
+                            const err = await res.json();
+                            alert('删除失败: ' + (err.error || '未知错误'));
+                        }
+                    } catch (e) {
+                        alert('请求失败: ' + e.message);
+                    }
+                };
+
+                const resetDatabase = async () => {
+                    if (!confirm('警告：确定要清空整个数据库吗？所有向量数据将丢失！')) return;
+                    if (!confirm('再次确认：此操作不可恢复！真的要清空吗？')) return;
+
+                    try {
+                        const res = await fetch('/api/admin/chroma/reset', { method: 'POST' });
+                        if (res.ok) {
+                            alert('数据库已重置。');
+                            loadSystemStats();
+                        } else {
+                            const err = await res.json();
+                            alert('重置失败: ' + (err.error || '未知错误'));
+                        }
+                    } catch (e) {
+                        alert('请求失败: ' + e.message);
+                    }
+                };
+
+                // --- Ingest Logic ---
                 const uploadNovel = async (event) => {
                     const file = event.target.files[0];
                     if (!file) return;
@@ -147,41 +447,68 @@
                             alert(data.message);
                             loadNovels(); // Refresh list
                         } else {
-                            alert('Upload failed: ' + data.error);
+                            alert('上传失败: ' + data.error);
                         }
                     } catch (e) {
-                        alert('Upload failed: ' + e.message);
+                        alert('上传失败: ' + e.message);
                     }
                 };
 
                 const ingestNovel = async (fileName) => {
-                    if (!confirm(`Start ingestion for ${fileName}? This might take a while.`)) return;
+                    if (!confirm(`是否开始处理 ${fileName}？这可能需要一些时间。`)) return;
                     
+                    const config = ingestConfigs.value[fileName];
+                    const maxScenes = config.maxScenes || 0;
+                    const version = config.version || 'v1';
+
                     ingesting.value = true;
                     try {
-                        const maxScenes = ingestLimits.value[fileName] || 0;
                         const res = await fetch('/api/novels/ingest', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ fileName, maxScenes })
+                            body: JSON.stringify({ fileName, maxScenes, version })
                         });
                         const data = await res.json();
                         if (res.ok) {
-                            alert('Ingestion started! Check server logs for progress.');
+                            alert('入库任务已开始！请查看服务器日志关注进度。');
+                            // Refresh versions after a short delay or assume it takes time
+                            setTimeout(() => fetchVersions(fileName), 2000);
                         } else {
-                            alert('Error: ' + data.error);
+                            alert('错误: ' + data.error);
                         }
                     } catch (e) {
-                        alert('Failed to start ingestion: ' + e.message);
+                        alert('无法开始入库: ' + e.message);
                     } finally {
                         ingesting.value = false;
                     }
                 };
 
+                // --- Knowledge Base Logic ---
+                const selectForChat = (novel, version) => {
+                    selectedNovel.value = novel;
+                    selectedVersion.value = version;
+                    currentTab.value = 'chat';
+                    chatHistory.value = []; // Clear history on switch? Or keep it.
+                    chatHistory.value.push({ role: 'assistant', content: `已切换到 ${novel} (${version})。有什么可以帮您？` });
+                };
+
                 // --- Chat Logic ---
+                const onNovelSelect = () => {
+                    selectedVersion.value = '';
+                    if (selectedNovel.value) {
+                        fetchVersions(selectedNovel.value).then(() => {
+                            // Auto-select latest version if available
+                            const versions = novelVersions.value[selectedNovel.value];
+                            if (versions && versions.length > 0) {
+                                selectedVersion.value = versions[versions.length - 1]; // Assuming appended order
+                            }
+                        });
+                    }
+                };
+
                 const sendMessage = async () => {
                     const q = questionInput.value.trim();
-                    if (!q || isThinking.value) return;
+                    if (!q || isThinking.value || !selectedVersion.value) return;
 
                     // Add User Message
                     chatHistory.value.push({ role: 'user', content: q });
@@ -193,7 +520,12 @@
                         const res = await fetch('/api/chat', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ question: q, topK: 3 })
+                            body: JSON.stringify({ 
+                                question: q, 
+                                topK: topK.value,
+                                novel: selectedNovel.value.replace(/\.txt$/i, ''),
+                                version: selectedVersion.value
+                            })
                         });
 
                         if (!res.ok) throw new Error('Network response was not ok');
@@ -208,7 +540,7 @@
                             confidence: data.confidence
                         });
                     } catch (e) {
-                        chatHistory.value.push({ role: 'error', content: 'Error: ' + e.message });
+                        chatHistory.value.push({ role: 'error', content: '错误: ' + e.message });
                     } finally {
                         isThinking.value = false;
                         scrollToBottom();
@@ -223,24 +555,55 @@
                     });
                 };
 
+                // Auto-refresh stats when switching to system tab
+                watch(currentTab, (val) => {
+                    if (val === 'system') {
+                        loadSystemStats();
+                    }
+                });
+
+                // Persist TopK setting
+                watch(topK, (val) => {
+                    localStorage.setItem('rag_topk', val);
+                });
+
                 onMounted(() => {
                     loadNovels();
+                    const savedTopK = localStorage.getItem('rag_topk');
+                    if (savedTopK) {
+                        topK.value = parseInt(savedTopK);
+                    }
                 });
 
                 return {
                     currentTab,
                     novels,
                     loadingNovels,
-                    ingestLimits,
+                    loadingVersions,
+                    ingestConfigs,
                     ingesting,
-                    loadNovels,
-                    uploadNovel,
-                    ingestNovel,
+                    novelVersions,
+                    selectedNovel,
+                    selectedVersion,
+                    topK,
+                    currentNovelVersions,
                     questionInput,
                     chatHistory,
                     isThinking,
+                    chatContainer,
+                    loadNovels,
+                    uploadNovel,
+                    ingestNovel,
+                    fetchVersions,
+                    selectForChat,
+                    onNovelSelect,
                     sendMessage,
-                    chatContainer
+                    // System
+                    systemStats,
+                    deleteNovelName,
+                    loadSystemStats,
+                    deleteByNovel,
+                    resetDatabase
                 };
             }
         }).mount('#app');

@@ -13,6 +13,10 @@
 
     <!-- Domain 层不依赖任何框架 -->
     <dependencies>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+        </dependency>
     </dependencies>
 
 </project>

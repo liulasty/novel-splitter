@@ -1,6 +1,8 @@
 package com.novel.splitter.application.controller;
 
 import com.novel.splitter.application.service.DownloadService;
+import com.novel.splitter.domain.model.dto.DownloadRequest;
+import com.novel.splitter.domain.model.dto.DownloadResponse;
 import lombok.Data;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -22,22 +24,5 @@ public class DownloadController {
         // 同步执行（注意：下载耗时较长，生产环境应异步）
         String savedPath = downloadService.downloadNovel(request.getUrl(), request.getName());
         return new DownloadResponse("Success", savedPath);
-    }
-
-    @Data
-    public static class DownloadRequest {
-        private String url;
-        private String name;
-    }
-
-    @Data
-    public static class DownloadResponse {
-        private String status;
-        private String savedPath;
-
-        public DownloadResponse(String status, String savedPath) {
-            this.status = status;
-            this.savedPath = savedPath;
-        }
     }
 }

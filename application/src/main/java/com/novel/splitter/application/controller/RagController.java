@@ -2,6 +2,7 @@ package com.novel.splitter.application.controller;
 
 import com.novel.splitter.application.service.rag.RagService;
 import com.novel.splitter.domain.model.Answer;
+import com.novel.splitter.domain.model.dto.RagRequest;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -19,13 +20,5 @@ public class RagController {
     @PostMapping
     public Answer ask(@RequestBody RagRequest request) {
         return ragService.ask(request.getQuestion(), request.getTopK() > 0 ? request.getTopK() : 3, request.getNovel(), request.getVersion());
-    }
-
-    @Data
-    public static class RagRequest {
-        private String question;
-        private int topK = 3;
-        private String novel;
-        private String version;
     }
 }

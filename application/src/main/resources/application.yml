@@ -14,7 +14,8 @@ embedding:
   store:
     type: chroma # memory or chroma
   onnx:
-    # Optional: Configure external model paths
+    # 直接指向您现有的文件
+    model-path: "d:/soft/novel-splitter/embedding/src/main/resources/embedding/model.onnx"
     # model-path: "D:/path/to/model.onnx"
     # vocab-path: "D:/path/to/vocab.txt"
 chroma:

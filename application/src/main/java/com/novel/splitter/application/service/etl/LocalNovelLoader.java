@@ -27,13 +27,16 @@ public class LocalNovelLoader {
     public Novel load(Path path) throws IOException {
         log.info("Loading novel from: {}", path);
         String fileName = path.getFileName().toString();
+        // Use the full filename without extension as the title to ensure uniqueness and matching with storage
         String title = fileName.replace(".txt", "");
         String author = "Unknown"; 
         
-        if (title.contains("-")) {
-            String[] parts = title.split("-");
-            title = parts[0];
-            author = parts.length > 1 ? parts[1] : "Unknown";
+        // Optional: Parse author if needed for metadata, but keep title as the identifier
+        if (fileName.contains("-")) {
+            String[] parts = fileName.replace(".txt", "").split("-");
+            if (parts.length > 1) {
+                author = parts[1];
+            }
         }
 
         List<Chapter> chapters = new ArrayList<>();

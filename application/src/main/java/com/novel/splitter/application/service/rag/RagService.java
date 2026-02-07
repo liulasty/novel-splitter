@@ -60,6 +60,12 @@ public class RagService {
         List<Scene> scenes = retrievalService.retrieve(query);
         log.info("Retrieved {} scenes", scenes.size());
 
+        for (int i = 0; i < scenes.size(); i++) {
+            Scene scene = scenes.get(i);
+            log.info("Scene[{}]: ID={}, Chapter={}, Metadata={}", i, scene.getId(), scene.getChapterTitle(), scene.getMetadata());
+            log.info("Scene[{}] Content:\n{}", i, scene.getText());
+        }
+
         // 2. 组装上下文 (Context Assembly)
         // 注意：ContextAssembler 目前返回 String，但我们需要 List<ContextBlock>。
         // 由于 ContextAssembler 设计时主要为了纯文本拼接，这里我们需要手动转换一下，
@@ -74,18 +80,45 @@ public class RagService {
 
         // 3. 构建 Prompt
         Prompt prompt = Prompt.builder()
-                .systemInstruction("You are a helpful assistant specialized in analyzing novel content. " +
-                        "Answer the user's question based ONLY on the provided context blocks. " +
-                        "Provide a detailed and comprehensive answer. " +
-                        "If the answer is not in the context, strictly state that you don't know.")
+                .systemInstruction("你是一个专门分析小说内容的智能助手。" +
+                        "你的任务是仅根据提供的上下文块回答用户的问题。" +
+                        "综合相关细节提供全面的回答。\n" +
+                        "如果上下文中没有答案，请明确说明你不知道。\n\n" +
+                        "### 响应格式 ###\n" +
+                        "你必须以有效的 JSON 格式返回结果。不要返回 Markdown 或代码块。\n" +
+                        "JSON 对象必须严格遵循以下 Schema：\n" +
+                        "{\n" +
+                        "  \"answer\": \"(string) 对问题的详细回答\",\n" +
+                        "  \"citations\": [\n" +
+                        "    {\n" +
+                        "      \"chunkId\": \"(string) 引用来源的 chunkId (必须与上下文中提供的 ID 完全一致)\",\n" +
+                        "      \"reason\": \"(string) 简要解释为何该块相关\"\n" +
+                        "    }\n" +
+                        "  ],\n" +
+                        "  \"confidence\": (number) 0.0 到 1.0 表示置信度\n" +
+                        "}\n" +
+                        "禁止包含其他字段。绝对禁止返回原始上下文块（如 content 字段）。")
                 .userQuestion(question)
                 .contextBlocks(contextBlocks)
-                .outputConstraint("Return the answer in JSON format with fields: answer, citations, confidence.")
+                .outputConstraint("JSON 对象，包含字段：answer, citations (list of {chunkId, reason}), confidence。")
                 .build();
 
         // 4. LLM 生成 (Generation)
-        Answer answer = llmClient.chat(prompt);
+        Answer answer;
+        try {
+            answer = llmClient.chat(prompt);
+        } catch (Exception e) {
+            log.error("LLM generation failed or returned invalid format: {}", e.getMessage());
+            // 兜底默认对象
+            answer = Answer.builder()
+                    .answer("很抱歉，生成回答时出现系统错误或格式异常。")
+                    .citations(Collections.emptyList())
+                    .confidence(0.0)
+                    .build();
+        }
+        
         log.info("Generated answer with confidence: {}", answer.getConfidence());
+        log.info("Full Answer Object: {}", answer);
 
         // 5. 校验引用完整性 (Validation)
         validateCitations(answer, contextBlocks);

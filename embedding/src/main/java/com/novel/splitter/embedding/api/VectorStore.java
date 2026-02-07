@@ -41,4 +41,21 @@ public interface VectorStore {
     default List<VectorRecord> search(float[] queryEmbedding, int topK) {
         return search(queryEmbedding, topK, java.util.Collections.emptyMap());
     }
+
+    /**
+     * 删除匹配条件的向量
+     *
+     * @param filter 过滤条件
+     */
+    void delete(java.util.Map<String, Object> filter);
+
+    /**
+     * 清空存储
+     */
+    void reset();
+
+    /**
+     * 获取总数
+     */
+    long count();
 }
