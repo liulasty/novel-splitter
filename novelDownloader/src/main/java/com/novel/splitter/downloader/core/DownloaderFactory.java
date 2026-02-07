@@ -2,7 +2,7 @@ package com.novel.splitter.downloader.core;
 
 import com.novel.splitter.downloader.api.NovelDownloader;
 import com.novel.splitter.downloader.impl.GeneralJsoupDownloader;
-import com.novel.splitter.downloader.model.SiteRule;
+import com.novel.splitter.domain.model.downloader.SiteRule;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;

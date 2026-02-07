@@ -1,7 +1,7 @@
 package com.novel.splitter.embedding.mock;
 
 import com.novel.splitter.domain.model.Scene;
-import com.novel.splitter.embedding.api.VectorRecord;
+import com.novel.splitter.domain.model.embedding.VectorRecord;
 import com.novel.splitter.embedding.api.VectorStore;
 import lombok.extern.slf4j.Slf4j;
 

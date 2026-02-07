@@ -6,6 +6,7 @@ import com.novel.splitter.llm.client.impl.MockLlmClient;
 import com.novel.splitter.llm.client.impl.OllamaLlmClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -17,6 +18,7 @@ import org.springframework.context.annotation.Configuration;
  * </p>
  */
 @Configuration
+@EnableConfigurationProperties(OllamaProperties.class)
 public class LlmClientConfig {
 
     @Bean
@@ -28,9 +30,8 @@ public class LlmClientConfig {
     @Bean
     @ConditionalOnProperty(name = "novel.llm.provider", havingValue = "ollama")
     public LlmClient ollamaLlmClient(
-            @Value("${llm.ollama.url:http://localhost:11434}") String ollamaUrl,
-            @Value("${llm.ollama.model:qwen2.5:7b}") String modelName,
+            OllamaProperties ollamaProperties,
             ObjectMapper objectMapper) {
-        return new OllamaLlmClient(ollamaUrl, modelName, objectMapper);
+        return new OllamaLlmClient(ollamaProperties, objectMapper);
     }
 }

@@ -29,7 +29,7 @@ class LocalNovelLoaderTest {
         System.out.println("Total Paragraphs: " + novel.getParagraphs().size());
         System.out.println("Total Chapters: " + novel.getChapters().size());
 
-        assertEquals("九阳帝尊", novel.getTitle());
+        assertEquals("九阳帝尊-剑棕", novel.getTitle());
         assertEquals("剑棕", novel.getAuthor());
         assertTrue(novel.getChapters().size() > 0, "Should have chapters");
 

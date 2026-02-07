@@ -1,6 +1,7 @@
 package com.novel.splitter.embedding.api;
 
 import com.novel.splitter.domain.model.Scene;
+import com.novel.splitter.domain.model.embedding.VectorRecord;
 
 import java.util.List;
 

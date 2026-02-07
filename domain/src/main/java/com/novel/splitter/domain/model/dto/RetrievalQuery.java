@@ -1,4 +1,4 @@
-package com.novel.splitter.retrieval.api;
+package com.novel.splitter.domain.model.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

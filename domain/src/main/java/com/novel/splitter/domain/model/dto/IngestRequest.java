@@ -1,4 +1,4 @@
-package com.novel.splitter.application.dto;
+package com.novel.splitter.domain.model.dto;
 
 import lombok.Data;
 

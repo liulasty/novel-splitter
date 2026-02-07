@@ -1,6 +1,6 @@
 package com.novel.splitter.retrieval.impl;
 
-import com.novel.splitter.retrieval.api.RetrievalQuery;
+import com.novel.splitter.domain.model.dto.RetrievalQuery;
 import org.springframework.stereotype.Component;
 
 /**

@@ -11,6 +11,7 @@ import com.novel.splitter.domain.model.llm.ollama.OllamaRequest;
 import com.novel.splitter.domain.model.llm.ollama.OllamaResponse;
 import com.novel.splitter.domain.model.llm.ollama.Options;
 import com.novel.splitter.llm.client.api.LlmClient;
+import com.novel.splitter.llm.client.config.OllamaProperties;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -36,17 +37,20 @@ public class OllamaLlmClient implements LlmClient {
     private final RestClient restClient;
     private final String modelName;
     private final ObjectMapper objectMapper;
+    private final OllamaProperties properties;
 
     public OllamaLlmClient(
-            @Value("${llm.ollama.url:http://localhost:11434}") String ollamaUrl,
-            @Value("${llm.ollama.model:qwen2.5:7b}") String modelName,
+            OllamaProperties properties,
             ObjectMapper objectMapper) {
+        String url = properties.getUrl() != null ? properties.getUrl() : "http://localhost:11434";
+        this.modelName = properties.getModel() != null ? properties.getModel() : "qwen2.5:7b";
+        
         this.restClient = RestClient.builder()
-                .baseUrl(ollamaUrl)
+                .baseUrl(url)
                 .build();
-        this.modelName = modelName;
+        this.properties = properties;
         this.objectMapper = objectMapper;
-        log.info("Initialized OllamaLlmClient with url: {}, model: {}", ollamaUrl, modelName);
+        log.info("Initialized OllamaLlmClient with url: {}, model: {}", url, modelName);
     }
 
     @Override
@@ -81,17 +85,33 @@ public class OllamaLlmClient implements LlmClient {
             }
             userContent.append("\n");
         }
-        userContent.append("Question: ").append(prompt.getUserQuestion());
+        userContent.append("User Question: ").append(prompt.getUserQuestion());
+        userContent.append("\n\nPlease answer the question in the specified JSON format.");
 
         messages.add(Message.builder().role("user").content(userContent.toString()).build());
 
         // 2. Build Request
+        Options.OptionsBuilder optionsBuilder = Options.builder();
+        String reqFormat = "json";
+
+        if (properties.getOptions() != null) {
+            OllamaProperties.OptionsConfig cfg = properties.getOptions();
+            if (cfg.getTemperature() != null) optionsBuilder.temperature(cfg.getTemperature());
+            if (cfg.getNumCtx() != null) optionsBuilder.numCtx(cfg.getNumCtx());
+            if (cfg.getNumThreads() != null) optionsBuilder.numThread(cfg.getNumThreads());
+            if (cfg.getMaxTokens() != null) optionsBuilder.numPredict(cfg.getMaxTokens());
+            if (cfg.getNumGpu() != null) optionsBuilder.numGpu(cfg.getNumGpu());
+            if (cfg.getFormat() != null) reqFormat = cfg.getFormat();
+        } else {
+             optionsBuilder.temperature(0.7); // Default if no options provided
+        }
+
         OllamaRequest request = OllamaRequest.builder()
                 .model(modelName)
                 .messages(messages)
-                .format("json")
+                .format(reqFormat)
                 .stream(false)
-                .options(Options.builder().temperature(0.7).build()) // Default temperature
+                .options(optionsBuilder.build())
                 .build();
 
         try {
@@ -129,19 +149,51 @@ public class OllamaLlmClient implements LlmClient {
             try (JsonParser parser = objectMapper.createParser(content)) {
                 Answer answer = parser.readValueAs(Answer.class);
                 
-                // Validate parsed answer
+                // Validate and fill defaults
                 if (answer.getAnswer() == null) {
                     log.warn("Parsed answer content is null. Raw response might not match Answer schema. Raw: {}", content);
-                    // Fallback: if the raw content looks like a simple string or the model failed to format, 
-                    // we might want to wrap the whole content as the answer?
-                    // For now, let's trust the schema enforcement in prompt, but maybe throw exception if strict.
-                    // Or if it parsed valid JSON but wrong fields (like chunk_id), we should error out.
                     
-                    // If content has "chunk_id", it means model returned a chunk.
-                    if (content.contains("\"chunk_id\"")) {
-                         throw new RuntimeException("LLM returned a Chunk object instead of Answer object. Prompt instructions ignored.");
+                    // Fallback: try to recover content from alternative fields
+                    try {
+                        com.fasterxml.jackson.databind.JsonNode rootNode = objectMapper.readTree(content);
+                        if (rootNode.has("response")) {
+                            com.fasterxml.jackson.databind.JsonNode respNode = rootNode.get("response");
+                            if (respNode.isTextual()) {
+                                answer.setAnswer(respNode.asText());
+                            } else if (respNode.isObject()) {
+                                // e.g. {"response": {"name": "...", "description": "..."}}
+                                if (respNode.has("description")) {
+                                    answer.setAnswer(respNode.get("description").asText());
+                                } else {
+                                    answer.setAnswer(respNode.toString());
+                                }
+                            }
+                        } else if (rootNode.has("content")) {
+                             answer.setAnswer(rootNode.get("content").asText());
+                        } else if (rootNode.has("message")) {
+                             answer.setAnswer(rootNode.get("message").asText());
+                        }
+                    } catch (Exception ignored) {
+                        // ignore fallback errors
+                    }
+
+                    if (answer.getAnswer() == null) {
+                         if (content.contains("\"chunk_id\"")) {
+                             throw new RuntimeException("LLM returned a Chunk object instead of Answer object. Prompt instructions ignored.");
+                         }
+                         throw new RuntimeException("LLM response missing 'answer' field.");
+                    } else {
+                        log.info("Recovered answer from non-standard JSON: {}", answer.getAnswer());
                     }
                 }
+
+                if (answer.getCitations() == null) {
+                    answer.setCitations(new ArrayList<>());
+                }
+                if (answer.getConfidence() == null) {
+                    answer.setConfidence(0.8); // Default confidence if missing
+                }
+
                 return answer;
             }
 

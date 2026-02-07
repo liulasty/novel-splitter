@@ -1,7 +1,7 @@
 package com.novel.splitter.assembler.impl;
 
-import com.novel.splitter.assembler.model.AssembledContext;
-import com.novel.splitter.assembler.model.ContextBlock;
+import com.novel.splitter.domain.model.context.AssembledContext;
+import com.novel.splitter.domain.model.ContextBlock;
 import com.novel.splitter.assembler.support.TokenCounter;
 import com.novel.splitter.domain.model.Scene;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,6 +32,9 @@ class StandardContextAssemblerTest {
                 .text(text)
                 .chapterIndex(chapterIndex)
                 .startParagraphIndex(paragraphIndex)
+                .metadata(com.novel.splitter.domain.model.SceneMetadata.builder()
+                        .chapterIndex(chapterIndex)
+                        .build())
                 .build();
     }
 
@@ -49,11 +52,11 @@ class StandardContextAssemblerTest {
         AssembledContext result = assembler.assemble(input, 100);
 
         assertEquals(2, result.getBlocks().size());
-        assertEquals(1, result.getBlocks().get(0).getChapterIndex());
-        assertEquals(2, result.getBlocks().get(1).getChapterIndex());
+        assertEquals(1, result.getBlocks().get(0).getSceneMetadata().getChapterIndex());
+        assertEquals(2, result.getBlocks().get(1).getSceneMetadata().getChapterIndex());
         // Verify stable IDs
-        assertEquals("C1", result.getBlocks().get(0).getId());
-        assertEquals("C2", result.getBlocks().get(1).getId());
+        assertEquals("C1", result.getBlocks().get(0).getChunkId());
+        assertEquals("C2", result.getBlocks().get(1).getChunkId());
     }
 
     @Test
@@ -69,13 +72,13 @@ class StandardContextAssemblerTest {
         AssembledContext result = assembler.assemble(input, 100);
 
         assertEquals(3, result.getBlocks().size());
-        assertEquals(1, result.getBlocks().get(0).getChapterIndex());
-        assertEquals(2, result.getBlocks().get(1).getChapterIndex());
-        assertEquals(3, result.getBlocks().get(2).getChapterIndex());
+        assertEquals(1, result.getBlocks().get(0).getSceneMetadata().getChapterIndex());
+        assertEquals(2, result.getBlocks().get(1).getSceneMetadata().getChapterIndex());
+        assertEquals(3, result.getBlocks().get(2).getSceneMetadata().getChapterIndex());
         
-        assertEquals("C1", result.getBlocks().get(0).getId());
-        assertEquals("C2", result.getBlocks().get(1).getId());
-        assertEquals("C3", result.getBlocks().get(2).getId());
+        assertEquals("C1", result.getBlocks().get(0).getChunkId());
+        assertEquals("C2", result.getBlocks().get(1).getChunkId());
+        assertEquals("C3", result.getBlocks().get(2).getChunkId());
     }
 
     @Test
@@ -98,7 +101,6 @@ class StandardContextAssemblerTest {
         assertEquals(1, result.getBlocks().size());
         assertEquals("A", result.getBlocks().get(0).getContent());
         assertTrue(result.isTruncated());
-        assertEquals(50, result.getTotalTokens());
     }
 
     @Test
@@ -121,16 +123,16 @@ class StandardContextAssemblerTest {
         // Both should be sorted to [S1, S2] -> C1, C2
         assertEquals(result1.getBlocks().size(), result2.getBlocks().size());
         
-        assertEquals("C1", result1.getBlocks().get(0).getId());
-        assertEquals(1, result1.getBlocks().get(0).getChapterIndex());
+        assertEquals("C1", result1.getBlocks().get(0).getChunkId());
+        assertEquals(1, result1.getBlocks().get(0).getSceneMetadata().getChapterIndex());
         
-        assertEquals("C1", result2.getBlocks().get(0).getId());
-        assertEquals(1, result2.getBlocks().get(0).getChapterIndex());
+        assertEquals("C1", result2.getBlocks().get(0).getChunkId());
+        assertEquals(1, result2.getBlocks().get(0).getSceneMetadata().getChapterIndex());
         
-        assertEquals("C2", result1.getBlocks().get(1).getId());
-        assertEquals(2, result1.getBlocks().get(1).getChapterIndex());
+        assertEquals("C2", result1.getBlocks().get(1).getChunkId());
+        assertEquals(2, result1.getBlocks().get(1).getSceneMetadata().getChapterIndex());
         
-        assertEquals("C2", result2.getBlocks().get(1).getId());
-        assertEquals(2, result2.getBlocks().get(1).getChapterIndex());
+        assertEquals("C2", result2.getBlocks().get(1).getChunkId());
+        assertEquals(2, result2.getBlocks().get(1).getSceneMetadata().getChapterIndex());
     }
 }

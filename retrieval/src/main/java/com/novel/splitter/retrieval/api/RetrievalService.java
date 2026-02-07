@@ -1,6 +1,7 @@
 package com.novel.splitter.retrieval.api;
 
 import com.novel.splitter.domain.model.Scene;
+import com.novel.splitter.domain.model.dto.RetrievalQuery;
 
 import java.util.List;
 

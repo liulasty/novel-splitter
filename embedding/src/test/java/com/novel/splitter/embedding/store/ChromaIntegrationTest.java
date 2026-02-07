@@ -2,9 +2,9 @@ package com.novel.splitter.embedding.store;
 
 import com.novel.splitter.domain.model.Scene;
 import com.novel.splitter.domain.model.SceneMetadata;
+import com.novel.splitter.domain.model.embedding.VectorRecord;
 import com.novel.splitter.embedding.config.EmbeddingConfig;
 import com.novel.splitter.embedding.store.ChromaVectorStore;
-import com.novel.splitter.embedding.api.VectorRecord;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

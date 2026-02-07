@@ -18,11 +18,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Slf4j
 @SpringBootTest(classes = com.novel.splitter.application.NovelSplitApplication.class)
-@Import({
-    com.novel.splitter.llm.client.config.LlmClientConfig.class, 
-    com.novel.splitter.embedding.config.EmbeddingConfig.class,
-    org.springframework.boot.autoconfigure.jackson.JacksonAutoConfiguration.class
-})
 @TestPropertySource(properties = {
     "novel.llm.provider=ollama",
     "llm.ollama.model=qwen:7b",

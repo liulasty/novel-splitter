@@ -3,7 +3,7 @@ package com.novel.splitter.embedding.store;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.novel.splitter.domain.model.Scene;
-import com.novel.splitter.embedding.api.VectorRecord;
+import com.novel.splitter.domain.model.embedding.VectorRecord;
 import com.novel.splitter.embedding.api.VectorStore;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;

@@ -8,7 +8,15 @@ novel:
 llm:
   ollama:
     url: http://localhost:11434
-    model: qwen:7b
+    model: qwen2.5:7b-instruct-q4_K_M
+    # 补充适配4060的优化参数（核心）
+    options:
+      num_ctx: 2048        # 限制上下文窗口，避免显存占用过高
+      num_threads: 16      # 适配i5-12600KF的16线程，提升推理速度
+      temperature: 0.1     # 降低随机性，缩短响应时间
+      max_tokens: 512      # 限制输出长度，减少计算量
+      format: json         # 强制JSON输出，匹配你的项目需求
+      num_gpu: 1           # 强制使用GPU，避免CPU推理
 
 embedding:
   store:
@@ -66,3 +74,34 @@ splitter:
         content-selector: "div.read-content"
         next-page-selector: "div.page-nav > a.next"
 
+  rag:
+    default-top-k: 5
+    min-confidence: 0.5
+    max-retries: 2
+    output-constraint: "JSON 对象，包含字段：answer, citations (list of {chunkId, reason}), confidence。"
+    system-instruction: |
+      你是一个专门分析小说内容的智能助手。
+      任务：仅根据提供的上下文块回答用户的问题。
+      如果上下文中没有答案，请明确说明你不知道。
+
+      *** 重要：输出格式必须是严格的 JSON ***
+      不要输出任何 Markdown 标记或代码块。
+      不要输出任何多余的解释文字。
+      直接返回一个 JSON 对象，Schema 如下：
+      {
+        "answer": "(string) 这里填写对问题的详细回答",
+        "citations": [
+          {
+            "chunkId": "(string) 引用来源的 chunkId",
+            "reason": "(string) 引用理由"
+          }
+        ],
+        "confidence": (number) 0.0 到 1.0
+      }
+
+      示例：
+      {
+        "answer": "楚晨是小说的主角...",
+        "citations": [],
+        "confidence": 0.9
+      }

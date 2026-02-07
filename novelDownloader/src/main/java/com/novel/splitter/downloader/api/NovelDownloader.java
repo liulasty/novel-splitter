@@ -1,6 +1,6 @@
 package com.novel.splitter.downloader.api;
 
-import com.novel.splitter.downloader.model.DownloadChapter;
+import com.novel.splitter.domain.model.downloader.DownloadChapter;
 import java.util.List;
 
 /**

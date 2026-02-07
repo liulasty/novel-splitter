@@ -36,6 +36,10 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 @SpringBootTest
 @DisplayName("RAG 系统全面自测")
+@org.springframework.test.context.TestPropertySource(properties = {
+    "novel.llm.provider=mock",
+    "embedding.store.type=memory"
+})
 // @Import(RagVerificationTest.TestConfig.class) // Removed TestConfig to avoid bean duplication
 public class RagVerificationTest {
 

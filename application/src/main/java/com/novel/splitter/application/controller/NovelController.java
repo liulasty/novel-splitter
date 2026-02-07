@@ -1,7 +1,7 @@
 package com.novel.splitter.application.controller;
 
-import com.novel.splitter.application.dto.IngestRequest;
 import com.novel.splitter.application.service.etl.NovelIngestionService;
+import com.novel.splitter.domain.model.dto.IngestRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;

@@ -1,5 +1,6 @@
-package com.novel.splitter.assembler.model;
+package com.novel.splitter.domain.model.context;
 
+import com.novel.splitter.domain.model.ContextBlock;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -30,7 +31,7 @@ public class AssembledContext {
         if (blocks == null) return "";
         StringBuilder sb = new StringBuilder();
         for (ContextBlock block : blocks) {
-            sb.append(String.format("[%s] %s\n", block.getId(), block.getContent()));
+            sb.append(String.format("[%s] %s\n", block.getChunkId(), block.getContent()));
         }
         return sb.toString();
     }

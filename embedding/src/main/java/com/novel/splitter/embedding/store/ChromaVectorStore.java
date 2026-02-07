@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.novel.splitter.domain.model.Scene;
 import com.novel.splitter.domain.model.embedding.chroma.ChromaCollection;
 import com.novel.splitter.domain.model.embedding.chroma.ChromaQueryResponse;
-import com.novel.splitter.embedding.api.VectorRecord;
+import com.novel.splitter.domain.model.embedding.VectorRecord;
 import com.novel.splitter.embedding.api.VectorStore;
 import lombok.Builder;
 import lombok.Data;
@@ -61,8 +61,9 @@ public class ChromaVectorStore implements VectorStore {
                         .map(s -> {
                             Map<String, Object> map = new HashMap<>();
                             map.put("chapter_index", s.getChapterIndex());
-                            map.put("chapter_title", s.getChapterTitle());
+                            if (s.getChapterTitle() != null) map.put("chapter_title", s.getChapterTitle());
                             map.put("start_paragraph_index", s.getStartParagraphIndex());
+                            
                             if (s.getMetadata() != null) {
                                 if (s.getMetadata().getNovel() != null) {
                                     map.put("novel", s.getMetadata().getNovel());
@@ -90,6 +91,13 @@ public class ChromaVectorStore implements VectorStore {
         request.put("embeddings", embeddingsList);
         request.put("metadatas", metadatas);
         request.put("documents", documents);
+
+        try {
+            String json = objectMapper.writeValueAsString(request);
+            // log.info("Sending request to ChromaDB: {}", json);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
 
         restClient.post()
                 .uri(chromaUrl + "/api/v2/tenants/" + DEFAULT_TENANT + "/databases/" + DEFAULT_DATABASE + "/collections/" + collectionId + "/add")

@@ -13,10 +13,20 @@ public class AppConfig {
     private StorageConfig storage;
     private RuleConfig rule;
     private DownloaderConfig downloader;
+    private RagConfig rag;
 
     @Data
     public static class StorageConfig {
         private String rootPath;
+    }
+
+    @Data
+    public static class RagConfig {
+        private String systemInstruction;
+        private String outputConstraint;
+        private int defaultTopK = 5;
+        private double minConfidence = 0.5;
+        private int maxRetries = 2;
     }
 
     @Data

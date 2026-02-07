@@ -1,6 +1,6 @@
 package com.novel.splitter.assembler.api;
 
-import com.novel.splitter.assembler.model.AssembledContext;
+import com.novel.splitter.domain.model.context.AssembledContext;
 import com.novel.splitter.domain.model.Scene;
 import java.util.List;
 

@@ -1,8 +1,8 @@
 package com.novel.splitter.downloader.impl;
 
 import com.novel.splitter.downloader.core.AbstractDownloader;
-import com.novel.splitter.downloader.model.DownloadChapter;
-import com.novel.splitter.downloader.model.SiteRule;
+import com.novel.splitter.domain.model.downloader.DownloadChapter;
+import com.novel.splitter.domain.model.downloader.SiteRule;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;

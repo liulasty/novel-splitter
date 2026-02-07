@@ -2,13 +2,13 @@ package com.novel.splitter.retrieval;
 
 import com.novel.splitter.domain.model.Scene;
 import com.novel.splitter.domain.model.SceneMetadata;
+import com.novel.splitter.domain.model.dto.RetrievalQuery;
 import com.novel.splitter.embedding.api.EmbeddingService;
 import com.novel.splitter.embedding.api.VectorStore;
 import com.novel.splitter.embedding.mock.MockEmbeddingService;
 import com.novel.splitter.embedding.mock.MockVectorStore;
 import com.novel.splitter.repository.api.SceneRepository;
 import com.novel.splitter.repository.impl.LocalFileSceneRepository;
-import com.novel.splitter.retrieval.api.RetrievalQuery;
 import com.novel.splitter.retrieval.api.RetrievalService;
 import com.novel.splitter.retrieval.impl.VectorRetrievalService;
 import org.junit.jupiter.api.BeforeEach;

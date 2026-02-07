@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
  */
 public class MockLlmClient implements LlmClient {
 
-    private static final Pattern NOUN_PATTERN = Pattern.compile("\\b[A-Z][a-zA-Z]*\\b"); // 识别首字母大写或全大写的单词
+    private static final Pattern NOUN_PATTERN = Pattern.compile("\\b[A-Za-z\\u4e00-\\u9fa5]+\\b"); // Simple word matching for English and Chinese
 
     @Override
     public Answer chat(Prompt prompt) {
@@ -36,7 +36,7 @@ public class MockLlmClient implements LlmClient {
         List<String> keywords = new ArrayList<>();
         List<ContextBlock> citedBlocks = new ArrayList<>();
         
-        // 简单策略：取前3个块，提取每个块的前几个大写单词
+        // 简单策略：取前3个块，提取每个块的前几个单词
         int limit = Math.min(prompt.getContextBlocks().size(), 3);
         for (int i = 0; i < limit; i++) {
             ContextBlock block = prompt.getContextBlocks().get(i);
@@ -57,11 +57,11 @@ public class MockLlmClient implements LlmClient {
         String narrative = String.format(
                 "Based on the analysis of %s, it appears that %s plays a significant role regarding '%s'. " +
                 "The text mentions %s in the context of %s, which directly addresses your query.",
-                keywords.get(0),
+                keywords.isEmpty() ? "the text" : keywords.get(0),
                 keywords.size() > 1 ? keywords.get(1) : "the character",
                 userQuerySummary,
                 keywords.size() > 2 ? keywords.get(2) : "this entity",
-                citedBlocks.get(0).getSceneMetadata() != null ? citedBlocks.get(0).getSceneMetadata().getChapterTitle() : "the chapter"
+                !citedBlocks.isEmpty() && citedBlocks.get(0).getSceneMetadata() != null ? citedBlocks.get(0).getSceneMetadata().getChapterTitle() : "the chapter"
         );
 
         // 3. 构造引用

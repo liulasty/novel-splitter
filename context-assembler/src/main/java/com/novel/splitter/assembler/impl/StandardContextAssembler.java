@@ -1,8 +1,8 @@
 package com.novel.splitter.assembler.impl;
 
 import com.novel.splitter.assembler.api.ContextAssembler;
-import com.novel.splitter.assembler.model.AssembledContext;
-import com.novel.splitter.assembler.model.ContextBlock;
+import com.novel.splitter.domain.model.context.AssembledContext;
+import com.novel.splitter.domain.model.ContextBlock;
 import com.novel.splitter.assembler.support.TokenCounter;
 import com.novel.splitter.domain.model.Scene;
 import lombok.RequiredArgsConstructor;
@@ -55,10 +55,9 @@ public class StandardContextAssembler implements ContextAssembler {
         for (int i = 0; i < truncatedList.size(); i++) {
             Scene scene = truncatedList.get(i);
             blocks.add(ContextBlock.builder()
-                    .id("C" + (i + 1))
+                    .chunkId("C" + (i + 1))
                     .content(scene.getText())
-                    .chapterIndex(scene.getChapterIndex())
-                    .paragraphIndex(scene.getStartParagraphIndex())
+                    .sceneMetadata(scene.getMetadata())
                     .build());
         }
 

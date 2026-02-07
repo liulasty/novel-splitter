@@ -14,6 +14,10 @@
     <dependencies>
         <dependency>
             <groupId>com.novel.splitter</groupId>
+            <artifactId>domain</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.novel.splitter</groupId>
             <artifactId>infrastructure</artifactId>
         </dependency>
         <dependency>

@@ -1,7 +1,7 @@
 package com.novel.splitter.downloader.core;
 
 import com.novel.splitter.downloader.api.NovelDownloader;
-import com.novel.splitter.downloader.model.DownloadChapter;
+import com.novel.splitter.domain.model.downloader.DownloadChapter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;

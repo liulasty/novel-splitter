@@ -1,4 +1,4 @@
-package com.novel.splitter.embedding.api;
+package com.novel.splitter.domain.model.embedding;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

@@ -1,4 +1,4 @@
-package com.novel.splitter.downloader.model;
+package com.novel.splitter.domain.model.downloader;
 
 import lombok.Builder;
 import lombok.Data;

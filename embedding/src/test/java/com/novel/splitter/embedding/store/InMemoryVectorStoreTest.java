@@ -1,7 +1,7 @@
 package com.novel.splitter.embedding.store;
 
 import com.novel.splitter.domain.model.Scene;
-import com.novel.splitter.embedding.api.VectorRecord;
+import com.novel.splitter.domain.model.embedding.VectorRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

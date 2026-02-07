@@ -12,6 +12,7 @@ import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.TestPropertySource;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -27,6 +28,7 @@ import static org.mockito.ArgumentMatchers.anyString;
  * </p>
  */
 @SpringBootTest
+@TestPropertySource(properties = "novel.llm.provider=mock")
 public class RagIntegrationTest {
 
     @Autowired
