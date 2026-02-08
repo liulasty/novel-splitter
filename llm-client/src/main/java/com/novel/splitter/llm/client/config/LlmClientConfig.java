@@ -2,10 +2,7 @@ package com.novel.splitter.llm.client.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.novel.splitter.llm.client.api.LlmClient;
-import com.novel.splitter.llm.client.impl.DeepSeekLlmClient;
-import com.novel.splitter.llm.client.impl.MockLlmClient;
-import com.novel.splitter.llm.client.impl.OllamaLlmClient;
-import org.springframework.beans.factory.annotation.Value;
+import com.novel.splitter.llm.client.impl.*;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -19,7 +16,7 @@ import org.springframework.context.annotation.Configuration;
  * </p>
  */
 @Configuration
-@EnableConfigurationProperties({OllamaProperties.class, DeepSeekProperties.class})
+@EnableConfigurationProperties({OllamaProperties.class, DeepSeekProperties.class, GeminiProperties.class, CozeProperties.class})
 public class LlmClientConfig {
 
     @Bean
@@ -42,5 +39,21 @@ public class LlmClientConfig {
             DeepSeekProperties deepSeekProperties,
             ObjectMapper objectMapper) {
         return new DeepSeekLlmClient(deepSeekProperties, objectMapper);
+    }
+
+    @Bean
+    @ConditionalOnProperty(name = "novel.llm.provider", havingValue = "gemini")
+    public LlmClient geminiLlmClient(
+            GeminiProperties geminiProperties,
+            ObjectMapper objectMapper) {
+        return new GeminiLlmClient(geminiProperties, objectMapper);
+    }
+
+    @Bean
+    @ConditionalOnProperty(name = "novel.llm.provider", havingValue = "coze")
+    public LlmClient cozeLlmClient(
+            CozeProperties cozeProperties,
+            ObjectMapper objectMapper) {
+        return new CozeLlmClient(cozeProperties, objectMapper);
     }
 }

@@ -3,9 +3,18 @@ server:
 
 novel:
   llm:
-    provider: deepseek # deepseek (insufficient balance) or ollama
+    provider: gemini # deepseek, ollama, gemini or coze
 
 llm:
+  coze:
+    base-url: ${COZE_BASE_URL:https://api.coze.com}
+    api-key: ${COZE_API_KEY}
+    bot-id: ${COZE_BOT_ID}
+    user-id: ${COZE_USER_ID:user_default}
+    rate-limit:
+      enabled: true
+      max-requests: 2
+      duration-seconds: 60
   deepseek:
     base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
     api-key: ${DEEPSEEK_API_KEY}
@@ -13,6 +22,14 @@ llm:
     rate-limit:
       enabled: true
       max-requests: 3
+      duration-seconds: 60
+  gemini:
+    base-url: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com}
+    api-key: ${GEMINI_API_KEY}
+    model: ${GEMINI_MODEL:gemini-2.0-flash-exp}
+    rate-limit:
+      enabled: true
+      max-requests: 15
       duration-seconds: 60
   ollama:
     url: http://localhost:11434
