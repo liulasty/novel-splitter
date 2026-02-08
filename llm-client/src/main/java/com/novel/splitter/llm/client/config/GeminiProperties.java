@@ -9,7 +9,8 @@ import org.springframework.context.annotation.Configuration;
 public class GeminiProperties {
     private String baseUrl = "https://generativelanguage.googleapis.com";
     private String apiKey;
-    private String model = "gemini-2.0-flash-exp";
+    private String model = "gemini-2.5-flash";
+    private Integer maxOutputTokens = 8192;
     private RateLimitConfig rateLimit;
 
     @Data

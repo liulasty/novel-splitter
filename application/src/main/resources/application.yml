@@ -26,7 +26,7 @@ llm:
   gemini:
     base-url: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com}
     api-key: ${GEMINI_API_KEY}
-    model: ${GEMINI_MODEL:gemini-2.0-flash-exp}
+    model: ${GEMINI_MODEL:gemini-2.5-flash}
     rate-limit:
       enabled: true
       max-requests: 15

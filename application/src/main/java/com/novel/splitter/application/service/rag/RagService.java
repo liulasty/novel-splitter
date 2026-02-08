@@ -89,7 +89,7 @@ public class RagService {
             stopWatch.start("3. LLM Generation");
             Answer answer;
             try {
-                answer = llmClient.chat(prompt, ragConfig.getMaxRetries());
+                answer = llmClient.chat(prompt);
             } catch (Exception e) {
                 log.error("LLM generation failed: {}", e.getMessage());
                 // 兜底默认对象

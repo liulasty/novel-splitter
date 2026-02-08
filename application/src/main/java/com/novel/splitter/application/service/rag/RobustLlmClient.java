@@ -23,36 +23,25 @@ public class RobustLlmClient {
     private final LlmClient llmClient;
 
     /**
-     * 发送聊天请求，带重试机制
+     * 发送聊天请求
+     * <p>
+     * 委托给底层 LlmClient 处理（底层已包含重试机制），本层仅负责结果验证和修复。
+     * </p>
      *
-     * @param prompt     提示词
-     * @param maxRetries 最大重试次数
+     * @param prompt 提示词
      * @return 结构化回答
      */
-    public Answer chat(Prompt prompt, int maxRetries) {
-        int attempt = 0;
-        Exception lastException = null;
+    public Answer chat(Prompt prompt) {
+        try {
+            Answer answer = llmClient.chat(prompt);
+            
+            // 格式验证和自动修复 (Format Validation & Auto-repair)
+            return validateAndRepair(answer);
 
-        while (attempt <= maxRetries) {
-            try {
-                if (attempt > 0) {
-                    log.info("Retrying LLM request (attempt {}/{})", attempt + 1, maxRetries + 1);
-                }
-                
-                Answer answer = llmClient.chat(prompt);
-                
-                // 格式验证和自动修复 (Format Validation & Auto-repair)
-                return validateAndRepair(answer);
-
-            } catch (Exception e) {
-                log.warn("LLM chat failed (attempt {}/{}): {}", attempt + 1, maxRetries + 1, e.getMessage());
-                lastException = e;
-            }
-            attempt++;
+        } catch (Exception e) {
+            log.error("LLM chat failed: {}", e.getMessage());
+            throw e;
         }
-        
-        log.error("All retries failed for LLM chat.");
-        throw new RuntimeException("LLM service failed after " + maxRetries + " retries", lastException);
     }
 
     private Answer validateAndRepair(Answer answer) {

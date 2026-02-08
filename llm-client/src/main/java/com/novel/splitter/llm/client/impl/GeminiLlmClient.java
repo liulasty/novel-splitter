@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import com.google.genai.Client;
+import com.google.genai.Client.Builder;
 import com.google.genai.types.Content;
 import com.google.genai.types.GenerateContentConfig;
 import com.google.genai.types.GenerateContentResponse;
@@ -20,8 +21,8 @@ import java.util.Deque;
 import java.util.LinkedList;
 
 /**
- * Gemini API Client Implementation.
- * Uses Google AI Gemini API (google-genai SDK).
+ * Gemini API 客户端实现。
+ * 使用 Google AI Gemini API (google-genai SDK)。
  */
 @Slf4j
 public class GeminiLlmClient implements LlmClient {
@@ -35,13 +36,19 @@ public class GeminiLlmClient implements LlmClient {
         this.properties = properties;
         this.objectMapper = objectMapper;
         
-        // Initialize Client using Builder
-        Client.Builder builder = Client.builder()
+        // 使用 Builder 初始化客户端
+        Builder builder = Client.builder()
                 .apiKey(properties.getApiKey());
 
+        // 配置 HTTP 选项（超时时间默认设置为 60秒，避免连接挂起）
+        HttpOptions.Builder httpOptionsBuilder = HttpOptions.builder();
         if (properties.getBaseUrl() != null && !properties.getBaseUrl().isEmpty()) {
-            builder.httpOptions(HttpOptions.builder().baseUrl(properties.getBaseUrl()).build());
+            httpOptionsBuilder.baseUrl(properties.getBaseUrl());
         }
+        // 设置超时时间（毫秒），这里设置为 60 秒
+        httpOptionsBuilder.timeout(60000);
+        
+        builder.httpOptions(httpOptionsBuilder.build());
 
         this.client = builder.build();
 
@@ -49,53 +56,53 @@ public class GeminiLlmClient implements LlmClient {
                 properties.getRateLimit().getMaxRequests(),
                 properties.getRateLimit().getDurationSeconds()
         );
-        log.info("Initialized GeminiLlmClient with model: {}", properties.getModel());
+        log.info("GeminiLlmClient 初始化完成，模型: {}", properties.getModel());
     }
 
     @Override
     public Answer chat(Prompt prompt) {
-        // Rate Limit Check
+        // 速率限制检查
         rateLimiter.acquire();
 
-        log.info("Sending request to Gemini model: {}", properties.getModel());
+        log.info("正在向 Gemini 模型发送请求: {}", properties.getModel());
 
         try {
-            // 1. Construct User Content
+            // 1. 构建用户内容
             StringBuilder userContentBuilder = new StringBuilder();
             if (prompt.getContextBlocks() != null && !prompt.getContextBlocks().isEmpty()) {
-                userContentBuilder.append("Context Information:\n");
+                userContentBuilder.append("上下文信息:\n");
                 for (ContextBlock block : prompt.getContextBlocks()) {
                     userContentBuilder.append("---\n");
-                    userContentBuilder.append("Chunk ID: ").append(block.getChunkId()).append("\n");
+                    userContentBuilder.append("块 ID: ").append(block.getChunkId()).append("\n");
                     if (block.getSceneMetadata() != null) {
-                        userContentBuilder.append("Source: ").append(block.getSceneMetadata().getChapterTitle()).append("\n");
+                        userContentBuilder.append("来源: ").append(block.getSceneMetadata().getChapterTitle()).append("\n");
                     }
-                    userContentBuilder.append("Content: ").append(block.getContent()).append("\n");
+                    userContentBuilder.append("内容: ").append(block.getContent()).append("\n");
                     userContentBuilder.append("---\n");
                 }
                 userContentBuilder.append("\n");
             }
-            userContentBuilder.append("User Question: ").append(prompt.getUserQuestion());
-            userContentBuilder.append("\n\nPlease answer the question in the specified JSON format.");
+            userContentBuilder.append("用户问题: ").append(prompt.getUserQuestion());
+            userContentBuilder.append("\n\n请以指定的 JSON 格式回答问题。");
 
-            // 2. Construct System Instruction
+            // 2. 构建系统指令
             String systemText = prompt.getSystemInstruction();
             if (prompt.getOutputConstraint() != null && !prompt.getOutputConstraint().isEmpty()) {
-                systemText += "\n\nIMPORTANT OUTPUT FORMAT:\n" + prompt.getOutputConstraint();
+                systemText += "\n\n重要输出格式:\n" + prompt.getOutputConstraint();
             }
-            systemText += "\n\nYou MUST respond with valid JSON matching the schema provided.";
+            systemText += "\n\n你必须回复符合提供的 Schema 的有效 JSON。";
             
             Content systemInstructionContent = Content.fromParts(Part.fromText(systemText));
             
-            // 3. Configure Generation
+            // 3. 配置生成选项
             GenerateContentConfig config = GenerateContentConfig.builder()
                     .responseMimeType("application/json")
                     .temperature(0.1f)
-                    .maxOutputTokens(2048)
+                    .maxOutputTokens(properties.getMaxOutputTokens())
                     .systemInstruction(systemInstructionContent)
                     .build();
 
-            // 4. Call API
+            // 4. 调用 API
             GenerateContentResponse response = client.models.generateContent(
                     properties.getModel(),
                     Content.fromParts(Part.fromText(userContentBuilder.toString())),
@@ -103,13 +110,13 @@ public class GeminiLlmClient implements LlmClient {
             );
 
             String content = response.text();
-            log.info("Gemini raw response: {}", content);
+            log.info("Gemini 原始响应: {}", content);
 
             if (content == null || content.isEmpty()) {
-                throw new RuntimeException("Empty response from Gemini");
+                throw new RuntimeException("Gemini 响应为空");
             }
 
-            // Clean up Markdown code blocks if present
+            // 清理 Markdown 代码块（如果存在）
             if (content.contains("```json")) {
                 content = content.replace("```json", "").replace("```", "");
             } else if (content.contains("```")) {
@@ -122,18 +129,18 @@ public class GeminiLlmClient implements LlmClient {
                 content = content.substring(firstBrace);
             }
 
-            // 5. Parse Response
+            // 5. 解析响应
             try (JsonParser parser = objectMapper.createParser(content)) {
                 return parser.readValueAs(Answer.class);
             }
 
         } catch (Exception e) {
-            log.error("Gemini API call failed", e);
-            throw new RuntimeException("Gemini API call failed: " + e.getMessage(), e);
+            log.error("Gemini API 调用失败", e);
+            throw new RuntimeException("Gemini API 调用失败: " + e.getMessage(), e);
         }
     }
 
-    // Simple Token Bucket Rate Limiter (Duplicated from DeepSeekLlmClient for independence)
+    // 简单令牌桶限流器（复制自 DeepSeekLlmClient 以保持独立性）
     private static class RateLimiter {
         private final int maxRequests;
         private final long durationMillis;
@@ -147,7 +154,7 @@ public class GeminiLlmClient implements LlmClient {
         public synchronized void acquire() {
             long now = System.currentTimeMillis();
 
-            // Remove expired timestamps
+            // 移除过期时间戳
             while (!requestTimestamps.isEmpty() && (now - requestTimestamps.peekFirst() > durationMillis)) {
                 requestTimestamps.pollFirst();
             }
@@ -157,19 +164,19 @@ public class GeminiLlmClient implements LlmClient {
                 return;
             }
 
-            // If limit reached, calculate wait time
+            // 如果达到限制，计算等待时间
             long oldestTimestamp = requestTimestamps.peekFirst();
             long waitTime = durationMillis - (now - oldestTimestamp);
 
             if (waitTime > 0) {
                 try {
-                    log.warn("Rate limit reached. Waiting for {} ms", waitTime);
+                    log.warn("达到速率限制。等待 {} 毫秒", waitTime);
                     Thread.sleep(waitTime);
-                    // Recursively try again after waiting
+                    // 等待后递归重试
                     acquire();
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
-                    throw new RuntimeException("Interrupted while waiting for rate limit", e);
+                    throw new RuntimeException("等待速率限制时被打断", e);
                 }
             } else {
                  requestTimestamps.pollFirst();
