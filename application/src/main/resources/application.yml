@@ -3,9 +3,17 @@ server:
 
 novel:
   llm:
-    provider: ollama # ollama or mock
+    provider: deepseek # deepseek (insufficient balance) or ollama
 
 llm:
+  deepseek:
+    base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
+    api-key: ${DEEPSEEK_API_KEY}
+    model: ${DEEPSEEK_MODEL:deepseek-chat}
+    rate-limit:
+      enabled: true
+      max-requests: 3
+      duration-seconds: 60
   ollama:
     url: http://localhost:11434
     model: qwen2.5:7b-instruct-q4_K_M

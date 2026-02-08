@@ -2,6 +2,7 @@ package com.novel.splitter.llm.client.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.novel.splitter.llm.client.api.LlmClient;
+import com.novel.splitter.llm.client.impl.DeepSeekLlmClient;
 import com.novel.splitter.llm.client.impl.MockLlmClient;
 import com.novel.splitter.llm.client.impl.OllamaLlmClient;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,7 +19,7 @@ import org.springframework.context.annotation.Configuration;
  * </p>
  */
 @Configuration
-@EnableConfigurationProperties(OllamaProperties.class)
+@EnableConfigurationProperties({OllamaProperties.class, DeepSeekProperties.class})
 public class LlmClientConfig {
 
     @Bean
@@ -33,5 +34,13 @@ public class LlmClientConfig {
             OllamaProperties ollamaProperties,
             ObjectMapper objectMapper) {
         return new OllamaLlmClient(ollamaProperties, objectMapper);
+    }
+
+    @Bean
+    @ConditionalOnProperty(name = "novel.llm.provider", havingValue = "deepseek")
+    public LlmClient deepSeekLlmClient(
+            DeepSeekProperties deepSeekProperties,
+            ObjectMapper objectMapper) {
+        return new DeepSeekLlmClient(deepSeekProperties, objectMapper);
     }
 }

@@ -19,6 +19,7 @@ bge-small-zh-v1.5-ONNX
 .vscode
 .idea
 .trae
+.env
 
 # 下载的文件
 data
@@ -31,6 +32,4 @@ logs
 
  # 忽略各个模块的编译文件夹
  /**/**/target
-
-
 
