@@ -5,7 +5,7 @@ import com.novel.splitter.domain.model.RawParagraph;
 import com.novel.splitter.domain.model.Scene;
 import com.novel.splitter.domain.model.SceneMetadata;
 import com.novel.splitter.domain.model.SemanticSegment;
-import com.novel.splitter.rule.LengthRule;
+import com.novel.splitter.rule.DynamicWindowRule;
 import com.novel.splitter.rule.SplitRule;
 
 import java.util.ArrayList;
@@ -24,14 +24,15 @@ public class SceneAssembler {
 
     private final SemanticSegmentBuilder segmentBuilder;
     private final List<SplitRule> splitRules;
-    // 目标场景长度（软限制）
+    // 目标场景长度（软限制）- 这里的常量仅作为 fallback 或 reference
     private static final int TARGET_SCENE_LENGTH = 1200;
 
     public SceneAssembler() {
-        this.segmentBuilder = new SemanticSegmentBuilder();
+        // 使用 Phase 2 的 ContextAwareSegmentBuilder
+        this.segmentBuilder = new ContextAwareSegmentBuilder();
         this.splitRules = new ArrayList<>();
-        // 默认规则配置：目标 1200 字，最大 3000 字
-        this.splitRules.add(new LengthRule(TARGET_SCENE_LENGTH, 3000));
+        // 使用 Phase 3 的 DynamicWindowRule
+        this.splitRules.add(new DynamicWindowRule());
     }
 
     /**
@@ -74,6 +75,7 @@ public class SceneAssembler {
         List<SemanticSegment> buffer = new ArrayList<>();
         int currentLength = 0;
         int sceneStartParaIdx = start; // 记录当前 Scene 的起始段落索引
+        String previousContext = ""; // 记录上一个 Scene 的上下文 (Phase 3 Requirement)
 
         for (SemanticSegment seg : segments) {
             // 评估是否需要切分
@@ -81,32 +83,40 @@ public class SceneAssembler {
             
             // 遍历所有规则
             for (SplitRule rule : splitRules) {
-                SplitRule.Decision decision = rule.evaluate(currentLength, seg);
+                // Phase 3: 传递 buffer 以支持动态密度分析
+                SplitRule.Decision decision = rule.evaluate(currentLength, buffer, seg);
                 if (decision == SplitRule.Decision.MUST_SPLIT) {
                     shouldSplit = true;
-                    break; // 只要有一个 MUST，就必须切
+                    break; 
                 } else if (decision == SplitRule.Decision.CAN_SPLIT) {
                     shouldSplit = true;
-                    // CAN_SPLIT 可以被后续规则否决吗？暂时简单处理，认为 CAN 就是切
                 }
             }
 
             // 如果决定切分，且 buffer 非空
             if (shouldSplit && !buffer.isEmpty()) {
                 // 构建并添加 Scene
-                Scene scene = buildSceneFromSegments(chapter, buffer, sceneStartParaIdx, novelName);
+                Scene scene = buildSceneFromSegments(chapter, buffer, sceneStartParaIdx, novelName, previousContext);
                 chapterScenes.add(scene);
                 
-                // 更新下一个 Scene 的起始索引
-                // 当前 Scene 的结束索引是 buffer 中最后一个 segment 的最后一个 paragraph index
-                // 所以下一个 Scene 的起始索引是当前 seg 的第一个 paragraph index
-                if (!seg.getParagraphs().isEmpty()) {
-                    sceneStartParaIdx = seg.getParagraphs().get(0).getIndex();
-                }
+                // Phase 3: 上下文重叠 (Context Overlap)
+                // 需求：保留上一个Scene的最后100-200字作为 prefix_context 字段
+                // 1. 从当前生成的 Scene 文本中提取
+                String sceneText = scene.getText();
+                int contextLength = Math.min(sceneText.length(), 200);
+                // 注意：getText() 可能包含末尾换行符
+                previousContext = sceneText.substring(Math.max(0, sceneText.length() - contextLength)).trim();
 
                 // 重置缓冲区
                 buffer.clear();
+                
+                // 重新计算 currentLength
                 currentLength = 0;
+
+                // 更新下一个 Scene 的起始索引
+                if (!seg.getParagraphs().isEmpty()) {
+                    sceneStartParaIdx = seg.getParagraphs().get(0).getIndex();
+                }
             }
 
             buffer.add(seg);
@@ -115,7 +125,7 @@ public class SceneAssembler {
 
         // 处理剩余部分
         if (!buffer.isEmpty()) {
-            chapterScenes.add(buildSceneFromSegments(chapter, buffer, sceneStartParaIdx, novelName));
+            chapterScenes.add(buildSceneFromSegments(chapter, buffer, sceneStartParaIdx, novelName, previousContext));
         }
 
         return chapterScenes;
@@ -125,23 +135,37 @@ public class SceneAssembler {
         return seg.getParagraphs().stream().mapToInt(p -> p.getContent().length()).sum();
     }
 
-    private Scene buildSceneFromSegments(Chapter chapter, List<SemanticSegment> segments, int startIdx, String novelName) {
-        // 展平为 RawParagraph 列表
+    private Scene buildSceneFromSegments(Chapter chapter, List<SemanticSegment> segments, int startIdx, String novelName, String prefixContext) {
+        // 展平为 RawParagraph 列表，但同时也传递原始 segments 以便计算元数据
         List<RawParagraph> paragraphs = segments.stream()
                 .flatMap(s -> s.getParagraphs().stream())
                 .collect(Collectors.toList());
         
         int endIdx = paragraphs.isEmpty() ? startIdx : paragraphs.get(paragraphs.size() - 1).getIndex();
         
-        return buildScene(chapter, paragraphs, startIdx, endIdx, novelName);
+        return buildScene(chapter, paragraphs, segments, startIdx, endIdx, novelName, prefixContext);
     }
 
-    private Scene buildScene(Chapter chapter, List<RawParagraph> paragraphs, int startIdx, int endIdx, String novelName) {
+    private Scene buildScene(Chapter chapter, List<RawParagraph> paragraphs, List<SemanticSegment> segments, int startIdx, int endIdx, String novelName, String prefixContext) {
         StringBuilder text = new StringBuilder();
         for (RawParagraph p : paragraphs) {
             text.append(p.getContent()).append("\n");
         }
         int wordCount = text.length();
+
+        // Phase 4: Evolution (自我进化) - 反馈机制 (Heuristic)
+        // 计算对话比例作为密度参考
+        long dialogueCount = segments.stream().filter(s -> "DIALOGUE".equals(s.getType())).count();
+        double densityScore = segments.isEmpty() ? 0.0 : (1.0 - (double) dialogueCount / segments.size());
+
+        // 计算质量得分 (简单的 PPL 模拟：结尾是否完整)
+        double qualityScore = 1.0;
+        if (text.length() > 0) {
+            char lastChar = text.charAt(text.length() - 2); // 倒数第二个字符（排除换行符）
+            if (lastChar != '。' && lastChar != '”' && lastChar != '！' && lastChar != '？' && lastChar != '.' && lastChar != '}') {
+                qualityScore = 0.7; // 结尾不完整，降权
+            }
+        }
 
         // RAG 元数据填充
         SceneMetadata metadata = SceneMetadata.builder()
@@ -151,10 +175,11 @@ public class SceneAssembler {
                 .startParagraph(startIdx)
                 .endParagraph(endIdx)
                 .chunkType("scene")
-                .role("narration") // 默认均为叙述，后续可通过 NLP 识别 Dialogue
+                .role("narration")
+                .densityScore(densityScore)
+                .qualityScore(qualityScore)
                 .build();
 
-        // 策略：如果字数超过目标长度的 1.5 倍，建议可再切分
         boolean canSplit = wordCount > (TARGET_SCENE_LENGTH * 1.5);
 
         return Scene.builder()
@@ -167,6 +192,7 @@ public class SceneAssembler {
                 .wordCount(wordCount)
                 .canSplit(canSplit)
                 .metadata(metadata)
+                .prefixContext(prefixContext)
                 .build();
     }
 }

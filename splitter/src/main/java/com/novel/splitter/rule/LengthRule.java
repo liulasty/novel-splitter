@@ -2,6 +2,8 @@ package com.novel.splitter.rule;
 
 import com.novel.splitter.domain.model.SemanticSegment;
 
+import java.util.List;
+
 public class LengthRule implements SplitRule {
 
     private final int targetLength;
@@ -13,7 +15,7 @@ public class LengthRule implements SplitRule {
     }
 
     @Override
-    public Decision evaluate(int currentLength, SemanticSegment nextSegment) {
+    public Decision evaluate(int currentLength, List<SemanticSegment> currentBuffer, SemanticSegment nextSegment) {
         // 1. 强制限制：如果加上下一段会超过最大长度，且当前已有内容，则必须切分
         // 注意：这里是一个简单的预判。更严格的逻辑可能需要看 nextSegment 是否巨大。
         // 但 SemanticSegmentBuilder 已经限制了单个 Segment 的大小（如800字）。

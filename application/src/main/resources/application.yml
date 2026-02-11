@@ -3,7 +3,7 @@ server:
 
 novel:
   llm:
-    provider: gemini # deepseek, ollama, gemini or coze
+    provider: deepseek # deepseek, ollama, gemini or coze
 
 llm:
   coze:

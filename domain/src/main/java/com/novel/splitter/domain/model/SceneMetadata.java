@@ -44,6 +44,12 @@ public class SceneMetadata {
     /** 角色/功能 (e.g., "narration", "dialogue") */
     private String role;
 
+    /** 信息密度得分 */
+    private Double densityScore;
+
+    /** 质量得分 (PPL模拟) */
+    private Double qualityScore;
+
     // === 语义分析字段 (预留) ===
     /** 出现的人物列表 */
     private List<String> characters;

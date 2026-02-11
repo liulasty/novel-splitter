@@ -29,4 +29,16 @@ public class RawParagraph {
      * 是否为空行
      */
     private final boolean isEmpty;
+
+    /**
+     * 段落类型
+     */
+    @Builder.Default
+    private final ParagraphType type = ParagraphType.TEXT;
+
+    /**
+     * 是否为锚点（不可切分）
+     */
+    @Builder.Default
+    private final boolean isAnchor = false;
 }

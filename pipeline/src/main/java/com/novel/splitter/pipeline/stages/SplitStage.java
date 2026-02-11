@@ -1,6 +1,7 @@
 package com.novel.splitter.pipeline.stages;
 
 import com.novel.splitter.core.ChapterRecognizer;
+import com.novel.splitter.core.MarkdownParagraphSplitter;
 import com.novel.splitter.core.ParagraphSplitter;
 import com.novel.splitter.core.SceneAssembler;
 import com.novel.splitter.domain.model.Chapter;
@@ -18,7 +19,8 @@ import java.util.List;
  */
 @Slf4j
 public class SplitStage implements Stage {
-    private final ParagraphSplitter paragraphSplitter = new ParagraphSplitter();
+    // Phase 1: Use MarkdownParagraphSplitter
+    private final ParagraphSplitter paragraphSplitter = new MarkdownParagraphSplitter();
     private final ChapterRecognizer chapterRecognizer = new ChapterRecognizer();
     private final SceneAssembler sceneAssembler = new SceneAssembler();
 

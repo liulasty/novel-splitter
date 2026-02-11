@@ -2,6 +2,8 @@ package com.novel.splitter.rule;
 
 import com.novel.splitter.domain.model.SemanticSegment;
 
+import java.util.List;
+
 /**
  * 切分规则接口
  */
@@ -17,8 +19,9 @@ public interface SplitRule {
      * 评估当前是否应该切分
      *
      * @param currentLength 当前 Scene 已累积的字数
+     * @param currentBuffer 当前 Scene 已累积的语义段
      * @param nextSegment   下一个即将加入的语义段
      * @return 切分决策
      */
-    Decision evaluate(int currentLength, SemanticSegment nextSegment);
+    Decision evaluate(int currentLength, List<SemanticSegment> currentBuffer, SemanticSegment nextSegment);
 }

@@ -53,6 +53,12 @@ public class Scene {
     private int wordCount;
     
     /**
+     * 前文摘要/上下文 (Overlap Context)
+     * 保留上一场景的最后 100-200 字，用于维持连贯性
+     */
+    private String prefixContext;
+
+    /**
      * 是否可再切分
      * <p>如果是长文本，建议为 true；如果已经很短，为 false。</p>
      */
