@@ -34,6 +34,7 @@ export interface IngestRequest {
 export interface NovelUploadResponse {
   message: string;
   error?: string;
+  fileName?: string;
 }
 
 // Scene related interfaces
@@ -46,9 +47,17 @@ export interface Scene {
 // System related interfaces
 export interface SystemStats {
   count: number;
-  storeType: string;
+  type: string;
 }
 
-export interface DeleteRequest {
-  novel: string;
+export interface VectorSearchRequest {
+  query: string;
+  topK?: number;
+  filter?: Record<string, any>;
 }
+
+export interface VectorRecord {
+  chunkId: string;
+  score: number;
+}
+

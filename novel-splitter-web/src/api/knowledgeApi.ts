@@ -16,4 +16,12 @@ export const knowledgeApi = {
     const response = await apiClient.get<Scene[]>(`/knowledge/${encodeURIComponent(novelName)}/scenes`);
     return response.data;
   },
+
+  deleteVersion: async (novelName: string, version: string): Promise<void> => {
+    await apiClient.delete(`/knowledge/${encodeURIComponent(novelName)}/versions/${encodeURIComponent(version)}`);
+  },
+
+  deleteKnowledgeBase: async (novelName: string): Promise<void> => {
+    await apiClient.delete(`/knowledge/${encodeURIComponent(novelName)}`);
+  },
 };

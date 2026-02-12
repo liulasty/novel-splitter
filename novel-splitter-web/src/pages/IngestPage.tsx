@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { UploadCloud, FileText, Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import { novelApi } from "@/api/novelApi";
 import { cn } from "@/lib/utils";
@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 export default function IngestPage() {
   const queryClient = useQueryClient();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadedFileName, setUploadedFileName] = useState<string>("");
   const [version, setVersion] = useState("v1");
   const [maxScenes, setMaxScenes] = useState(0);
   const [ingestStatus, setIngestStatus] = useState<string>("");
@@ -17,10 +18,14 @@ export default function IngestPage() {
     mutationFn: novelApi.uploadNovel,
     onSuccess: (data) => {
       setIngestStatus(`上传成功: ${data.message}`);
+      if (data.fileName) {
+        setUploadedFileName(data.fileName);
+      }
       queryClient.invalidateQueries({ queryKey: ['novels'] });
     },
-    onError: (error) => {
-      setIngestStatus(`上传失败: ${error}`);
+    onError: (error: any) => {
+      const msg = error.response?.data?.error || error.message || "Unknown error";
+      setIngestStatus(`上传失败: ${msg}`);
     }
   });
 
@@ -30,14 +35,16 @@ export default function IngestPage() {
     onSuccess: (data) => {
       setIngestStatus(`入库成功: ${data.message}`);
     },
-    onError: (error) => {
-      setIngestStatus(`入库失败: ${error}`);
+    onError: (error: any) => {
+      const msg = error.response?.data?.error || error.message || "Unknown error";
+      setIngestStatus(`入库失败: ${msg}`);
     }
   });
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setSelectedFile(e.target.files[0]);
+      setUploadedFileName(""); // Reset uploaded filename on new selection
       setIngestStatus("");
     }
   };
@@ -48,18 +55,16 @@ export default function IngestPage() {
   };
 
   const handleIngest = async () => {
-    if (!selectedFile && !ingestStatus.includes("上传成功")) {
-        // If no file selected and not just uploaded, maybe user wants to ingest an existing file?
-        // For simplicity, we assume the flow is Upload -> Ingest for now, or user manually types filename.
-        // But here we rely on selectedFile name.
-        if (!selectedFile) {
+    if (!uploadedFileName) {
+        if (selectedFile) {
+            setIngestStatus("请先点击'上传文件'按钮完成上传");
+        } else {
              setIngestStatus("请先选择并上传文件");
-             return;
         }
+        return;
     }
     
-    // Assuming the file name on server matches the uploaded file name
-    const fileName = selectedFile?.name || ""; 
+    const fileName = uploadedFileName;
     
     if (!fileName) {
         setIngestStatus("无法获取文件名");

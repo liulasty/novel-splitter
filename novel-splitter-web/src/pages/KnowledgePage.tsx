@@ -1,23 +1,61 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Loader2, Book, GitBranch, AlertCircle } from "lucide-react";
+import { Loader2, Book, GitBranch, AlertCircle, Trash2 } from "lucide-react";
 import { novelApi } from "@/api/novelApi";
 import { knowledgeApi } from "@/api/knowledgeApi";
 
 // Component to display versions for a single novel
 function NovelVersionsCard({ novel }: { novel: string }) {
+  const queryClient = useQueryClient();
+  
   const { data: versions, isLoading, isError } = useQuery({
     queryKey: ['versions', novel],
     queryFn: () => knowledgeApi.getVersions(novel),
   });
 
+  const deleteNovelMutation = useMutation({
+    mutationFn: () => knowledgeApi.deleteKnowledgeBase(novel),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['novels'] });
+    },
+  });
+
+  const deleteVersionMutation = useMutation({
+    mutationFn: (version: string) => knowledgeApi.deleteVersion(novel, version),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['versions', novel] });
+    },
+  });
+
+  const handleDeleteNovel = () => {
+    if (confirm(`确定要删除知识库 "${novel}" 吗？这将删除所有源文件、切分版本和向量数据。`)) {
+      deleteNovelMutation.mutate();
+    }
+  };
+
+  const handleDeleteVersion = (version: string) => {
+    if (confirm(`确定要删除版本 "${version}" 吗？`)) {
+        deleteVersionMutation.mutate(version);
+    }
+  };
+
   return (
-    <Card className="hover:shadow-md transition-shadow">
+    <Card className="hover:shadow-md transition-shadow group relative">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <Book className="w-5 h-5 text-blue-500" />
-          {novel}
-        </CardTitle>
+        <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-lg truncate pr-8" title={novel}>
+            <Book className="w-5 h-5 text-blue-500 shrink-0" />
+            <span className="truncate">{novel}</span>
+            </CardTitle>
+            <button 
+                onClick={handleDeleteNovel}
+                disabled={deleteNovelMutation.isPending}
+                className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md absolute top-4 right-4"
+                title="删除整个知识库"
+            >
+                {deleteNovelMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+            </button>
+        </div>
         <CardDescription>
             {isLoading ? "加载版本信息..." : `共 ${versions?.length || 0} 个版本`}
         </CardDescription>
@@ -37,10 +75,17 @@ function NovelVersionsCard({ novel }: { novel: string }) {
             <div className="flex flex-wrap gap-2">
                 {versions && versions.length > 0 ? (
                     versions.map((v) => (
-                        <span key={v} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
+                        <div key={v} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100 group/tag">
                             <GitBranch className="w-3 h-3 mr-1" />
                             {v}
-                        </span>
+                            <button 
+                                onClick={() => handleDeleteVersion(v)}
+                                className="ml-1.5 p-0.5 text-blue-400 hover:text-red-500 rounded-full hover:bg-red-50 hidden group-hover/tag:block"
+                                title="删除版本"
+                            >
+                                <Trash2 className="w-3 h-3" />
+                            </button>
+                        </div>
                     ))
                 ) : (
                     <span className="text-sm text-gray-400 italic">暂无版本数据</span>

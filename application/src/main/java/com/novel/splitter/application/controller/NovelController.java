@@ -1,5 +1,6 @@
 package com.novel.splitter.application.controller;
 
+import com.novel.splitter.application.config.AppConfig;
 import com.novel.splitter.application.service.etl.NovelIngestionService;
 import com.novel.splitter.domain.model.dto.IngestRequest;
 import lombok.RequiredArgsConstructor;
@@ -25,18 +26,29 @@ import java.util.stream.Stream;
 public class NovelController {
 
     private final NovelIngestionService ingestionService;
-    private static final String NOVEL_STORAGE_PATH = "d:\\soft\\novel-splitter\\data\\novel-storage";
+    private final AppConfig appConfig;
+
+    private Path getStoragePath() throws IOException {
+        Path path = Paths.get(appConfig.getStorage().getRootPath());
+        if (!Files.exists(path)) {
+            Files.createDirectories(path);
+        }
+        return path;
+    }
 
     @GetMapping
     public ResponseEntity<List<String>> listNovels() {
-        try (Stream<Path> stream = Files.list(Paths.get(NOVEL_STORAGE_PATH))) {
-            List<String> files = stream
-                    .filter(file -> !Files.isDirectory(file))
-                    .map(Path::getFileName)
-                    .map(Path::toString)
-                    .filter(name -> name.endsWith(".txt"))
-                    .collect(Collectors.toList());
-            return ResponseEntity.ok(files);
+        try {
+            Path storagePath = getStoragePath();
+            try (Stream<Path> stream = Files.list(storagePath)) {
+                List<String> files = stream
+                        .filter(file -> !Files.isDirectory(file))
+                        .map(Path::getFileName)
+                        .map(Path::toString)
+                        .filter(name -> name.endsWith(".txt"))
+                        .collect(Collectors.toList());
+                return ResponseEntity.ok(files);
+            }
         } catch (Exception e) {
             log.error("Failed to list novels", e);
             return ResponseEntity.internalServerError().body(Collections.emptyList());
@@ -49,22 +61,41 @@ public class NovelController {
             return ResponseEntity.badRequest().body(Map.of("error", "File is empty"));
         }
         try {
-            Path destination = Paths.get(NOVEL_STORAGE_PATH, file.getOriginalFilename());
+            String originalFilename = file.getOriginalFilename();
+            String newFilename = generateUniqueFilename(originalFilename);
+            Path destination = getStoragePath().resolve(newFilename);
             Files.copy(file.getInputStream(), destination, StandardCopyOption.REPLACE_EXISTING);
-            return ResponseEntity.ok(Map.of("message", "File uploaded successfully: " + file.getOriginalFilename()));
+            return ResponseEntity.ok(Map.of("message", "File uploaded successfully: " + newFilename, "fileName", newFilename));
         } catch (IOException e) {
             log.error("Failed to upload file", e);
             return ResponseEntity.internalServerError().body(Map.of("error", "Upload failed: " + e.getMessage()));
         }
     }
 
+    private String generateUniqueFilename(String originalFilename) {
+        if (originalFilename == null) return "unknown_" + System.currentTimeMillis() + ".txt";
+        
+        String name = originalFilename;
+        String ext = "";
+        int dotIndex = originalFilename.lastIndexOf('.');
+        if (dotIndex > 0) {
+            name = originalFilename.substring(0, dotIndex);
+            ext = originalFilename.substring(dotIndex);
+        }
+        
+        java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
+        String timestamp = java.time.LocalDateTime.now().format(formatter);
+        
+        return name + "_" + timestamp + ext;
+    }
+
     @PostMapping("/ingest")
     public ResponseEntity<Map<String, String>> ingest(@RequestBody IngestRequest request) {
         log.info("Received ingest request: {}", request);
         try {
-            Path novelPath = Paths.get(NOVEL_STORAGE_PATH, request.getFileName());
+            Path novelPath = getStoragePath().resolve(request.getFileName());
             if (!Files.exists(novelPath)) {
-                return ResponseEntity.badRequest().body(Map.of("error", "File not found"));
+                return ResponseEntity.badRequest().body(Map.of("error", "File not found: " + request.getFileName()));
             }
             
             // Run in a separate thread to avoid blocking (simple async)

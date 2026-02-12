@@ -25,12 +25,19 @@ public class KnowledgeBaseController {
      */
     @GetMapping("/{novelName}/scenes")
     public ResponseEntity<List<Scene>> getScenes(@PathVariable("novelName") String novelName) {
-        return ResponseEntity.ok(knowledgeBaseService.getScenesByNovel(novelName));
+        return ResponseEntity.ok(knowledgeBaseService.getScenesByNovel(normalizeNovelName(novelName)));
     }
 
     @GetMapping("/{novelName}/versions")
     public ResponseEntity<List<String>> listVersions(@PathVariable("novelName") String novelName) {
-        return ResponseEntity.ok(knowledgeBaseService.listVersions(novelName));
+        return ResponseEntity.ok(knowledgeBaseService.listVersions(normalizeNovelName(novelName)));
+    }
+
+    private String normalizeNovelName(String novelName) {
+        if (novelName != null && novelName.endsWith(".txt")) {
+            return novelName.substring(0, novelName.length() - 4);
+        }
+        return novelName;
     }
 
     /**
@@ -65,6 +72,25 @@ public class KnowledgeBaseController {
     @DeleteMapping("/scenes/{id}")
     public ResponseEntity<Void> deleteScene(@PathVariable("id") String id) {
         knowledgeBaseService.deleteScene(id);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * 删除指定版本
+     */
+    @DeleteMapping("/{novelName}/versions/{version}")
+    public ResponseEntity<Void> deleteVersion(@PathVariable("novelName") String novelName, 
+                                              @PathVariable("version") String version) {
+        knowledgeBaseService.deleteVersion(normalizeNovelName(novelName), version);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * 删除整个知识库（包括所有版本和源文件）
+     */
+    @DeleteMapping("/{novelName}")
+    public ResponseEntity<Void> deleteKnowledgeBase(@PathVariable("novelName") String novelName) {
+        knowledgeBaseService.deleteKnowledgeBase(normalizeNovelName(novelName));
         return ResponseEntity.ok().build();
     }
 }

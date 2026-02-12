@@ -17,6 +17,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.io.File;
 
 /**
  * 本地文件系统实现的 Scene 仓库
@@ -152,6 +153,65 @@ public class LocalFileSceneRepository implements SceneRepository {
         } catch (Exception e) {
             log.error("Error deleting scene: " + id, e);
             throw new RuntimeException("Error deleting scene: " + id, e);
+        }
+    }
+
+    @Override
+    public synchronized void deleteVersion(String novelName, String version) {
+        log.info("Deleting version: {}/{}", novelName, version);
+        
+        // 1. Remove from cache
+        List<String> idsToRemove = cache.values().stream()
+            .filter(s -> {
+                if (s.getMetadata() == null) return false;
+                return novelName.equals(s.getMetadata().getNovel()) && 
+                       version.equals(s.getMetadata().getVersion());
+            })
+            .map(Scene::getId)
+            .collect(Collectors.toList());
+            
+        for (String id : idsToRemove) {
+            cache.remove(id);
+            sceneFileMap.remove(id);
+        }
+        
+        // 2. Delete directory
+        Path dir = storageRoot.resolve("scene").resolve(novelName).resolve(version);
+        deleteDirectory(dir);
+    }
+
+    @Override
+    public synchronized void deleteNovel(String novelName) {
+        log.info("Deleting novel: {}", novelName);
+        
+        // 1. Remove from cache
+        List<String> idsToRemove = cache.values().stream()
+            .filter(s -> {
+                if (s.getMetadata() == null) return false;
+                return novelName.equals(s.getMetadata().getNovel());
+            })
+            .map(Scene::getId)
+            .collect(Collectors.toList());
+            
+        for (String id : idsToRemove) {
+            cache.remove(id);
+            sceneFileMap.remove(id);
+        }
+        
+        // 2. Delete directory
+        Path dir = storageRoot.resolve("scene").resolve(novelName);
+        deleteDirectory(dir);
+    }
+
+    private void deleteDirectory(Path path) {
+        if (!Files.exists(path)) return;
+        try (Stream<Path> walk = Files.walk(path)) {
+            walk.sorted(java.util.Comparator.reverseOrder())
+                .map(Path::toFile)
+                .forEach(File::delete);
+        } catch (IOException e) {
+            log.error("Failed to delete directory: " + path, e);
+            throw new RuntimeException("Failed to delete directory: " + path, e);
         }
     }
 
