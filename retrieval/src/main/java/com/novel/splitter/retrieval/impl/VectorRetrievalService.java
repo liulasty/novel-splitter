@@ -45,14 +45,23 @@ public class VectorRetrievalService implements RetrievalService {
             filter.put("version", query.getVersion());
         }
 
+        log.info("Executing vector search with filter: {}", filter);
+
         List<VectorRecord> records = vectorStore.search(queryVector, query.getTopK(), filter);
         log.debug("Found {} vector matches", records.size());
 
         // 3. Hydrate (Vector -> Scene)
         return records.stream()
-                .map(record -> sceneRepository.findById(record.getChunkId()))
-                .filter(Optional::isPresent)
-                .map(Optional::get)
+                .map(record -> {
+                    Optional<Scene> sceneOpt = sceneRepository.findById(record.getChunkId());
+                    if (sceneOpt.isPresent()) {
+                        Scene scene = sceneOpt.get();
+                        scene.setScore(record.getScore());
+                        return scene;
+                    }
+                    return null;
+                })
+                .filter(Objects::nonNull)
                 .toList();
     }
 }

@@ -5,6 +5,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.Map;
+
 /**
  * Prompt 中的上下文块
  * <p>
@@ -25,4 +27,16 @@ public class ContextBlock {
 
     /** 关联的元数据 (直接引用 SceneMetadata) */
     private SceneMetadata sceneMetadata;
+
+    /** Token 数量 */
+    private int tokenCount;
+
+    /** 排名 (1-based) */
+    private int rank;
+
+    /** 评分 */
+    private double score;
+
+    /** 扩展元数据 */
+    private Map<String, Object> metadata;
 }

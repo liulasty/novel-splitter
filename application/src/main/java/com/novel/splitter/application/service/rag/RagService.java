@@ -1,6 +1,8 @@
 package com.novel.splitter.application.service.rag;
 
 import com.novel.splitter.application.config.AppConfig;
+import com.novel.splitter.assembler.api.ContextAssembler;
+import com.novel.splitter.assembler.config.AssemblerConfig;
 import com.novel.splitter.domain.model.Answer;
 import com.novel.splitter.domain.model.ContextBlock;
 import com.novel.splitter.domain.model.Prompt;
@@ -29,8 +31,9 @@ public class RagService {
 
     private final RetrievalService retrievalService;
     private final RobustLlmClient llmClient;
-    private final ContextAdapter contextAdapter;
+    private final ContextAssembler contextAssembler;
     private final AppConfig appConfig;
+    private final AssemblerConfig assemblerConfig;
 
     /**
      * 提出问题并获取回答 (兼容旧接口)
@@ -60,10 +63,16 @@ public class RagService {
             AppConfig.RagConfig ragConfig = appConfig.getRag();
             int actualTopK = topK > 0 ? topK : ragConfig.getDefaultTopK();
             
+            // Normalize novel ID: remove .txt extension to match ingestion convention
+            String novelId = novel;
+            if (novel != null) {
+                novelId = novel.replace(".txt", "");
+            }
+
             RetrievalQuery query = RetrievalQuery.builder()
                     .question(question)
                     .topK(actualTopK)
-                    .novel(novel)
+                    .novel(novelId)
                     .version(version)
                     .build();
             List<Scene> scenes = retrievalService.retrieve(query);
@@ -72,9 +81,8 @@ public class RagService {
 
             // 2. 组装上下文 (Context Assembly)
             stopWatch.start("2. Context Assembly");
-            List<ContextBlock> contextBlocks = scenes.stream()
-                    .map(contextAdapter::convert)
-                    .collect(Collectors.toList());
+            // 使用新版 ContextAssembler 进行流水线处理
+            List<ContextBlock> contextBlocks = contextAssembler.assemble(question, scenes, assemblerConfig);
             stopWatch.stop();
 
             // 3. 构建 Prompt

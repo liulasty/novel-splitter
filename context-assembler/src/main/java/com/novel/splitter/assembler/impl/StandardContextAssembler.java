@@ -1,84 +1,117 @@
 package com.novel.splitter.assembler.impl;
 
 import com.novel.splitter.assembler.api.ContextAssembler;
-import com.novel.splitter.domain.model.context.AssembledContext;
-import com.novel.splitter.domain.model.ContextBlock;
+import com.novel.splitter.assembler.config.AssemblerConfig;
+import com.novel.splitter.assembler.impl.stage.SceneDeduplicator;
+import com.novel.splitter.assembler.impl.stage.SceneMerger;
+import com.novel.splitter.assembler.impl.stage.SceneReScorer;
+import com.novel.splitter.assembler.impl.stage.TokenBudgetAllocator;
 import com.novel.splitter.assembler.support.TokenCounter;
+import com.novel.splitter.domain.model.ContextBlock;
 import com.novel.splitter.domain.model.Scene;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Component
+@Primary
 @RequiredArgsConstructor
+@Slf4j
 public class StandardContextAssembler implements ContextAssembler {
 
+    private final SceneReScorer reScorer;
+    private final SceneDeduplicator deduplicator;
+    private final SceneMerger merger;
+    private final TokenBudgetAllocator allocator;
     private final TokenCounter tokenCounter;
 
     @Override
-    public AssembledContext assemble(List<Scene> retrievedChunks, int maxTokens) {
-        if (retrievedChunks == null || retrievedChunks.isEmpty()) {
-            return AssembledContext.builder()
-                    .blocks(Collections.emptyList())
-                    .totalTokens(0)
-                    .truncated(false)
-                    .build();
+    public List<ContextBlock> assemble(String question, List<Scene> retrievedScenes, AssemblerConfig config) {
+        int originalCount = retrievedScenes != null ? retrievedScenes.size() : 0;
+        if (originalCount == 0) {
+            return Collections.emptyList();
         }
 
-        // 1. 同一 chapterIndex 去重 (保留第一次出现的)
-        List<Scene> deduplicated = deduplicateByChapterIndex(retrievedChunks);
+        // Stage 1: ReScore
+        // 注意：ReScore 会直接修改 Scene 对象的 score 字段
+        reScorer.rescore(retrievedScenes, question, config);
 
-        // 2. 按 chapterIndex + paragraphIndex 排序
-        deduplicated.sort(Comparator.comparingInt(Scene::getChapterIndex)
+        // Stage 2: Deduplicate
+        List<Scene> uniqueScenes = deduplicator.deduplicate(retrievedScenes);
+        int dedupCount = uniqueScenes.size();
+
+        // Stage 3: Merge Adjacent
+        List<Scene> mergedScenes = merger.merge(uniqueScenes, config);
+        int mergedCount = mergedScenes.size();
+
+        // Stage 4: Token Budget Control
+        List<Scene> finalScenes = allocator.allocate(mergedScenes, config);
+        int finalCount = finalScenes.size();
+        
+        // Calculate stats
+        int totalTokens = finalScenes.stream().mapToInt(s -> tokenCounter.count(s.getText())).sum();
+        int truncatedCount = mergedCount - finalCount;
+
+        // Stage 5: Final Sort & Build
+        // 5.1 计算 Rank (基于 Score 在 finalScenes 中的排名)
+        List<Scene> rankedScenes = new ArrayList<>(finalScenes);
+        rankedScenes.sort(Comparator.comparingDouble((Scene s) -> s.getScore() != null ? s.getScore() : 0.0).reversed());
+        
+        Map<String, Integer> rankMap = new HashMap<>();
+        for (int i = 0; i < rankedScenes.size(); i++) {
+            rankMap.put(rankedScenes.get(i).getId(), i + 1);
+        }
+
+        // 5.2 按文档顺序 (Chapter -> Paragraph) 排序，以便 LLM 阅读
+        finalScenes.sort(Comparator.comparingInt(Scene::getChapterIndex)
                 .thenComparingInt(Scene::getStartParagraphIndex));
 
-        // 3. 按 Token 上限截断
-        List<Scene> truncatedList = new ArrayList<>();
-        int currentTokens = 0;
-        boolean isTruncated = false;
-
-        for (Scene scene : deduplicated) {
-            int sceneTokens = tokenCounter.count(scene.getText());
-            // 如果加入当前 Scene 会超限，则停止
-            if (currentTokens + sceneTokens > maxTokens) {
-                isTruncated = true;
-                break;
-            }
-            truncatedList.add(scene);
-            currentTokens += sceneTokens;
-        }
-
-        // 4. 生成稳定编号 (C1, C2...) 并转换为 ContextBlock
         List<ContextBlock> blocks = new ArrayList<>();
-        for (int i = 0; i < truncatedList.size(); i++) {
-            Scene scene = truncatedList.get(i);
+        for (Scene scene : finalScenes) {
+            int tokens = tokenCounter.count(scene.getText());
+            int rank = rankMap.getOrDefault(scene.getId(), 0);
+            
+            Map<String, Object> metadata = new HashMap<>();
+            if (scene.getMetadata() != null) {
+                metadata.put("novelName", scene.getMetadata().getNovel());
+                metadata.put("chapterTitle", scene.getMetadata().getChapterTitle());
+                metadata.put("chapterIndex", scene.getMetadata().getChapterIndex());
+                if (scene.getMetadata().getExtra() != null) {
+                    metadata.putAll(scene.getMetadata().getExtra());
+                }
+            }
+            // Ensure mergedSceneIds is visible
+            if (scene.getMetadata() != null && scene.getMetadata().getExtra() != null) {
+                Object mergedIds = scene.getMetadata().getExtra().get("mergedSceneIds");
+                if (mergedIds != null) {
+                    metadata.put("mergedSceneIds", mergedIds);
+                }
+            }
+
             blocks.add(ContextBlock.builder()
-                    .chunkId("C" + (i + 1))
+                    .chunkId(scene.getId())
                     .content(scene.getText())
                     .sceneMetadata(scene.getMetadata())
+                    .tokenCount(tokens)
+                    .rank(rank)
+                    .score(scene.getScore() != null ? scene.getScore() : 0.0)
+                    .metadata(metadata)
                     .build());
         }
 
-        return AssembledContext.builder()
-                .blocks(blocks)
-                .totalTokens(currentTokens)
-                .truncated(isTruncated)
-                .build();
-    }
+        // Log Output
+        log.info("\n[Assembler]\n" +
+                "- 原始检索数量: {}\n" +
+                "- 去重后数量: {}\n" +
+                "- 合并后数量: {}\n" +
+                "- 最终使用数量: {}\n" +
+                "- 总Token: {}\n" +
+                "- 被截断数量: {}",
+                originalCount, dedupCount, mergedCount, finalCount, totalTokens, truncatedCount);
 
-    private List<Scene> deduplicateByChapterIndex(List<Scene> scenes) {
-        Set<Integer> seenChapters = new HashSet<>();
-        List<Scene> result = new ArrayList<>();
-        
-        for (Scene scene : scenes) {
-            // Scene.chapterIndex is primitive int, so no null check needed
-            if (!seenChapters.contains(scene.getChapterIndex())) {
-                seenChapters.add(scene.getChapterIndex());
-                result.add(scene);
-            }
-        }
-        return result;
+        return blocks;
     }
 }

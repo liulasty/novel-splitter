@@ -68,4 +68,9 @@ public class Scene {
      * 元数据
      */
     private SceneMetadata metadata;
+
+    /**
+     * 检索评分 (非持久化字段，运行时注入)
+     */
+    private Double score;
 }

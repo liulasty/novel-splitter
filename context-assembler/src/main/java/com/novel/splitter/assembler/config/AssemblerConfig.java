@@ -23,4 +23,34 @@ public class AssemblerConfig {
      * 推荐值：900
      */
     private int maxChunkLength = 900;
+
+    /**
+     * 最大 Context Token 限制
+     */
+    private int maxContextTokens = 3000;
+
+    /**
+     * 为回答保留的 Token 数
+     */
+    private int reserveForAnswerTokens = 1000;
+
+    /**
+     * 是否开启邻接合并
+     */
+    private boolean enableMerge = true;
+
+    /**
+     * 是否开启重评分
+     */
+    private boolean enableRescore = true;
+
+    /**
+     * 是否开启关键词加权
+     */
+    private boolean enableKeywordBoost = true;
+
+    /**
+     * 最大 Scene 数量限制 (同 maxChunks，保留以兼容)
+     */
+    private int maxScenes = 5;
 }
