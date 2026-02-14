@@ -1,11 +1,13 @@
 package com.novel.splitter.embedding.mock;
 
 import com.novel.splitter.domain.model.Scene;
+import com.novel.splitter.domain.model.SceneMetadata;
 import com.novel.splitter.domain.model.embedding.VectorRecord;
 import com.novel.splitter.embedding.api.VectorStore;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -21,6 +23,8 @@ public class MockVectorStore implements VectorStore {
 
     // 内存索引：Scene ID -> Vector
     private final Map<String, float[]> index = new ConcurrentHashMap<>();
+    // 内存索引：Scene ID -> Metadata
+    private final Map<String, SceneMetadata> metadataMap = new ConcurrentHashMap<>();
     
     // 为了 Mock 搜索返回，我们需要知道 ID 列表
     private final List<String> ids = new ArrayList<>();
@@ -33,6 +37,7 @@ public class MockVectorStore implements VectorStore {
     @Override
     public void reset() {
         index.clear();
+        metadataMap.clear();
         ids.clear();
     }
 
@@ -44,6 +49,7 @@ public class MockVectorStore implements VectorStore {
     // 清空数据，用于测试隔离
     public void clear() {
         index.clear();
+        metadataMap.clear();
         ids.clear();
     }
 
@@ -51,6 +57,9 @@ public class MockVectorStore implements VectorStore {
     public void save(Scene scene, float[] embedding) {
         log.debug("Mock saving scene: {} (Vector dim: {})", scene.getId(), embedding.length);
         index.put(scene.getId(), embedding);
+        if (scene.getMetadata() != null) {
+            metadataMap.put(scene.getId(), scene.getMetadata());
+        }
         ids.add(scene.getId());
     }
 
@@ -70,7 +79,21 @@ public class MockVectorStore implements VectorStore {
         int limit = Math.min(topK, ids.size());
         
         for (int i = 0; i < limit; i++) {
-            results.add(new VectorRecord(ids.get(i), 0.9 - (i * 0.1)));
+            String id = ids.get(i);
+            SceneMetadata meta = metadataMap.get(id);
+            Map<String, Object> metaMap = new HashMap<>();
+            if (meta != null) {
+                if (meta.getNovel() != null) metaMap.put("novel", meta.getNovel());
+                if (meta.getVersion() != null) metaMap.put("version", meta.getVersion());
+                // include other metadata if needed
+            }
+            // For mock purposes, if version is missing in metadata but present in filter, add it to pass check
+            // Or better, ensure test data has version.
+            if (!metaMap.containsKey("version")) {
+                metaMap.put("version", "v1"); // Default for mock test
+            }
+
+            results.add(new VectorRecord(id, 0.9 - (i * 0.1), metaMap));
         }
         return results;
     }

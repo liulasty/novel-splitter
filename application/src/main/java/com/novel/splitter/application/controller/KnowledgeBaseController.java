@@ -41,41 +41,6 @@ public class KnowledgeBaseController {
     }
 
     /**
-     * 根据 ID 获取 Scene
-     */
-    @GetMapping("/scenes/{id}")
-    public ResponseEntity<Scene> getScene(@PathVariable("id") String id) {
-        try {
-            return ResponseEntity.ok(knowledgeBaseService.getSceneById(id));
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
-    }
-
-    /**
-     * 更新 Scene
-     */
-    @PutMapping("/scenes")
-    public ResponseEntity<Void> updateScene(@RequestBody Scene scene) {
-        try {
-            knowledgeBaseService.updateScene(scene);
-            return ResponseEntity.ok().build();
-        } catch (RuntimeException e) {
-            log.error("Update failed", e);
-            return ResponseEntity.badRequest().build();
-        }
-    }
-
-    /**
-     * 删除 Scene
-     */
-    @DeleteMapping("/scenes/{id}")
-    public ResponseEntity<Void> deleteScene(@PathVariable("id") String id) {
-        knowledgeBaseService.deleteScene(id);
-        return ResponseEntity.ok().build();
-    }
-
-    /**
      * 删除指定版本
      */
     @DeleteMapping("/{novelName}/versions/{version}")

@@ -26,5 +26,5 @@ public class ChromaQueryResponse {
     /** 
      * 匹配的文档元数据列表
      */
-    private List<List<Object>> metadatas;
+    private List<List<java.util.Map<String, Object>>> metadatas;
 }

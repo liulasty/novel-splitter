@@ -17,6 +17,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -187,8 +188,8 @@ public class ChromaVectorStore implements VectorStore {
         Map<String, Object> request = new HashMap<>();
         request.put("query_embeddings", Collections.singletonList(embeddingList));
         request.put("n_results", topK);
-        // We only need ids and distances
-        request.put("include", Collections.singletonList("distances")); 
+        // We need ids, distances, and metadatas
+        request.put("include", Arrays.asList("distances", "metadatas")); 
         
         if (filter != null && !filter.isEmpty()) {
             if (filter.size() == 1) {
@@ -213,12 +214,20 @@ public class ChromaVectorStore implements VectorStore {
 
         List<String> resultIds = response.getIds().get(0);
         List<Double> distances = response.getDistances().get(0);
+        List<Map<String, Object>> resultMetas = (response.getMetadatas() != null && !response.getMetadatas().isEmpty()) ? response.getMetadatas().get(0) : null;
 
         return IntStream.range(0, resultIds.size())
-                .mapToObj(i -> new VectorRecord(
-                        resultIds.get(i),
-                        1.0 - distances.get(i) // Convert distance to similarity score approx
-                ))
+                .mapToObj(i -> {
+                    Map<String, Object> meta = null;
+                    if (resultMetas != null && i < resultMetas.size()) {
+                        meta = resultMetas.get(i);
+                    }
+                    return new VectorRecord(
+                            resultIds.get(i),
+                            1.0 - distances.get(i), // Convert distance to similarity score approx
+                            meta
+                    );
+                })
                 .collect(Collectors.toList());
     }
 

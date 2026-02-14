@@ -8,15 +8,13 @@ import com.novel.splitter.embedding.api.VectorStore;
 import com.novel.splitter.embedding.mock.MockEmbeddingService;
 import com.novel.splitter.embedding.mock.MockVectorStore;
 import com.novel.splitter.repository.api.SceneRepository;
-import com.novel.splitter.repository.impl.LocalFileSceneRepository;
 import com.novel.splitter.retrieval.api.RetrievalService;
 import com.novel.splitter.retrieval.impl.VectorRetrievalService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.util.Collections;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * 离线验证脚本
@@ -37,10 +35,7 @@ class RetrievalQualityTest {
         embeddingService = new MockEmbeddingService(768);
         vectorStore = new MockVectorStore();
         
-        // 使用一个 Mock 的 SceneRepository 或者真实的 LocalFileSceneRepository
-        // 这里为了简单，我们扩展 LocalFileSceneRepository 或者直接 Mock 它
-        // 由于 LocalFileSceneRepository 依赖文件系统，测试环境可能没有文件
-        // 所以我们手动 Mock 一个带数据的 Repository
+        // 使用一个 Mock 的 SceneRepository
         sceneRepository = new InMemorySceneRepository();
 
         // 2. 组装 Service
@@ -51,19 +46,22 @@ class RetrievalQualityTest {
     }
 
     private void prepareTestData() {
+        String novelName = "九阳帝尊";
+        String version = "v1";
+
         // 创建几个模拟 Scene 并存入 Repository 和 VectorStore
-        Scene s1 = createScene("楚晨无法修炼", "第一章", 1);
-        Scene s2 = createScene("楚晨遇到小师妹", "第二章", 2);
+        Scene s1 = createScene(novelName, version, "楚晨无法修炼", "第一章", 1);
+        Scene s2 = createScene(novelName, version, "楚晨遇到小师妹", "第二章", 2);
         
         // 保存到 Repository
-        sceneRepository.saveScenes("test-novel", "v1", List.of(s1, s2));
+        sceneRepository.saveScenes(novelName, version, List.of(s1, s2));
         
         // 保存到 VectorStore (模拟 Embedding 过程)
         vectorStore.save(s1, embeddingService.embed(s1.getText()));
         vectorStore.save(s2, embeddingService.embed(s2.getText()));
     }
 
-    private Scene createScene(String text, String chapterTitle, int index) {
+    private Scene createScene(String novel, String version, String text, String chapterTitle, int index) {
         return Scene.builder()
                 .id(UUID.randomUUID().toString())
                 .text(text)
@@ -73,7 +71,8 @@ class RetrievalQualityTest {
                 .endParagraphIndex(10)
                 .wordCount(text.length())
                 .metadata(SceneMetadata.builder()
-                        .novel("九阳帝尊")
+                        .novel(novel)
+                        .version(version)
                         .chapterTitle(chapterTitle)
                         .chapterIndex(index)
                         .role("narration")
@@ -117,38 +116,60 @@ class RetrievalQualityTest {
      * 简单的内存 Repository 用于测试
      */
     static class InMemorySceneRepository implements SceneRepository {
-        private final java.util.Map<String, Scene> store = new java.util.HashMap<>();
+        // Map<NovelName::Version, List<Scene>>
+        private final Map<String, List<Scene>> store = new HashMap<>();
+
+        private String getKey(String novelName, String version) {
+            return novelName + "::" + version;
+        }
 
         @Override
         public void saveScenes(String novelName, String version, List<Scene> scenes) {
-            scenes.forEach(s -> store.put(s.getId(), s));
+            store.put(getKey(novelName, version), new ArrayList<>(scenes));
         }
 
         @Override
-        public java.util.Optional<Scene> findById(String id) {
-            return java.util.Optional.ofNullable(store.get(id));
+        public List<Scene> loadScenes(String novelName, String version) {
+            return store.getOrDefault(getKey(novelName, version), Collections.emptyList());
         }
 
         @Override
-        public List<Scene> findByNovel(String novelName) {
-            return store.values().stream()
-                    .filter(s -> s.getMetadata() != null && novelName.equals(s.getMetadata().getNovel()))
-                    .collect(java.util.stream.Collectors.toList());
+        public void deleteVersion(String novelName, String version) {
+            store.remove(getKey(novelName, version));
         }
 
         @Override
-        public void update(Scene scene) {
-            store.put(scene.getId(), scene);
-        }
-
-        @Override
-        public void delete(String id) {
-            store.remove(id);
+        public void deleteNovel(String novelName) {
+            // remove all keys starting with novelName::
+            List<String> keysToRemove = new ArrayList<>();
+            for (String key : store.keySet()) {
+                if (key.startsWith(novelName + "::")) {
+                    keysToRemove.add(key);
+                }
+            }
+            keysToRemove.forEach(store::remove);
         }
 
         @Override
         public List<String> listVersions(String novelName) {
-            return java.util.Collections.emptyList();
+            List<String> versions = new ArrayList<>();
+            for (String key : store.keySet()) {
+                if (key.startsWith(novelName + "::")) {
+                    versions.add(key.substring(novelName.length() + 2));
+                }
+            }
+            return versions;
+        }
+
+        @Override
+        public List<Scene> findByNovel(String novelName) {
+            List<Scene> result = new ArrayList<>();
+            for (Map.Entry<String, List<Scene>> entry : store.entrySet()) {
+                if (entry.getKey().startsWith(novelName + "::")) {
+                    result.addAll(entry.getValue());
+                }
+            }
+            return result;
         }
     }
 }

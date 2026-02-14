@@ -62,8 +62,9 @@ chroma:
   collection: novel-splitter
 
 assembler:
-  max-chunks: 3
-  max-chunk-length: 900
+  max-chunks: 5
+  max-chunk-length: 3000
+  max-context-tokens: 12000
 
 splitter:
   storage:

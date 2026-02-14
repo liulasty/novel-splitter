@@ -33,35 +33,6 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
     }
 
     @Override
-    public Scene getSceneById(String id) {
-        return sceneRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Scene not found: " + id));
-    }
-
-    @Override
-    public void updateScene(Scene scene) {
-        log.info("Updating scene: {}", scene.getId());
-        // 简单校验
-        sceneRepository.findById(scene.getId())
-                .orElseThrow(() -> new RuntimeException("Scene not found: " + scene.getId()));
-        
-        sceneRepository.update(scene);
-    }
-
-    @Override
-    public void deleteScene(String id) {
-        log.info("Deleting scene: {}", id);
-        sceneRepository.delete(id);
-        // Also delete from vector store? 
-        // Current VectorStore delete takes a filter. 
-        // We can't easily delete a single vector by ID unless we expose deleteById or filter by ID.
-        // VectorStore.delete(Map<String, Object> filter)
-        // If we want to delete by ID, we'd need to extend VectorStore or rely on metadata having ID (unlikely).
-        // For now, assume sceneRepository handles the main deletion, and VectorStore might be out of sync if we delete single scene.
-        // Ideally VectorStore should support deleteById.
-    }
-
-    @Override
     public void deleteVersion(String novelName, String version) {
         log.info("Deleting version: {}/{}", novelName, version);
         sceneRepository.deleteVersion(novelName, version);
@@ -76,26 +47,47 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         
         try {
             // Delete raw file
-            // Note: Raw files are stored in {root}/raw/{novelName}.txt
-            java.nio.file.Path rawDir = Paths.get(novelStoragePath, "raw");
+            // Strategy: Check 'raw' subdirectory first (Downloader), then root (Uploader)
+            java.nio.file.Path rootDir = Paths.get(novelStoragePath);
+            java.nio.file.Path rawDir = rootDir.resolve("raw");
             
-            // Try with .txt extension
-            java.nio.file.Path rawPath = rawDir.resolve(novelName + ".txt");
-            if (Files.exists(rawPath)) {
-                Files.delete(rawPath);
-                log.info("Deleted raw file: {}", rawPath);
+            // 1. Check in 'raw' subdirectory
+            boolean deleted = deleteFileIfExists(rawDir, novelName);
+            
+            // 2. If not found/deleted in 'raw', check in root directory
+            if (!deleted) {
+                deleted = deleteFileIfExists(rootDir, novelName);
+            }
+            
+            if (deleted) {
+                log.info("Successfully deleted raw file for novel: {}", novelName);
             } else {
-                 // Try exact match if novelName already has extension or without extension
-                 rawPath = rawDir.resolve(novelName);
-                 if (Files.exists(rawPath)) {
-                     Files.delete(rawPath);
-                     log.info("Deleted raw file: {}", rawPath);
-                 }
+                log.warn("Raw file not found for deletion: {}", novelName);
             }
         } catch (Exception e) {
             log.error("Failed to delete raw file for novel: " + novelName, e);
             // Don't throw, partial success is better
         }
+    }
+
+    private boolean deleteFileIfExists(java.nio.file.Path dir, String novelName) throws java.io.IOException {
+        // Try with .txt extension
+        java.nio.file.Path path = dir.resolve(novelName + ".txt");
+        if (Files.exists(path)) {
+            Files.delete(path);
+            log.info("Deleted raw file: {}", path);
+            return true;
+        }
+        
+        // Try exact match
+        path = dir.resolve(novelName);
+        if (Files.exists(path)) {
+            Files.delete(path);
+            log.info("Deleted raw file: {}", path);
+            return true;
+        }
+        
+        return false;
     }
 
     @Override

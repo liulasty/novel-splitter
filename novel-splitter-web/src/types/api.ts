@@ -61,3 +61,25 @@ export interface VectorRecord {
   score: number;
 }
 
+// RAG Debug related interfaces
+export interface ContextBlock {
+  chunkId: string;
+  content: string;
+  tokenCount: number;
+  score: number;
+  metadata?: Record<string, any>;
+}
+
+export interface Prompt {
+  systemInstruction: string;
+  userQuestion: string;
+  contextBlocks: ContextBlock[];
+  outputConstraint: string;
+}
+
+export interface RagDebugResponse {
+  retrievedScenes: Scene[];
+  contextBlocks: ContextBlock[];
+  finalPrompt: Prompt;
+  stats: Record<string, any>;
+}

@@ -5,6 +5,7 @@ import KnowledgePage from '@/pages/KnowledgePage';
 import IngestPage from '@/pages/IngestPage';
 import SystemPage from '@/pages/SystemPage';
 import ErrorPage from '@/pages/ErrorPage';
+import RagDebugPage from '@/pages/RagDebugPage';
 
 export const router = createBrowserRouter([
   {
@@ -27,6 +28,10 @@ export const router = createBrowserRouter([
       {
         path: 'system',
         element: <SystemPage />,
+      },
+      {
+        path: 'debug',
+        element: <RagDebugPage />,
       },
     ],
   },

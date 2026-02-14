@@ -5,35 +5,29 @@ import com.novel.splitter.infrastructure.json.JsonUtils;
 import com.novel.splitter.repository.api.SceneRepository;
 import lombok.extern.slf4j.Slf4j;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import java.io.File;
 
 /**
  * 本地文件系统实现的 Scene 仓库
  * <p>
  * 存储结构：root/scene/{novelName}/{version}/scenes.json
+ * 作为“文件产物管理器”，只负责文件的存取和管理，不维护细粒度索引。
  * </p>
  */
 @Slf4j
 public class LocalFileSceneRepository implements SceneRepository {
 
     private final Path storageRoot;
-    
-    // 简单的内存缓存：SceneID -> Scene
-    private final Map<String, Scene> cache = new ConcurrentHashMap<>();
-    // 简单的文件映射：SceneID -> FilePath
-    private final Map<String, Path> sceneFileMap = new ConcurrentHashMap<>();
 
     public LocalFileSceneRepository(String storageRootPath) {
         this.storageRoot = Paths.get(storageRootPath);
@@ -48,171 +42,50 @@ public class LocalFileSceneRepository implements SceneRepository {
             }
             Path file = dir.resolve("scenes.json");
             JsonUtils.writeToFile(file, scenes);
-            
-            // 更新缓存
-            for (Scene scene : scenes) {
-                cache.put(scene.getId(), scene);
-                sceneFileMap.put(scene.getId(), file);
-            }
+            log.info("Saved {} scenes to {}", scenes.size(), file);
         } catch (IOException e) {
             throw new RuntimeException("Failed to save scenes to " + dir, e);
         }
     }
 
     @Override
-    public Optional<Scene> findById(String id) {
-        // 1. 查缓存
-        if (cache.containsKey(id)) {
-            return Optional.of(cache.get(id));
+    public List<Scene> loadScenes(String novelName, String version) {
+        Path file = storageRoot.resolve("scene").resolve(novelName).resolve(version).resolve("scenes.json");
+        if (!Files.exists(file)) {
+            log.warn("Scenes file not found: {}", file);
+            return new ArrayList<>();
         }
-
-        // 2. 如果缓存未命中，尝试扫描磁盘
-        log.warn("Scene cache miss for id: {}. Scanning disk...", id);
-        scanAndLoadCache();
-        
-        return Optional.ofNullable(cache.get(id));
+        try {
+            Scene[] sceneArray = JsonUtils.readFromFile(file, Scene[].class);
+            return sceneArray != null ? new ArrayList<>(Arrays.asList(sceneArray)) : new ArrayList<>();
+        } catch (Exception e) {
+            log.error("Failed to load scenes from " + file, e);
+            throw new RuntimeException("Failed to load scenes from " + file, e);
+        }
     }
 
     @Override
     public List<Scene> findByNovel(String novelName) {
-        try {
-            scanAndLoadCache(); // 确保缓存已加载
-            return cache.values().stream()
-                    .filter(s -> s.getMetadata() != null && novelName.equals(s.getMetadata().getNovel()))
-                    .collect(Collectors.toList());
-        } catch (Exception e) {
-            log.error("Error finding scenes for novel: " + novelName, e);
-            throw new RuntimeException("Error finding scenes for novel: " + novelName, e);
+        List<Scene> allScenes = new ArrayList<>();
+        List<String> versions = listVersions(novelName);
+        for (String version : versions) {
+            allScenes.addAll(loadScenes(novelName, version));
         }
+        return allScenes;
     }
 
     @Override
-    public synchronized void update(Scene scene) {
-        try {
-            if (!cache.containsKey(scene.getId())) {
-                 // 尝试加载
-                 scanAndLoadCache();
-                 if (!cache.containsKey(scene.getId())) {
-                     throw new RuntimeException("Scene not found: " + scene.getId());
-                 }
-            }
-    
-            Path file = sceneFileMap.get(scene.getId());
-            if (file == null) {
-                 throw new RuntimeException("Scene file not found for: " + scene.getId());
-            }
-    
-            // 这是一个低效实现：读取文件，替换，写回
-            Scene[] sceneArray = JsonUtils.readFromFile(file, Scene[].class);
-            List<Scene> scenes = new ArrayList<>(Arrays.asList(sceneArray));
-            
-            boolean found = false;
-            for (int i = 0; i < scenes.size(); i++) {
-                if (scenes.get(i).getId().equals(scene.getId())) {
-                    scenes.set(i, scene);
-                    found = true;
-                    break;
-                }
-            }
-            
-            if (found) {
-                JsonUtils.writeToFile(file, scenes);
-                cache.put(scene.getId(), scene);
-            }
-        } catch (Exception e) {
-            log.error("Error updating scene: " + scene.getId(), e);
-            throw new RuntimeException("Error updating scene: " + scene.getId(), e);
-        }
-    }
-
-    @Override
-    public synchronized void delete(String id) {
-        try {
-            if (!cache.containsKey(id)) {
-                 scanAndLoadCache();
-                 if (!cache.containsKey(id)) {
-                     return; // Already deleted or not exist
-                 }
-            }
-    
-            Path file = sceneFileMap.get(id);
-            if (file == null) {
-                 throw new RuntimeException("Scene file not found for: " + id);
-            }
-    
-            Scene[] sceneArray = JsonUtils.readFromFile(file, Scene[].class);
-            List<Scene> scenes = new ArrayList<>(Arrays.asList(sceneArray));
-            
-            boolean removed = scenes.removeIf(s -> s.getId().equals(id));
-            
-            if (removed) {
-                JsonUtils.writeToFile(file, scenes);
-                cache.remove(id);
-                sceneFileMap.remove(id);
-            }
-        } catch (Exception e) {
-            log.error("Error deleting scene: " + id, e);
-            throw new RuntimeException("Error deleting scene: " + id, e);
-        }
-    }
-
-    @Override
-    public synchronized void deleteVersion(String novelName, String version) {
+    public void deleteVersion(String novelName, String version) {
         log.info("Deleting version: {}/{}", novelName, version);
-        
-        // 1. Remove from cache
-        List<String> idsToRemove = cache.values().stream()
-            .filter(s -> {
-                if (s.getMetadata() == null) return false;
-                return novelName.equals(s.getMetadata().getNovel()) && 
-                       version.equals(s.getMetadata().getVersion());
-            })
-            .map(Scene::getId)
-            .collect(Collectors.toList());
-            
-        for (String id : idsToRemove) {
-            cache.remove(id);
-            sceneFileMap.remove(id);
-        }
-        
-        // 2. Delete directory
         Path dir = storageRoot.resolve("scene").resolve(novelName).resolve(version);
         deleteDirectory(dir);
     }
 
     @Override
-    public synchronized void deleteNovel(String novelName) {
+    public void deleteNovel(String novelName) {
         log.info("Deleting novel: {}", novelName);
-        
-        // 1. Remove from cache
-        List<String> idsToRemove = cache.values().stream()
-            .filter(s -> {
-                if (s.getMetadata() == null) return false;
-                return novelName.equals(s.getMetadata().getNovel());
-            })
-            .map(Scene::getId)
-            .collect(Collectors.toList());
-            
-        for (String id : idsToRemove) {
-            cache.remove(id);
-            sceneFileMap.remove(id);
-        }
-        
-        // 2. Delete directory
         Path dir = storageRoot.resolve("scene").resolve(novelName);
         deleteDirectory(dir);
-    }
-
-    private void deleteDirectory(Path path) {
-        if (!Files.exists(path)) return;
-        try (Stream<Path> walk = Files.walk(path)) {
-            walk.sorted(java.util.Comparator.reverseOrder())
-                .map(Path::toFile)
-                .forEach(File::delete);
-        } catch (IOException e) {
-            log.error("Failed to delete directory: " + path, e);
-            throw new RuntimeException("Failed to delete directory: " + path, e);
-        }
     }
 
     @Override
@@ -231,38 +104,17 @@ public class LocalFileSceneRepository implements SceneRepository {
         }
     }
 
-    private synchronized void scanAndLoadCache() {
-        if (!cache.isEmpty()) {
+    private void deleteDirectory(Path path) {
+        if (!Files.exists(path)) {
             return;
         }
-        
-        Path sceneRoot = storageRoot.resolve("scene");
-        if (!Files.exists(sceneRoot)) {
-            return;
-        }
-
-        try (Stream<Path> walk = Files.walk(sceneRoot)) {
-            walk.filter(p -> p.toString().endsWith("scenes.json"))
-                .forEach(this::loadScenesFromFile);
+        try (Stream<Path> walk = Files.walk(path)) {
+            walk.sorted(Comparator.reverseOrder())
+                .map(Path::toFile)
+                .forEach(File::delete);
         } catch (IOException e) {
-            log.error("Failed to scan scene directory", e);
-            // We don't throw here to allow partial functionality
-        } catch (Exception e) {
-            log.error("Unexpected error during cache scan", e);
-        }
-    }
-
-    private void loadScenesFromFile(Path path) {
-        try {
-            Scene[] sceneArray = JsonUtils.readFromFile(path, Scene[].class);
-            if (sceneArray != null) {
-                for (Scene scene : sceneArray) {
-                    cache.put(scene.getId(), scene);
-                    sceneFileMap.put(scene.getId(), path);
-                }
-            }
-        } catch (Exception e) {
-            log.error("Failed to load scenes from file: " + path, e);
+            log.error("Failed to delete directory: " + path, e);
+            throw new RuntimeException("Failed to delete directory: " + path, e);
         }
     }
 }

@@ -19,4 +19,7 @@ public class VectorRecord {
     
     /** 相似度分数 */
     private double score;
+
+    /** 元数据 */
+    private java.util.Map<String, Object> metadata;
 }

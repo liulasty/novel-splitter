@@ -11,11 +11,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Map;
-import java.util.HashMap;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * 基于向量的检索服务实现
@@ -51,17 +48,51 @@ public class VectorRetrievalService implements RetrievalService {
         log.debug("Found {} vector matches", records.size());
 
         // 3. Hydrate (Vector -> Scene)
-        return records.stream()
-                .map(record -> {
-                    Optional<Scene> sceneOpt = sceneRepository.findById(record.getChunkId());
-                    if (sceneOpt.isPresent()) {
-                        Scene scene = sceneOpt.get();
-                        scene.setScore(record.getScore());
-                        return scene;
+        // Group by novel/version to minimize file IO
+        Map<String, List<VectorRecord>> groupedRecords = new HashMap<>();
+        List<VectorRecord> processingOrder = new ArrayList<>();
+
+        for (VectorRecord record : records) {
+            Map<String, Object> meta = record.getMetadata();
+            if (meta == null || !meta.containsKey("novel") || !meta.containsKey("version")) {
+                log.warn("Vector record {} missing metadata (novel/version), skipping hydration", record.getChunkId());
+                continue;
+            }
+            String key = meta.get("novel") + "::" + meta.get("version");
+            groupedRecords.computeIfAbsent(key, k -> new ArrayList<>()).add(record);
+            processingOrder.add(record);
+        }
+
+        // Load scenes batch by batch
+        Map<String, Scene> hydratedScenes = new HashMap<>();
+        for (Map.Entry<String, List<VectorRecord>> entry : groupedRecords.entrySet()) {
+            String[] parts = entry.getKey().split("::");
+            String novel = parts[0];
+            String version = parts[1];
+
+            try {
+                List<Scene> scenes = sceneRepository.loadScenes(novel, version);
+                Map<String, Scene> sceneMap = scenes.stream()
+                        .collect(Collectors.toMap(Scene::getId, s -> s, (v1, v2) -> v1));
+                
+                for (VectorRecord r : entry.getValue()) {
+                    Scene s = sceneMap.get(r.getChunkId());
+                    if (s != null) {
+                        s.setScore(r.getScore());
+                        hydratedScenes.put(r.getChunkId(), s);
+                    } else {
+                        log.warn("Scene {} not found in file product {}/{}", r.getChunkId(), novel, version);
                     }
-                    return null;
-                })
+                }
+            } catch (Exception e) {
+                log.error("Failed to load scenes for {}/{}", novel, version, e);
+            }
+        }
+
+        // Restore order based on vector search results
+        return processingOrder.stream()
+                .map(r -> hydratedScenes.get(r.getChunkId()))
                 .filter(Objects::nonNull)
-                .toList();
+                .collect(Collectors.toList());
     }
 }

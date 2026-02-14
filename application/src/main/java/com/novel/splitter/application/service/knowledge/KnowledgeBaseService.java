@@ -16,25 +16,6 @@ public interface KnowledgeBaseService {
     List<Scene> getScenesByNovel(String novelName);
 
     /**
-     * 根据 ID 获取 Scene
-     * @param id Scene ID
-     * @return Scene 对象
-     */
-    Scene getSceneById(String id);
-
-    /**
-     * 更新 Scene
-     * @param scene 更新后的 Scene 对象
-     */
-    void updateScene(Scene scene);
-
-    /**
-     * 删除 Scene
-     * @param id Scene ID
-     */
-    void deleteScene(String id);
-
-    /**
      * 删除指定版本的切分结果（及相关向量）
      * @param novelName 小说名称
      * @param version 版本

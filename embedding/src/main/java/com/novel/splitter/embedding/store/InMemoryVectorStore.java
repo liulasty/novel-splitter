@@ -196,19 +196,23 @@ public class InMemoryVectorStore implements VectorStore {
             
             double similarity = cosineSimilarity(queryEmbedding, vector);
 
+            com.novel.splitter.domain.model.SceneMetadata meta = metadataMap.get(id);
+            Map<String, Object> metaMap = new HashMap<>();
+            if (meta != null) {
+                if (meta.getNovel() != null) metaMap.put("novel", meta.getNovel());
+                if (meta.getVersion() != null) metaMap.put("version", meta.getVersion());
+            }
+
             if (topKQueue.size() < topK) {
-                topKQueue.offer(new VectorRecord(id, similarity));
-            } else {
-                if (similarity > topKQueue.peek().getScore()) {
-                    topKQueue.poll();
-                    topKQueue.offer(new VectorRecord(id, similarity));
-                }
+                topKQueue.offer(new VectorRecord(id, similarity, metaMap));
+            } else if (similarity > topKQueue.peek().getScore()) {
+                topKQueue.poll();
+                topKQueue.offer(new VectorRecord(id, similarity, metaMap));
             }
         }
 
-        // 导出并按分数降序排列
         List<VectorRecord> results = new ArrayList<>(topKQueue);
-        results.sort((a, b) -> Double.compare(b.getScore(), a.getScore()));
+        results.sort(Comparator.comparingDouble(VectorRecord::getScore).reversed());
         return results;
     }
 
