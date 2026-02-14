@@ -5,6 +5,7 @@ import { knowledgeApi } from '@/api/knowledgeApi';
 import { ragApi } from '@/api/ragApi';
 import type { RagDebugResponse, ChatRequest, Scene, ContextBlock } from '@/types/api';
 import { estimateTokens } from '@/utils/tokenEstimator';
+import { toast } from 'sonner';
 
 export default function RagDebugPage() {
   const [novels, setNovels] = useState<string[]>([]);
@@ -84,10 +85,10 @@ export default function RagDebugPage() {
     if (!text) return;
     try {
       await navigator.clipboard.writeText(text);
-      alert('已复制完整 Prompt 到剪贴板');
+      toast.success('已复制完整 Prompt 到剪贴板');
     } catch (err) {
       console.error('Failed to copy:', err);
-      alert('复制失败，请手动复制');
+      toast.error('复制失败，请手动复制');
     }
   };
 

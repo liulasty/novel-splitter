@@ -1,12 +1,34 @@
 import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Loader2, Send, Bot, User, BookOpen } from "lucide-react";
+import { Loader2, Send, Bot, User, BookOpen, ChevronDown, ChevronUp } from "lucide-react";
 import { novelApi } from "@/api/novelApi";
 import { knowledgeApi } from "@/api/knowledgeApi";
 import { chatApi } from "@/api/chatApi";
 import { cn } from "@/lib/utils";
 import type { Citation } from "@/types/api";
+
+function CitationItem({ citation }: { citation: Citation }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div 
+      className="bg-gray-50/50 p-3 rounded-md text-xs text-gray-600 border border-gray-100/50 cursor-pointer hover:bg-gray-100 transition-colors group relative"
+      onClick={() => setExpanded(!expanded)}
+    >
+      <div className="flex justify-between items-center mb-1.5">
+          <span className="font-semibold text-gray-500 flex items-center gap-1">
+             片段详情
+             {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          </span>
+          {citation.score && <span className="text-[10px] text-gray-400 font-mono">Score: {citation.score.toFixed(4)}</span>}
+      </div>
+      <p className={cn("italic text-gray-700 leading-relaxed whitespace-pre-wrap", expanded ? "" : "line-clamp-3")}>
+        {citation.content || "(无内容)"}
+      </p>
+    </div>
+  );
+}
 
 interface Message {
   id: string;
@@ -206,10 +228,7 @@ export default function ChatPage() {
                                    </p>
                                    <div className="space-y-2">
                                        {msg.citations.map((cit, idx) => (
-                                           <div key={idx} className="bg-gray-50/50 p-2 rounded text-xs text-gray-600 border border-gray-100/50">
-                                               <p className="line-clamp-3 italic">"{cit.content}"</p>
-                                               {cit.score && <span className="text-[10px] text-gray-400 mt-1 block">Score: {cit.score.toFixed(4)}</span>}
-                                           </div>
+                                           <CitationItem key={idx} citation={cit} />
                                        ))}
                                    </div>
                                </div>

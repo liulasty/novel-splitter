@@ -198,21 +198,28 @@ public class RagService {
             return;
         }
 
-        List<String> validChunkIds = contextBlocks.stream()
-                .map(ContextBlock::getChunkId)
-                .collect(Collectors.toList());
+        // 1. 构建 Map 加速查找
+        Map<String, ContextBlock> blockMap = contextBlocks.stream()
+                .collect(Collectors.toMap(ContextBlock::getChunkId, block -> block, (a, b) -> a));
 
-        // 过滤无效引用
+        // 2. 过滤并回填
         List<Answer.Citation> validCitations = answer.getCitations().stream()
                 .filter(citation -> {
-                    if (citation.getChunkId() == null) {
+                    String chunkId = citation.getChunkId();
+                    if (chunkId == null) {
                         return false;
                     }
-                    boolean isValid = validChunkIds.contains(citation.getChunkId());
-                    if (!isValid) {
-                        log.warn("Filtered invalid citation: chunkId='{}' not found in context.", citation.getChunkId());
+                    
+                    ContextBlock block = blockMap.get(chunkId);
+                    if (block == null) {
+                        log.warn("Filtered invalid citation: chunkId='{}' not found in context.", chunkId);
+                        return false;
                     }
-                    return isValid;
+
+                    // 回填信息
+                    citation.setContent(block.getContent());
+                    citation.setScore(block.getScore());
+                    return true;
                 })
                 .collect(Collectors.toList());
         

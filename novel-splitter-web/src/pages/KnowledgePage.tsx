@@ -3,6 +3,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Loader2, Book, GitBranch, AlertCircle, Trash2 } from "lucide-react";
 import { novelApi } from "@/api/novelApi";
 import { knowledgeApi } from "@/api/knowledgeApi";
+import { toast } from 'sonner';
 
 // Component to display versions for a single novel
 function NovelVersionsCard({ novel }: { novel: string }) {
@@ -16,27 +17,51 @@ function NovelVersionsCard({ novel }: { novel: string }) {
   const deleteNovelMutation = useMutation({
     mutationFn: () => knowledgeApi.deleteKnowledgeBase(novel),
     onSuccess: () => {
+      toast.success(`知识库 "${novel}" 已删除`);
       queryClient.invalidateQueries({ queryKey: ['novels'] });
+    },
+    onError: (error) => {
+      toast.error(`删除知识库失败: ${error}`);
     },
   });
 
   const deleteVersionMutation = useMutation({
     mutationFn: (version: string) => knowledgeApi.deleteVersion(novel, version),
     onSuccess: () => {
+      toast.success(`版本 "${version}" 已删除`);
       queryClient.invalidateQueries({ queryKey: ['versions', novel] });
+    },
+    onError: (error) => {
+      toast.error(`删除版本失败: ${error}`);
     },
   });
 
   const handleDeleteNovel = () => {
-    if (confirm(`确定要删除知识库 "${novel}" 吗？这将删除所有源文件、切分版本和向量数据。`)) {
-      deleteNovelMutation.mutate();
-    }
+    toast(`确定要删除知识库 "${novel}" 吗？`, {
+      description: '这将删除所有源文件、切分版本和向量数据，操作不可恢复。',
+      action: {
+        label: '确定删除',
+        onClick: () => deleteNovelMutation.mutate(),
+      },
+      cancel: {
+        label: '取消',
+        onClick: () => {},
+      },
+    });
   };
 
   const handleDeleteVersion = (version: string) => {
-    if (confirm(`确定要删除版本 "${version}" 吗？`)) {
-        deleteVersionMutation.mutate(version);
-    }
+    toast(`确定要删除版本 "${version}" 吗？`, {
+      description: '此操作不可恢复。',
+      action: {
+        label: '确定删除',
+        onClick: () => deleteVersionMutation.mutate(version),
+      },
+      cancel: {
+        label: '取消',
+        onClick: () => {},
+      },
+    });
   };
 
   return (

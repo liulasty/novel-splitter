@@ -4,6 +4,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Trash2, Search, Loader2 } from "lucide-react";
 import { vectorApi } from "@/api/vectorApi";
 import { cn } from "@/lib/utils";
+import { toast } from 'sonner';
 
 export default function SystemPage() {
   const queryClient = useQueryClient();
@@ -22,10 +23,10 @@ export default function SystemPage() {
     mutationFn: vectorApi.reset,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vectorStats'] });
-      alert("数据库已清空");
+      toast.success("数据库已清空");
     },
     onError: (error) => {
-      alert(`清空失败: ${error}`);
+      toast.error(`清空失败: ${error}`);
     }
   });
 
@@ -37,16 +38,24 @@ export default function SystemPage() {
         setSearchResults(results);
     } catch (error) {
         console.error(error);
-        alert("搜索失败");
+        toast.error("搜索失败");
     } finally {
         setIsSearching(false);
     }
   };
 
   const handleReset = () => {
-      if (confirm("确定要清空所有向量数据吗？此操作不可逆！")) {
-          resetMutation.mutate();
-      }
+      toast("确定要清空所有向量数据吗？", {
+          description: "此操作不可逆！",
+          action: {
+              label: "确定清空",
+              onClick: () => resetMutation.mutate(),
+          },
+          cancel: {
+              label: "取消",
+              onClick: () => {},
+          },
+      });
   };
 
   return (

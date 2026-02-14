@@ -73,5 +73,15 @@ public class Answer {
          * </p>
          */
         private String reason;
+        
+        /**
+         * 引用内容 (回填字段)
+         */
+        private String content;
+
+        /**
+         * 匹配分数 (回填字段)
+         */
+        private Double score;
     }
 }

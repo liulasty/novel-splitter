@@ -69,7 +69,7 @@ public class MockLlmClient implements LlmClient {
                 .map(block -> {
                     String reason = "Contains mentions of " + 
                             (block.getContent().length() > 10 ? block.getContent().substring(0, 10) + "..." : "keywords");
-                    return new Answer.Citation(block.getChunkId(), reason);
+                    return new Answer.Citation(block.getChunkId(), reason, block.getContent(), block.getScore());
                 })
                 .collect(Collectors.toList());
 

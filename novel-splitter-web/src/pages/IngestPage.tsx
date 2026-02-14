@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { UploadCloud, FileText, Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import { novelApi } from "@/api/novelApi";
 import { cn } from "@/lib/utils";
+import { toast } from 'sonner';
 
 export default function IngestPage() {
   const queryClient = useQueryClient();
@@ -17,7 +18,9 @@ export default function IngestPage() {
   const uploadMutation = useMutation({
     mutationFn: novelApi.uploadNovel,
     onSuccess: (data) => {
-      setIngestStatus(`上传成功: ${data.message}`);
+      const msg = `上传成功: ${data.message}`;
+      setIngestStatus(msg);
+      toast.success(msg);
       if (data.fileName) {
         setUploadedFileName(data.fileName);
       }
@@ -25,7 +28,9 @@ export default function IngestPage() {
     },
     onError: (error: any) => {
       const msg = error.response?.data?.error || error.message || "Unknown error";
-      setIngestStatus(`上传失败: ${msg}`);
+      const fullMsg = `上传失败: ${msg}`;
+      setIngestStatus(fullMsg);
+      toast.error(fullMsg);
     }
   });
 
@@ -33,11 +38,15 @@ export default function IngestPage() {
   const ingestMutation = useMutation({
     mutationFn: novelApi.ingestNovel,
     onSuccess: (data) => {
-      setIngestStatus(`入库成功: ${data.message}`);
+      const msg = `入库成功: ${data.message}`;
+      setIngestStatus(msg);
+      toast.success(msg);
     },
     onError: (error: any) => {
       const msg = error.response?.data?.error || error.message || "Unknown error";
-      setIngestStatus(`入库失败: ${msg}`);
+      const fullMsg = `入库失败: ${msg}`;
+      setIngestStatus(fullMsg);
+      toast.error(fullMsg);
     }
   });
 
