@@ -28,9 +28,11 @@ public class SplitService {
     private final AppConfig appConfig;
     private final NovelRepository novelRepository;
     private final SceneRepository sceneRepository;
+    private final com.novel.splitter.embedding.api.EmbeddingService embeddingService;
 
-    public SplitService(AppConfig appConfig) {
+    public SplitService(AppConfig appConfig, com.novel.splitter.embedding.api.EmbeddingService embeddingService) {
         this.appConfig = appConfig;
+        this.embeddingService = embeddingService;
         
         // 初始化 Repository（这里简单起见直接实例化，也可以配置为 Bean）
         String storageRoot = appConfig.getStorage().getRootPath();
@@ -51,7 +53,7 @@ public class SplitService {
         // 1. 构建 Pipeline
         SequentialPipeline pipeline = new SequentialPipeline()
                 .addStage(new LoadStage(novelRepository))
-                .addStage(new SplitStage()) // 这里可以传入配置的切分规则
+                .addStage(new SplitStage(embeddingService)) // 这里可以传入配置的切分规则
                 .addStage(new ValidationStage()
                         .addValidator(new LengthValidator(
                                 appConfig.getRule().getMinLength(),

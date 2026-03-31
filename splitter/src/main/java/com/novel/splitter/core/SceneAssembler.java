@@ -5,6 +5,7 @@ import com.novel.splitter.domain.model.RawParagraph;
 import com.novel.splitter.domain.model.Scene;
 import com.novel.splitter.domain.model.SceneMetadata;
 import com.novel.splitter.domain.model.SemanticSegment;
+import com.novel.splitter.embedding.api.EmbeddingService;
 import com.novel.splitter.rule.DynamicWindowRule;
 import com.novel.splitter.rule.SplitRule;
 
@@ -24,15 +25,21 @@ public class SceneAssembler {
 
     private final SemanticSegmentBuilder segmentBuilder;
     private final List<SplitRule> splitRules;
+    private final SemanticDensityAnalyzer densityAnalyzer;
     // 目标场景长度（软限制）- 这里的常量仅作为 fallback 或 reference
     private static final int TARGET_SCENE_LENGTH = 1200;
 
     public SceneAssembler() {
+        this(null);
+    }
+
+    public SceneAssembler(EmbeddingService embeddingService) {
         // 使用 Phase 2 的 ContextAwareSegmentBuilder
-        this.segmentBuilder = new ContextAwareSegmentBuilder();
+        this.segmentBuilder = new ContextAwareSegmentBuilder(embeddingService);
         this.splitRules = new ArrayList<>();
         // 使用 Phase 3 的 DynamicWindowRule
         this.splitRules.add(new DynamicWindowRule());
+        this.densityAnalyzer = new SemanticDensityAnalyzer();
     }
 
     /**
@@ -155,8 +162,7 @@ public class SceneAssembler {
 
         // Phase 4: Evolution (自我进化) - 反馈机制 (Heuristic)
         // 计算对话比例作为密度参考
-        long dialogueCount = segments.stream().filter(s -> "DIALOGUE".equals(s.getType())).count();
-        double densityScore = segments.isEmpty() ? 0.0 : (1.0 - (double) dialogueCount / segments.size());
+        double densityScore = densityAnalyzer.calculateDensityScore(segments);
 
         // 计算质量得分 (简单的 PPL 模拟：结尾是否完整)
         double qualityScore = 1.0;

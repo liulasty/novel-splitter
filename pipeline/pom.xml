@@ -22,6 +22,10 @@
         </dependency>
         <dependency>
             <groupId>com.novel.splitter</groupId>
+            <artifactId>embedding</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.novel.splitter</groupId>
             <artifactId>repository</artifactId>
         </dependency>
         <dependency>

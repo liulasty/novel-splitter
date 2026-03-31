@@ -3,6 +3,7 @@ package com.novel.splitter.core;
 import com.novel.splitter.domain.model.ParagraphType;
 import com.novel.splitter.domain.model.RawParagraph;
 import com.novel.splitter.domain.model.SemanticSegment;
+import com.novel.splitter.embedding.api.EmbeddingService;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -69,6 +70,67 @@ class ContextAwareSegmentBuilderTest {
         assertEquals(1, segments.size());
         assertEquals("CODE_BLOCK", segments.get(0).getType());
         assertEquals(3, segments.get(0).getParagraphs().size());
+    }
+
+    @Test
+    void testSemanticMergeWithEmbedding() {
+        EmbeddingService mockEmbeddingService = new EmbeddingService() {
+            @Override
+            public float[] embed(String text) {
+                if (text.contains("A")) {
+                    return new float[]{1.0f, 0.0f, 0.0f}; // Simulating high similarity for A and B if we change B
+                } else if (text.contains("B")) {
+                    return new float[]{0.9f, 0.1f, 0.0f}; // Cosine similarity ~ 0.99 > 0.85
+                }
+                return new float[]{0.0f, 1.0f, 0.0f};
+            }
+            @Override
+            public List<float[]> embedBatch(List<String> texts) {
+                return null;
+            }
+        };
+        ContextAwareSegmentBuilder semanticBuilder = new ContextAwareSegmentBuilder(mockEmbeddingService);
+
+        List<RawParagraph> inputs = new ArrayList<>();
+        inputs.add(createPara(1, "这是段落A，描述同一个场景。"));
+        inputs.add(createPara(2, "这是段落B，继续描述。"));
+
+        List<SemanticSegment> segments = semanticBuilder.build(inputs);
+
+        // Expectation: Merged into 1 segment due to high similarity > 0.85
+        assertEquals(1, segments.size());
+        assertEquals(2, segments.get(0).getParagraphs().size());
+    }
+
+    @Test
+    void testSemanticCutWithEmbedding() {
+        EmbeddingService mockEmbeddingService = new EmbeddingService() {
+            @Override
+            public float[] embed(String text) {
+                if (text.contains("A")) {
+                    return new float[]{1.0f, 0.0f, 0.0f}; 
+                } else if (text.contains("C")) {
+                    return new float[]{0.0f, 1.0f, 0.0f}; // Cosine similarity 0.0 < 0.65
+                }
+                return new float[]{0.0f, 0.0f, 1.0f};
+            }
+            @Override
+            public List<float[]> embedBatch(List<String> texts) {
+                return null;
+            }
+        };
+        ContextAwareSegmentBuilder semanticBuilder = new ContextAwareSegmentBuilder(mockEmbeddingService);
+
+        List<RawParagraph> inputs = new ArrayList<>();
+        inputs.add(createPara(1, "这是段落A，描述场景A。"));
+        inputs.add(createPara(2, "这是段落C，完全不同的场景。"));
+
+        List<SemanticSegment> segments = semanticBuilder.build(inputs);
+
+        // Expectation: Cut into 2 segments due to low similarity < 0.65
+        assertEquals(2, segments.size());
+        assertEquals(1, segments.get(0).getParagraphs().size());
+        assertEquals(1, segments.get(1).getParagraphs().size());
     }
 
     private RawParagraph createPara(int index, String content) {

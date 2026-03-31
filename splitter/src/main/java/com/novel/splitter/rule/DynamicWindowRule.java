@@ -1,6 +1,7 @@
 package com.novel.splitter.rule;
 
 import com.novel.splitter.domain.model.SemanticSegment;
+import com.novel.splitter.core.SemanticDensityAnalyzer;
 
 import java.util.List;
 
@@ -16,6 +17,12 @@ public class DynamicWindowRule implements SplitRule {
     private static final int HIGH_DENSITY_TARGET = 800;  // 高密度（代码、公式）
     private static final int LOW_DENSITY_TARGET = 1500;  // 低密度（对话、流水账）
     private static final int ABSOLUTE_MAX_LENGTH = 3000;
+    
+    private final SemanticDensityAnalyzer densityAnalyzer;
+
+    public DynamicWindowRule() {
+        this.densityAnalyzer = new SemanticDensityAnalyzer();
+    }
 
     @Override
     public Decision evaluate(int currentLength, List<SemanticSegment> currentBuffer, SemanticSegment nextSegment) {
@@ -41,13 +48,12 @@ public class DynamicWindowRule implements SplitRule {
         // 密度分析 (Density Analysis)
         
         // 判据 1: 是否包含代码块 -> 高密度
-        boolean hasCode = buffer.stream().anyMatch(s -> "CODE_BLOCK".equals(s.getType()));
-        if (hasCode) return HIGH_DENSITY_TARGET;
+        if (densityAnalyzer.hasHighDensityBlock(buffer)) {
+            return HIGH_DENSITY_TARGET;
+        }
 
         // 判据 2: 对话比例 -> 低密度
-        // 统计 SemanticSegment 中类型为 DIALOGUE 的比例
-        long dialogueCount = buffer.stream().filter(s -> "DIALOGUE".equals(s.getType())).count();
-        double dialogueRatio = (double) dialogueCount / buffer.size();
+        double dialogueRatio = densityAnalyzer.calculateDialogueRatio(buffer);
         
         if (dialogueRatio > 0.5) {
             return LOW_DENSITY_TARGET;

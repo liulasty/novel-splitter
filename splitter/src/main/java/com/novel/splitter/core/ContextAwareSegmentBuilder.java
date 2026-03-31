@@ -2,10 +2,10 @@ package com.novel.splitter.core;
 
 import com.novel.splitter.domain.model.RawParagraph;
 import com.novel.splitter.domain.model.SemanticSegment;
+import com.novel.splitter.embedding.api.EmbeddingService;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Pattern;
 
 /**
  * 上下文感知语义段构建器 (Phase 2)
@@ -14,15 +14,26 @@ import java.util.regex.Pattern;
  * 1. 识别 Anchor (标题、代码块) 并特殊处理。
  * 2. 增强的对话识别 (支持混合结构)。
  * 3. 动作描写吸附 (Adsorption)。
+ * 4. 集成 OnnxEmbeddingService 计算余弦相似度。
  * </p>
  */
 public class ContextAwareSegmentBuilder extends SemanticSegmentBuilder {
 
-    private static final Pattern QUOTE_PATTERN = Pattern.compile("[\"“].*[\"”]");
-    // 简单的说话动词后缀匹配 (Heuristic)
-    private static final Pattern SPEAKING_VERB_SUFFIX = Pattern.compile(".*(说|道|问|喊|叫|回复|表示)[:：]$");
-    
     private static final int MAX_SEGMENT_LENGTH = 800;
+    
+    private final SpeakerModel speakerModel;
+    private final ParagraphRelevanceScorer relevanceScorer;
+    private final EmbeddingService embeddingService;
+
+    public ContextAwareSegmentBuilder() {
+        this(null);
+    }
+
+    public ContextAwareSegmentBuilder(EmbeddingService embeddingService) {
+        this.speakerModel = new SpeakerModel();
+        this.relevanceScorer = new ParagraphRelevanceScorer(speakerModel);
+        this.embeddingService = embeddingService;
+    }
 
     @Override
     public List<SemanticSegment> build(List<RawParagraph> paragraphs) {
@@ -56,11 +67,22 @@ public class ContextAwareSegmentBuilder extends SemanticSegmentBuilder {
                 type = p.getType().name(); 
             } else {
                 // 普通文本逻辑
-                if (currentType != null && !currentType.equals(type)) {
-                    // 尝试吸附
-                    boolean canMerge = canMerge(buffer, p, currentType, type);
-                    if (!canMerge) {
-                        shouldSplit = true;
+                if (currentType != null) {
+                    Boolean semanticMerge = evaluateSemanticMerge(buffer, p);
+                    
+                    if (semanticMerge != null) {
+                        // 如果有明确的语义决定 (>0.85 合并, <0.65 拆分)
+                        if (!semanticMerge) {
+                            shouldSplit = true;
+                        }
+                    } else {
+                        // 回退到基于类型的相关性评分
+                        if (!currentType.equals(type)) {
+                            boolean canMerge = canMerge(buffer, p, currentType, type);
+                            if (!canMerge) {
+                                shouldSplit = true;
+                            }
+                        }
                     }
                 }
             }
@@ -90,29 +112,44 @@ public class ContextAwareSegmentBuilder extends SemanticSegmentBuilder {
         return segments;
     }
 
-    private boolean canMerge(List<RawParagraph> buffer, RawParagraph current, String prevType, String currType) {
-        // 1. 只有 TEXT 类型参与吸附 (Anchor 不参与)
-        if (current.isAnchor()) return false;
-        if (!buffer.isEmpty() && buffer.get(buffer.size()-1).isAnchor()) return false;
-        
-        // 2. Narration (短) + Dialogue -> 合并 (例如：他说： "...")
-        if (SemanticSegmentBuilder.TYPE_NARRATION.equals(prevType) && SemanticSegmentBuilder.TYPE_DIALOGUE.equals(currType)) {
-            RawParagraph last = buffer.get(buffer.size() - 1);
-            // 前一段少于 50 字，可能是前缀
-            if (last.getContent().length() < 50) {
-                return true;
-            }
-        }
-        
-        // 3. Dialogue + Narration (短) -> 合并 (例如： "..." 他笑了笑。)
-        if (SemanticSegmentBuilder.TYPE_DIALOGUE.equals(prevType) && SemanticSegmentBuilder.TYPE_NARRATION.equals(currType)) {
-            // 当前段少于 50 字，可能是后缀动作
-            if (current.getContent().length() < 50) {
-                return true;
-            }
-        }
+    private Boolean evaluateSemanticMerge(List<RawParagraph> buffer, RawParagraph current) {
+        if (buffer.isEmpty() || embeddingService == null) return null;
+        RawParagraph last = buffer.get(buffer.size() - 1);
 
-        return false;
+        try {
+            float[] v1 = embeddingService.embed(last.getContent());
+            float[] v2 = embeddingService.embed(current.getContent());
+            double similarity = cosineSimilarity(v1, v2);
+
+            if (similarity > 0.85) {
+                return true; // merge
+            } else if (similarity < 0.65) {
+                return false; // cut
+            }
+        } catch (Exception e) {
+            // Ignore embedding errors and fallback
+        }
+        return null;
+    }
+
+    private boolean canMerge(List<RawParagraph> buffer, RawParagraph current, String prevType, String currType) {
+        if (buffer.isEmpty()) return false;
+        RawParagraph last = buffer.get(buffer.size() - 1);
+        return relevanceScorer.shouldMerge(last, current, prevType, currType);
+    }
+
+    private double cosineSimilarity(float[] v1, float[] v2) {
+        if (v1 == null || v2 == null || v1.length != v2.length) return 0;
+        double dotProduct = 0;
+        double normA = 0;
+        double normB = 0;
+        for (int i = 0; i < v1.length; i++) {
+            dotProduct += v1[i] * v2[i];
+            normA += v1[i] * v1[i];
+            normB += v2[i] * v2[i];
+        }
+        if (normA == 0 || normB == 0) return 0;
+        return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
     }
 
     private String detectType(RawParagraph p) {
@@ -120,8 +157,7 @@ public class ContextAwareSegmentBuilder extends SemanticSegmentBuilder {
             return p.getType().name();
         }
         
-        String content = p.getContent();
-        if (QUOTE_PATTERN.matcher(content).find()) {
+        if (speakerModel.containsDialogue(p)) {
             return SemanticSegmentBuilder.TYPE_DIALOGUE;
         }
         return SemanticSegmentBuilder.TYPE_NARRATION;

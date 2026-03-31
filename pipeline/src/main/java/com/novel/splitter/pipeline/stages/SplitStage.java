@@ -10,6 +10,7 @@ import com.novel.splitter.domain.model.Scene;
 import com.novel.splitter.pipeline.api.Stage;
 import com.novel.splitter.pipeline.context.PipelineContext;
 import lombok.extern.slf4j.Slf4j;
+import com.novel.splitter.embedding.api.EmbeddingService;
 
 import java.util.List;
 
@@ -22,7 +23,15 @@ public class SplitStage implements Stage {
     // Phase 1: Use MarkdownParagraphSplitter
     private final ParagraphSplitter paragraphSplitter = new MarkdownParagraphSplitter();
     private final ChapterRecognizer chapterRecognizer = new ChapterRecognizer();
-    private final SceneAssembler sceneAssembler = new SceneAssembler();
+    private final SceneAssembler sceneAssembler;
+
+    public SplitStage(EmbeddingService embeddingService) {
+        this.sceneAssembler = new SceneAssembler(embeddingService);
+    }
+    
+    public SplitStage() {
+        this.sceneAssembler = new SceneAssembler();
+    }
 
     @Override
     public void process(PipelineContext context) {
