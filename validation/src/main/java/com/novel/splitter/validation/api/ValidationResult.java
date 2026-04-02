@@ -16,8 +16,11 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ValidationResult {
+    @Builder.Default
     private boolean passed = true;
+    @Builder.Default
     private List<String> errors = new ArrayList<>();
+    @Builder.Default
     private List<String> warnings = new ArrayList<>();
 
     public void addError(String error) {

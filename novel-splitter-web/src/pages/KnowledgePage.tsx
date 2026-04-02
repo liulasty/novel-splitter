@@ -27,7 +27,7 @@ function NovelVersionsCard({ novel }: { novel: string }) {
 
   const deleteVersionMutation = useMutation({
     mutationFn: (version: string) => knowledgeApi.deleteVersion(novel, version),
-    onSuccess: () => {
+    onSuccess: (_, version) => {
       toast.success(`版本 "${version}" 已删除`);
       queryClient.invalidateQueries({ queryKey: ['versions', novel] });
     },
@@ -133,7 +133,11 @@ export default function KnowledgePage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-2">
          <h1 className="text-3xl font-bold tracking-tight text-gray-900">知识库管理</h1>
-         <p className="text-gray-500">查看已入库小说及其版本详情。</p>
+         <p className="text-gray-500">
+           查看已入库小说及其版本详情。
+           <br/>
+           <span className="text-blue-600 font-medium">状态说明：</span> 此处仅展示<strong>已成功消费 MQ 队列任务并成功存入 ChromaDB 向量库</strong>的文件。如果您刚刚上传了文件但未在此处看到，请前往<a href="/ingest" className="text-blue-800 underline hover:text-blue-600 font-bold">入库处理</a>页面查看其在 RabbitMQ 队列中的排队和处理状态。
+         </p>
       </div>
 
       {isNovelsLoading ? (

@@ -2,10 +2,15 @@ package com.novel.splitter.core;
 
 import com.novel.splitter.domain.model.RawParagraph;
 import com.novel.splitter.domain.model.SemanticSegment;
+import com.novel.splitter.core.strategy.DialogueStrategy;
+import com.novel.splitter.core.strategy.SegmentMergeStrategy;
+import com.novel.splitter.core.strategy.LengthLimitStrategy;
+import com.novel.splitter.core.strategy.DefaultDialogueStrategy;
+import com.novel.splitter.core.strategy.DefaultSegmentMergeStrategy;
+import com.novel.splitter.core.strategy.DefaultLengthLimitStrategy;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Pattern;
 
 /**
  * 语义段构建器
@@ -18,79 +23,97 @@ import java.util.regex.Pattern;
  */
 public class SemanticSegmentBuilder {
 
-    private static final Pattern QUOTE_PATTERN = Pattern.compile("[\"“].*[\"”]");
-    // 强制切分阈值（避免单个 Segment 过长）
-    private static final int MAX_SEGMENT_LENGTH = 800; 
+    /** 强制切分阈值（避免单个 Segment 过长） */
+    public static final int DEFAULT_MAX_SEGMENT_LENGTH = 800; 
 
+    /** 语义段类型：对话 */
     public static final String TYPE_DIALOGUE = "DIALOGUE";
+    
+    /** 语义段类型：叙述 */
     public static final String TYPE_NARRATION = "NARRATION";
+
+    private DialogueStrategy dialogueStrategy;
+    private SegmentMergeStrategy segmentMergeStrategy;
+    private LengthLimitStrategy lengthLimitStrategy;
+
+    public SemanticSegmentBuilder() {
+        this.dialogueStrategy = new DefaultDialogueStrategy();
+        this.segmentMergeStrategy = new DefaultSegmentMergeStrategy();
+        this.lengthLimitStrategy = new DefaultLengthLimitStrategy(DEFAULT_MAX_SEGMENT_LENGTH);
+    }
+
+    public void setDialogueStrategy(DialogueStrategy dialogueStrategy) {
+        this.dialogueStrategy = dialogueStrategy;
+    }
+
+    public void setSegmentMergeStrategy(SegmentMergeStrategy segmentMergeStrategy) {
+        this.segmentMergeStrategy = segmentMergeStrategy;
+    }
+
+    public void setLengthLimitStrategy(LengthLimitStrategy lengthLimitStrategy) {
+        this.lengthLimitStrategy = lengthLimitStrategy;
+    }
 
     /**
      * 构建语义段列表
+     * 
+     * @param paragraphs 原始段落列表
+     * @return 语义段列表
      */
     public List<SemanticSegment> build(List<RawParagraph> paragraphs) {
         List<SemanticSegment> segments = new ArrayList<>();
+        
+        // 增加空值防护
         if (paragraphs == null || paragraphs.isEmpty()) {
             return segments;
         }
 
-        List<RawParagraph> buffer = new ArrayList<>();
-        String currentType = null;
-        int currentLength = 0;
+        SegmentState state = new SegmentState(paragraphs.size());
 
         for (RawParagraph p : paragraphs) {
-            if (p.isEmpty()) continue;
-
-            String type = detectType(p);
-            
-            // 状态切换或长度超限时，提交当前 buffer
-            boolean typeChanged = currentType != null && !currentType.equals(type);
-            boolean lengthLimitReached = currentLength > MAX_SEGMENT_LENGTH;
-
-            if (!buffer.isEmpty() && (typeChanged || lengthLimitReached)) {
-                segments.add(createSegment(buffer, currentType));
-                buffer.clear();
-                currentLength = 0;
+            // 空值防护
+            if (p == null || p.getContent() == null || p.isEmpty()) {
+                continue;
             }
 
-            // 更新状态
-            if (buffer.isEmpty()) {
-                currentType = type;
-            }
+            int pLength = p.getContent().length(); // 缓存长度，优化性能
+            String type = dialogueStrategy.detectType(p, state.getCurrentType());
             
-            buffer.add(p);
-            currentLength += p.getContent().length();
+            boolean shouldSplit = false;
+
+            if (!state.isEmpty()) {
+                // 预测长度，判断是否超限 (Task 4.1)
+                boolean lengthLimitReached = lengthLimitStrategy.isExceeded(state.getCurrentLength(), pLength);
+                
+                // 判断是否应该合并 (Task 4.3 严格切分)
+                boolean shouldMerge = segmentMergeStrategy.shouldMerge(state.getBuffer(), p, state.getCurrentType(), type);
+                
+                if (lengthLimitReached || !shouldMerge) {
+                    shouldSplit = true;
+                }
+            }
+
+            if (shouldSplit) {
+                segments.add(state.toSegment());
+                state.clear();
+            }
+
+            state.add(p, type, pLength);
         }
 
         // 提交剩余部分
-        if (!buffer.isEmpty()) {
-            segments.add(createSegment(buffer, currentType));
+        if (!state.isEmpty()) {
+            segments.add(state.toSegment());
         }
 
         return segments;
     }
 
-    private SemanticSegment createSegment(List<RawParagraph> paragraphs, String type) {
+    protected SemanticSegment createSegment(List<RawParagraph> paragraphs, String type) {
         // 创建一个新的 List 副本，避免引用问题
         return SemanticSegment.builder()
                 .paragraphs(new ArrayList<>(paragraphs))
                 .type(type)
                 .build();
-    }
-
-    /**
-     * 探测段落类型
-     * 简单规则：包含引号视为对话，否则为叙述
-     */
-    private String detectType(RawParagraph p) {
-        String content = p.getContent();
-        // 1. 显式引号
-        if (QUOTE_PATTERN.matcher(content).find()) {
-            return TYPE_DIALOGUE;
-        }
-        // 2. 只有标点和极短文字，通常是语气词，跟随上下文（这里暂归为 Narration，依靠后续逻辑优化）
-        // TODO: 更复杂的上下文感知逻辑
-        
-        return TYPE_NARRATION;
     }
 }

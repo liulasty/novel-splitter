@@ -13,14 +13,7 @@ import com.novel.splitter.domain.model.llm.ollama.Options;
 import com.novel.splitter.llm.client.api.LlmClient;
 import com.novel.splitter.llm.client.config.OllamaProperties;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.http.MediaType;
 

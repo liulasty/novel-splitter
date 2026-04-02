@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { MessageSquare, Database, FileInput, Settings, Bug } from 'lucide-react';
+import { MessageSquare, Database, FileInput, Settings, Bug, Server } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function Layout() {
@@ -11,6 +11,7 @@ export default function Layout() {
     { path: '/ingest', label: '入库处理', icon: FileInput },
     { path: '/debug', label: 'RAG 调试', icon: Bug },
     { path: '/system', label: '系统管理', icon: Settings },
+    { path: '/chroma-admin', label: 'Chroma 管理', icon: Server },
   ];
 
   return (

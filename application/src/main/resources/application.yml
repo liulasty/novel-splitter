@@ -2,6 +2,11 @@ server:
   port: 8080
 
 spring:
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: user
+    password: password
   servlet:
     multipart:
       max-file-size: 50MB
@@ -58,7 +63,7 @@ embedding:
     # model-path: "D:/path/to/model.onnx"
     # vocab-path: "D:/path/to/vocab.txt"
 chroma:
-  url: http://localhost:8081
+  url: http://localhost:8000
   collection: novel-splitter
 
 assembler:

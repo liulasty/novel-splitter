@@ -3,6 +3,7 @@ package com.novel.splitter.core;
 import com.novel.splitter.domain.model.RawParagraph;
 import com.novel.splitter.domain.model.SemanticSegment;
 import com.novel.splitter.embedding.api.EmbeddingService;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -17,6 +18,7 @@ import java.util.List;
  * 4. 集成 OnnxEmbeddingService 计算余弦相似度。
  * </p>
  */
+@Slf4j
 public class ContextAwareSegmentBuilder extends SemanticSegmentBuilder {
 
     private static final int MAX_SEGMENT_LENGTH = 800;
@@ -117,8 +119,21 @@ public class ContextAwareSegmentBuilder extends SemanticSegmentBuilder {
         RawParagraph last = buffer.get(buffer.size() - 1);
 
         try {
-            float[] v1 = embeddingService.embed(last.getContent());
-            float[] v2 = embeddingService.embed(current.getContent());
+            String content1 = last.getContent();
+            String content2 = current.getContent();
+            
+            if (content1 == null || content1.trim().isEmpty() || content2 == null || content2.trim().isEmpty()) {
+                return null;
+            }
+
+            float[] v1 = embeddingService.embed(content1);
+            float[] v2 = embeddingService.embed(content2);
+            
+            if (v1 == null || v2 == null || v1.length == 0 || v2.length == 0) {
+                log.warn("Embedding result is null or empty, falling back to rule-based merge evaluation.");
+                return null;
+            }
+
             double similarity = cosineSimilarity(v1, v2);
 
             if (similarity > 0.85) {
@@ -127,7 +142,9 @@ public class ContextAwareSegmentBuilder extends SemanticSegmentBuilder {
                 return false; // cut
             }
         } catch (Exception e) {
-            // Ignore embedding errors and fallback
+            log.warn("Error evaluating semantic merge, falling back to rule-based: {}", e.getMessage());
+            // Explicit fallback
+            return null;
         }
         return null;
     }
@@ -163,7 +180,7 @@ public class ContextAwareSegmentBuilder extends SemanticSegmentBuilder {
         return SemanticSegmentBuilder.TYPE_NARRATION;
     }
     
-    private SemanticSegment createSegment(List<RawParagraph> paragraphs, String type) {
+    protected SemanticSegment createSegment(List<RawParagraph> paragraphs, String type) {
         return SemanticSegment.builder()
                 .paragraphs(new ArrayList<>(paragraphs))
                 .type(type)

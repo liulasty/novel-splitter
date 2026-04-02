@@ -1,14 +1,11 @@
 package com.novel.splitter.embedding.store;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.novel.splitter.domain.model.Scene;
 import com.novel.splitter.domain.model.embedding.chroma.ChromaCollection;
 import com.novel.splitter.domain.model.embedding.chroma.ChromaQueryResponse;
 import com.novel.splitter.domain.model.embedding.VectorRecord;
 import com.novel.splitter.embedding.api.VectorStore;
-import lombok.Builder;
-import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;

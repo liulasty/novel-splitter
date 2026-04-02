@@ -1,22 +1,12 @@
 package com.novel.splitter.llm.client;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.novel.splitter.domain.model.Answer;
-import com.novel.splitter.domain.model.Prompt;
 import com.novel.splitter.llm.client.config.CozeProperties;
 import com.novel.splitter.llm.client.impl.CozeLlmClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
-import org.springframework.web.client.RestClient;
-
-import java.lang.reflect.Field;
-import java.util.Collections;
-
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 class CozeLlmClientTest {
 

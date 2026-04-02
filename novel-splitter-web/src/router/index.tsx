@@ -4,6 +4,7 @@ import ChatPage from '@/pages/ChatPage';
 import KnowledgePage from '@/pages/KnowledgePage';
 import IngestPage from '@/pages/IngestPage';
 import SystemPage from '@/pages/SystemPage';
+import ChromaAdminPage from '@/pages/ChromaAdminPage';
 import ErrorPage from '@/pages/ErrorPage';
 import RagDebugPage from '@/pages/RagDebugPage';
 
@@ -28,6 +29,10 @@ export const router = createBrowserRouter([
       {
         path: 'system',
         element: <SystemPage />,
+      },
+      {
+        path: 'chroma-admin',
+        element: <ChromaAdminPage />,
       },
       {
         path: 'debug',

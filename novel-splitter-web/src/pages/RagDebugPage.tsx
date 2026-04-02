@@ -3,7 +3,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { novelApi } from '@/api/novelApi';
 import { knowledgeApi } from '@/api/knowledgeApi';
 import { ragApi } from '@/api/ragApi';
-import type { RagDebugResponse, ChatRequest, Scene, ContextBlock } from '@/types/api';
+import type { RagDebugResponse, ChatRequest } from '@/types/api';
 import { estimateTokens } from '@/utils/tokenEstimator';
 import { toast } from 'sonner';
 
