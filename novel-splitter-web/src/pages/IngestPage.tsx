@@ -207,6 +207,16 @@ export default function IngestPage() {
                                             task.status === 'SUCCESS' ? "text-teal-600" : task.status === 'FAILED' ? "text-red-500" : "text-gray-400"
                                         )} />
                                         {task.fileName}
+                                        {task.version && (
+                                            <span className="text-[10px] font-semibold bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded ml-1">
+                                                {task.version}
+                                            </span>
+                                        )}
+                                        {task.maxScenes > 0 && task.maxScenes < 2147483647 && (
+                                            <span className="text-[10px] font-semibold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">
+                                                max:{task.maxScenes}
+                                            </span>
+                                        )}
                                     </div>
                                     <div className="flex items-center gap-3">
                                         <span className="text-xs text-gray-400">{new Date(task.createdAt).toLocaleString()}</span>

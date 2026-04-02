@@ -4,6 +4,8 @@ public class SplitTask {
     private String taskId;
     private String novelId;
     private String fileName;
+    private int maxScenes;
+    private String version;
     private TaskStatus status;
     private int progress;
     private String message;
@@ -24,11 +26,13 @@ public class SplitTask {
         this.progress = 0;
     }
 
-    public SplitTask(String taskId, String novelId, String fileName) {
+    public SplitTask(String taskId, String novelId, String fileName, int maxScenes, String version) {
         this();
         this.taskId = taskId;
         this.novelId = novelId;
         this.fileName = fileName;
+        this.maxScenes = maxScenes;
+        this.version = version;
     }
 
     public String getTaskId() { return taskId; }
@@ -39,6 +43,12 @@ public class SplitTask {
 
     public String getFileName() { return fileName; }
     public void setFileName(String fileName) { this.fileName = fileName; }
+
+    public int getMaxScenes() { return maxScenes; }
+    public void setMaxScenes(int maxScenes) { this.maxScenes = maxScenes; }
+
+    public String getVersion() { return version; }
+    public void setVersion(String version) { this.version = version; }
 
     public TaskStatus getStatus() { return status; }
     public void setStatus(TaskStatus status) { 

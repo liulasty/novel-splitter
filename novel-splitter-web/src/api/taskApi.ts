@@ -8,6 +8,8 @@ export interface SplitTask {
   taskId: string;
   novelId: string;
   fileName: string;
+  maxScenes: number;
+  version: string;
   status: 'PENDING' | 'PROCESSING' | 'SUCCESS' | 'FAILED';
   progress: number;
   message: string;

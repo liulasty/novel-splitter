@@ -17,8 +17,8 @@ public class TaskService {
         this.taskRepository = taskRepository;
     }
 
-    public SplitTask createTask(String taskId, String novelId, String fileName) {
-        SplitTask task = new SplitTask(taskId, novelId, fileName);
+    public SplitTask createTask(String taskId, String novelId, String fileName, int maxScenes, String version) {
+        SplitTask task = new SplitTask(taskId, novelId, fileName, maxScenes, version);
         return taskRepository.save(task);
     }
 

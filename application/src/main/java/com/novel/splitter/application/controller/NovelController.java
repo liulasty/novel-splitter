@@ -148,11 +148,14 @@ public class NovelController {
             String taskId = UUID.randomUUID().toString();
             String novelId = request.getFileName().replace(".txt", "");
             
+            int maxScenes = request.getMaxScenes() > 0 ? request.getMaxScenes() : Integer.MAX_VALUE;
+            String version = request.getVersion() != null && !request.getVersion().trim().isEmpty() ? request.getVersion() : "v1";
+
             // 1. Create task in DB
-            taskService.createTask(taskId, novelId, request.getFileName());
+            taskService.createTask(taskId, novelId, request.getFileName(), maxScenes, version);
             
             // 2. Send message to RabbitMQ
-            SplitTaskMessage message = new SplitTaskMessage(taskId, novelId, novelPath.toAbsolutePath().toString());
+            SplitTaskMessage message = new SplitTaskMessage(taskId, novelId, novelPath.toAbsolutePath().toString(), maxScenes, version);
             rabbitTemplate.convertAndSend(RabbitConfig.SPLIT_TASK_QUEUE, message);
             
             log.info("切分任务已发送到队列, taskId: {}", taskId);

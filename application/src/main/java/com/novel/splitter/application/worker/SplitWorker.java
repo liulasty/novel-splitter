@@ -30,9 +30,7 @@ public class SplitWorker {
             
             Path novelPath = Paths.get(message.getFilePath());
             
-            // For now, we assume maxScenes is MAX_VALUE and version is "v1" since it's an async job without specific request parameters passed in message.
-            // In a real scenario, we would pass these in the message as well.
-            ingestionService.ingest(novelPath, Integer.MAX_VALUE, "v1", (progress, info) -> {
+            ingestionService.ingest(novelPath, message.getMaxScenes(), message.getVersion(), (progress, info) -> {
                 taskService.updateTaskStatus(message.getTaskId(), SplitTask.TaskStatus.PROCESSING, progress, info);
             });
             
