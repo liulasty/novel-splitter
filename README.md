@@ -34,7 +34,7 @@
 
 ### 1. 表现与接入层 (Presentation & Entry)
 *   **`application` (应用入口)**
-    *   **职责**：Spring Boot 核心启动入口，整合所有模块。提供基于 RESTful API 的控制器（如 `NovelController`、`ChatController`、`VectorManagementController`）。同时提供 `SplitCommandRunner` 供极客用户在命令行模式下运行。
+    *   **职责**：Spring Boot 核心启动入口，整合所有模块。提供基于 RESTful API 的控制器（如 `NovelController`、`ChatController`、`VectorManagementController`）。整合 RabbitMQ 实现了基于消息队列的异步任务调度，包含 `LoadWorker`、`SplitWorker` 和 `EmbedWorker` 三阶段异步流水线，彻底解决大文件处理时的阻塞和内存溢出问题。同时提供 `SplitCommandRunner` 供极客用户在命令行模式下运行。
 *   **`novel-splitter-web` (现代前端 UI)**
     *   **职责**：提供全套的图形化操作界面，降低系统使用门槛。
     *   **现状**：基于 React 19, TypeScript, Zustand, TanStack Query 和 Tailwind CSS 4 构建。包含小说导入 (Ingest)、知识库管理 (Knowledge)、RAG 对话测试 (Chat) 和系统向量库监控 (System) 四大核心页面。
@@ -86,15 +86,29 @@
 
 ```mermaid
 graph TD
-    A[原始TXT文件 / 爬虫抓取] -->|1. LoadStage| B(按行读取并清理)
-    B -->|2. SplitStage| C{ChapterRecognizer}
-    C -->|划分章节| D[MarkdownParagraphSplitter]
-    D -->|切分段落| E[SceneAssembler]
-    E -->|合并组装| F((Scene 列表))
-    F -->|3. ValidationStage| G{长度/质量校验}
-    G -->|过滤无效数据| H|4. SaveStage|
-    H --> I[Repository: 存为JSON]
-    H --> J[Embedding: 存入向量数据库]
+    A[用户上传TXT / 爬虫抓取] -->|创建 Task 发送 load 消息| MQ((RabbitMQ))
+    
+    subgraph AsyncPipeline [异步 Worker 管道]
+        MQ -->|1. 消费 load 消息| LW[LoadWorker]
+        LW -->|按行读取并清理| B(保存至 NovelCache)
+        B -->|发送 split 消息| MQ
+        
+        MQ -->|2. 消费 split 消息| SW[SplitWorker]
+        B -.->|读取缓存| SW
+        SW -->|智能切分| C{ChapterRecognizer}
+        C -->|划分章节| D[MarkdownParagraphSplitter]
+        D -->|切分段落| E[SceneAssembler]
+        E -->|合并组装| F((Scene 列表))
+        F -->|质量校验| G{LengthValidator}
+        G -->|过滤无效数据| H[保存至 Repository JSON]
+        H -->|发送 embed 消息| MQ
+        
+        MQ -->|3. 消费 embed 消息| EW[EmbedWorker]
+        H -.->|读取 JSON| EW
+        EW -->|生成向量并入库| J[(Chroma / InMemory)]
+    end
+    
+    J -->|任务状态更新为 SUCCESS| TS[Task 状态数据库]
 ```
 
 ### 2. 对话检索流 (RAG Chat Flow)

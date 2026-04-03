@@ -1,5 +1,8 @@
 # 基于 MQ 的异步切分与入库架构设计
 
+> **实现状态 (Implementation Status):**
+> 规划的 **3 队列架构（Load、Split、Embed）** 现已使用 **RabbitMQ** 和 **`ProgressSseService`** 完全实现。
+
 ## 1. 需求分析与功能边界确认
 
 ### 核心需求

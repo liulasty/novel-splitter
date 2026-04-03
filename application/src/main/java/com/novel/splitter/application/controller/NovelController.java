@@ -169,7 +169,7 @@ public class NovelController {
             taskService.createTask(taskId, novelId, request.getFileName(), maxScenes, version);
             
             // 2. Send message to RabbitMQ via IngestionService
-            novelIngestionService.ingestAsync(taskId, novelPath.toAbsolutePath().toString(), maxScenes, version);
+            novelIngestionService.ingestAsync(taskId, novelId, novelPath.toAbsolutePath().toString(), maxScenes, version);
             
             log.info("切分任务已发送到队列, taskId: {}", taskId);
 
