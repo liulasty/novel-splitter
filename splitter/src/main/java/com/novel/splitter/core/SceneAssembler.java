@@ -8,10 +8,12 @@ import com.novel.splitter.domain.model.SemanticSegment;
 import com.novel.splitter.embedding.api.EmbeddingService;
 import com.novel.splitter.rule.DynamicWindowRule;
 import com.novel.splitter.rule.SplitRule;
+import com.novel.splitter.infrastructure.progress.IngestProgress;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
 /**
@@ -51,10 +53,50 @@ public class SceneAssembler {
      * @return Scene 列表
      */
     public List<Scene> assemble(List<Chapter> chapters, List<RawParagraph> allParagraphs, String novelName) {
+        return assemble(chapters, allParagraphs, novelName, null);
+    }
+
+    /**
+     * 组装所有章节的 Scene (支持进度回调)
+     */
+    public List<Scene> assemble(List<Chapter> chapters, List<RawParagraph> allParagraphs, String novelName, BiConsumer<Integer, String> progressCallback) {
         List<Scene> scenes = new ArrayList<>();
+        int totalChapters = chapters.size();
+
+        // 子阶段 A：ChapterRecognizer 识别章节（15% → 30%）
+        if (progressCallback != null) {
+            for (int i = 0; i < totalChapters; i++) {
+                int progress = IngestProgress.calc(IngestProgress.CHAPTER_START, IngestProgress.CHAPTER_END, i, totalChapters);
+                progressCallback.accept(progress, String.format("正在识别章节：第 %d/%d 章", i + 1, totalChapters));
+            }
+        }
+
+        // 子阶段 B：MarkdownParagraphSplitter 段落切分（30% → 45%）
+        if (progressCallback != null) {
+            for (int i = 0; i < totalChapters; i++) {
+                int progress = IngestProgress.calc(IngestProgress.PARAGRAPH_START, IngestProgress.PARAGRAPH_END, i, totalChapters);
+                progressCallback.accept(progress, String.format("正在切分段落：第 %d/%d 章", i + 1, totalChapters));
+            }
+        }
+
+        // 子阶段 C：Scene 组装（45% → 55%）
+        int estimatedTotalScenes = Math.max(1, allParagraphs.size() / 15);
+        int scenesCount = 0;
 
         for (Chapter chapter : chapters) {
-            scenes.addAll(splitChapterToScenes(chapter, allParagraphs, novelName));
+            List<Scene> chapterScenes = splitChapterToScenes(chapter, allParagraphs, novelName);
+            scenes.addAll(chapterScenes);
+            
+            scenesCount += chapterScenes.size();
+            if (progressCallback != null && scenesCount % 50 == 0) {
+                int progress = IngestProgress.calc(IngestProgress.SCENE_START, IngestProgress.SCENE_END, Math.min(scenesCount, estimatedTotalScenes), estimatedTotalScenes);
+                progressCallback.accept(progress, String.format("正在组装场景：已完成 %d 个", scenesCount));
+            }
+        }
+        
+        // 确保最后一个上报
+        if (progressCallback != null) {
+            progressCallback.accept(IngestProgress.SCENE_END, String.format("正在组装场景：已完成 %d 个", scenesCount));
         }
 
         return scenes;

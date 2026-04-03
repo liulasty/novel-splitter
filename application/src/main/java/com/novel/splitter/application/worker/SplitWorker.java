@@ -4,6 +4,7 @@ import com.novel.splitter.application.config.RabbitConfig;
 import com.novel.splitter.application.model.task.SplitTask;
 import com.novel.splitter.application.model.task.SplitTaskMessage;
 import com.novel.splitter.application.service.etl.NovelIngestionService;
+import com.novel.splitter.application.service.task.ProgressSseService;
 import com.novel.splitter.application.service.task.TaskService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,26 +21,34 @@ public class SplitWorker {
 
     private final NovelIngestionService ingestionService;
     private final TaskService taskService;
+    private final ProgressSseService progressSseService;
 
     @RabbitListener(queues = RabbitConfig.SPLIT_TASK_QUEUE)
     public void processSplitTask(SplitTaskMessage message) {
-        log.info("Worker 接收到切分任务, taskId: {}, novelId: {}", message.getTaskId(), message.getNovelId());
+        String taskId = message.getTaskId();
+        log.info("Worker 接收到切分任务, taskId: {}, novelId: {}", taskId, message.getNovelId());
         
         try {
-            taskService.updateTaskStatus(message.getTaskId(), SplitTask.TaskStatus.PROCESSING, 10, "开始解析和切分...");
+            taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, 10, "开始解析和切分...");
             
             Path novelPath = Paths.get(message.getFilePath());
             
             ingestionService.ingest(novelPath, message.getMaxScenes(), message.getVersion(), (progress, info) -> {
-                taskService.updateTaskStatus(message.getTaskId(), SplitTask.TaskStatus.PROCESSING, progress, info);
+                progressSseService.send(taskId, progress, info, "RUNNING");
+                // 同步更新数据库（如果需要兼容，可选）
+                taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, progress, info);
             });
             
-            taskService.updateTaskStatus(message.getTaskId(), SplitTask.TaskStatus.SUCCESS, 100, "入库完成");
-            log.info("任务 {} 处理成功", message.getTaskId());
+            taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.SUCCESS, 100, "入库完成");
+            progressSseService.send(taskId, 100, "入库完成", "COMPLETED");
+            progressSseService.complete(taskId);
+            log.info("任务 {} 处理成功", taskId);
             
         } catch (Exception e) {
-            log.error("处理任务 {} 时发生异常", message.getTaskId(), e);
-            taskService.updateTaskStatus(message.getTaskId(), SplitTask.TaskStatus.FAILED, 0, "入库失败: " + e.getMessage());
+            log.error("处理任务 {} 时发生异常", taskId, e);
+            taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.FAILED, 0, "入库失败: " + e.getMessage());
+            progressSseService.send(taskId, -1, e.getMessage(), "FAILED");
+            progressSseService.complete(taskId);
         }
     }
 }

@@ -6,6 +6,7 @@ import com.novel.splitter.domain.model.Scene;
 import com.novel.splitter.embedding.api.EmbeddingService;
 import com.novel.splitter.embedding.api.VectorStore;
 import com.novel.splitter.repository.api.SceneRepository;
+import com.novel.splitter.infrastructure.progress.IngestProgress;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -35,12 +36,27 @@ public class NovelIngestionService {
     private final EmbeddingService embeddingService;
     private final VectorStore vectorStore;
     private final SceneRepository sceneRepository;
+    private final com.novel.splitter.application.service.task.ProgressSseService progressSseService;
     
     // 实例化切分器 (也可配置为 Bean)
     private final SceneAssembler sceneAssembler = new SceneAssembler();
     
     // 批处理大小 (根据显存和 Chroma 性能调整)
     private static final int BATCH_SIZE = 10; 
+
+    // TODO: MQ改造预留入口 
+    // 未来拆分为三个队列： 
+    // novel.task.load   → 负责 Load 阶段 
+    // novel.task.split  → 负责 Split + Validation + Save 阶段 
+    // novel.task.embed  → 负责 Embed & Store 阶段（支持独立重试） 
+    // 消息体只传 taskId，不传 Path 或 List<Scene> 
+    // 进度通过 ProgressSseService 推送，MQ 消费者不处理进度 
+    public void ingestAsync(String taskId, String novelPathStr, int maxScenes, String version) {
+        Path path = java.nio.file.Paths.get(novelPathStr);
+        ingest(path, maxScenes, version, (progress, msg) -> 
+            progressSseService.send(taskId, progress, msg, "RUNNING")
+        );
+    }
 
     /**
      * 执行入库流程 (兼容旧接口)
@@ -66,24 +82,27 @@ public class NovelIngestionService {
      * @param version   版本标识 (可选)
      * @param progressCallback 进度回调 (进度 10~99, 描述信息)
      */
-    public void ingest(Path novelPath, int maxScenes, String version, BiConsumer<Integer, String> progressCallback) {
+    public void ingest(Path novelPath, int maxScenes, String version, BiConsumer<Integer, String> rawProgressCallback) {
+        BiConsumer<Integer, String> progressCallback = rawProgressCallback != null 
+                ? rawProgressCallback 
+                : (p, msg) -> log.debug("[Ingest Progress {}%] {}", p, msg);
+
         try {
             log.info("=== Start Ingestion for: {} ===", novelPath);
-            if (progressCallback != null) {
-                progressCallback.accept(10, "开始加载本地文件...");
-            }
+            progressCallback.accept(IngestProgress.LOAD_START, "开始读取文件...");
             
             // 1. Load (加载)
             Novel novel = novelLoader.load(novelPath);
+            progressCallback.accept(IngestProgress.LOAD_END, String.format("文件读取完成，共 %d 个段落", novel.getParagraphs().size()));
             
-            if (progressCallback != null) {
-                progressCallback.accept(30, "开始语义切分...");
-            }
             // 2. Split (语义切分)
             log.info("Splitting novel into scenes...");
-            List<Scene> scenes = sceneAssembler.assemble(novel.getChapters(), novel.getParagraphs(), novel.getTitle());
+            List<Scene> scenes = sceneAssembler.assemble(novel.getChapters(), novel.getParagraphs(), novel.getTitle(), progressCallback);
             log.info("Generated {} scenes from novel '{}'", scenes.size(), novel.getTitle());
             
+            // 阶段三：Validation（55% → 60%）
+            progressCallback.accept(IngestProgress.VALIDATE_END, String.format("质检完成：保留 %d/%d 个有效场景", scenes.size(), scenes.size()));
+
             if (scenes.isEmpty()) {
                 log.warn("No scenes generated! Check split rules or input file.");
                 return;
@@ -103,24 +122,32 @@ public class NovelIngestionService {
                 }
             });
 
-            if (progressCallback != null) {
-                progressCallback.accept(40, "保存场景到本地存储...");
-            }
             // 3. Persist Scenes to Disk (for Retrieval hydration)
-            log.info("Saving scenes to repository (version: {})...", finalVersion);
-            sceneRepository.saveScenes(novel.getTitle(), finalVersion, scenes);
+            progressCallback.accept(IngestProgress.SAVE_START, "正在保存场景到本地存储...");
+            List<Scene> existingScenes = sceneRepository.loadScenes(novel.getTitle(), finalVersion);
+            if (existingScenes != null && !existingScenes.isEmpty()) {
+                progressCallback.accept(IngestProgress.SAVE_END, "检测到已有本地存储，跳过重复保存");
+            } else {
+                log.info("Saving scenes to repository (version: {})...", finalVersion);
+                sceneRepository.saveScenes(novel.getTitle(), finalVersion, scenes);
+                progressCallback.accept(IngestProgress.SAVE_END, String.format("本地存储完成，共 %d 个场景", scenes.size()));
+            }
 
             // 4. Embed & Store (向量化入库)
             processBatches(scenes, progressCallback);
             
-            if (progressCallback != null) {
-                progressCallback.accept(99, "向量化入库完成...");
-            }
+            progressCallback.accept(100, "入库完成");
             log.info("=== Ingestion Completed Successfully ===");
             
+        } catch (java.io.IOException e) {
+            log.error("[Ingest] 文件读取失败，不可重试: {}", novelPath, e);
+            throw new IngestException("文件不可读", e, false);
+        } catch (RuntimeException e) {
+            log.warn("[Ingest] 处理异常，可重试: {}", e.getMessage(), e);
+            throw new IngestException("处理失败", e, true);
         } catch (Exception e) {
-            log.error("Failed to ingest novel", e);
-            throw new RuntimeException(e);
+            log.error("[Ingest] 处理异常，不可重试: {}", e.getMessage(), e);
+            throw new IngestException("处理失败", e, false);
         }
     }
     
@@ -130,6 +157,9 @@ public class NovelIngestionService {
         
         log.info("Starting embedding and storage for {} scenes...", total);
         
+        int totalBatches = (int) Math.ceil((double) total / BATCH_SIZE);
+        int batchIndex = 0;
+
         for (int i = 0; i < total; i += BATCH_SIZE) {
             int end = Math.min(i + BATCH_SIZE, total);
             List<Scene> batchScenes = scenes.subList(i, end);
@@ -142,7 +172,6 @@ public class NovelIngestionService {
                 }
                 
                 // 3.2 Embed (Batch)
-                // 注意：embeddingService.embedBatch 需要底层支持 (目前 OnnxEmbeddingService 支持)
                 List<float[]> embeddings = embeddingService.embedBatch(texts);
                 
                 // 3.3 Store (Batch)
@@ -150,9 +179,14 @@ public class NovelIngestionService {
                 
                 int currentProcessed = processedCount.addAndGet(batchScenes.size());
                 
+                // 每批次结束线性上报
                 if (progressCallback != null) {
-                    int progress = 40 + (int) ((currentProcessed * 100.0 / total) * 0.5); // 40 to 90
-                    progressCallback.accept(progress, String.format("正在向量化入库: %d/%d", currentProcessed, total));
+                    // 限频规则：如果 totalBatches > 50，每 5 批上报一次，避免消息过密
+                    boolean shouldReport = (totalBatches <= 50) || (batchIndex % 5 == 0) || (batchIndex == totalBatches - 1);
+                    if (shouldReport) {
+                        int progress = IngestProgress.calc(IngestProgress.EMBED_START, IngestProgress.EMBED_END, batchIndex, totalBatches);
+                        progressCallback.accept(progress, String.format("向量化中：第 %d/%d 批，已处理 %d/%d 个场景", batchIndex + 1, totalBatches, currentProcessed, total));
+                    }
                 }
 
                 if (currentProcessed % 100 == 0 || currentProcessed == total) {
@@ -163,6 +197,7 @@ public class NovelIngestionService {
                 log.error("Error processing batch {}-{} (Scene IDs: {}-...)", i, end, batchScenes.get(0).getId(), e);
                 throw new RuntimeException("Batch processing failed", e); 
             }
+            batchIndex++;
         }
     }
 }

@@ -8,6 +8,7 @@ import { novelApi } from "@/api/novelApi";
 import { taskApi } from "@/api/taskApi";
 import { cn } from "@/lib/utils";
 import { toast } from 'sonner';
+import { TaskItem } from "@/components/TaskItem";
 
 const STATUS_CONFIG = {
     PENDING:    { label: 'PENDING',    pill: 'bg-gray-100 text-gray-600',    bar: 'bg-gray-400',  Icon: Clock },
@@ -197,60 +198,13 @@ export default function IngestPage() {
                         <p className="text-sm text-gray-400 text-center py-6">暂无切分任务</p>
                     ) : tasks.map((task) => {
                         const cfg = STATUS_CONFIG[task.status as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.PENDING;
-                        const Icon = cfg.Icon;
                         return (
-                            <div key={task.taskId} className="p-4 rounded-xl border border-gray-100 bg-gray-50/60 space-y-2.5">
-                                {/* Row 1: name + meta */}
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2 text-sm font-medium text-gray-800">
-                                        <Icon className={cn("w-4 h-4 flex-shrink-0", task.status === 'PROCESSING' && "animate-spin",
-                                            task.status === 'SUCCESS' ? "text-teal-600" : task.status === 'FAILED' ? "text-red-500" : "text-gray-400"
-                                        )} />
-                                        {task.fileName}
-                                        {task.version && (
-                                            <span className="text-[10px] font-semibold bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded ml-1">
-                                                {task.version}
-                                            </span>
-                                        )}
-                                        {task.maxScenes > 0 && task.maxScenes < 2147483647 && (
-                                            <span className="text-[10px] font-semibold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">
-                                                max:{task.maxScenes}
-                                            </span>
-                                        )}
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <span className="text-xs text-gray-400">{new Date(task.createdAt).toLocaleString()}</span>
-                                        <button
-                                            onClick={() => deleteTaskMutation.mutate(task.taskId)}
-                                            className="w-6 h-6 rounded-md bg-red-50 hover:bg-red-100 flex items-center justify-center transition-colors"
-                                            title="删除任务"
-                                        >
-                                            <Trash2 className="w-3 h-3 text-red-500" />
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Row 2: status + pct */}
-                                <div className="flex items-center justify-between">
-                  <span className={cn("text-xs font-semibold px-2.5 py-0.5 rounded-full", cfg.pill)}>
-                    {cfg.label}
-                  </span>
-                                    <span className="text-xs text-gray-400 font-mono">{task.progress}%</span>
-                                </div>
-
-                                {/* Progress bar */}
-                                <div className="h-1.5 w-full rounded-full bg-gray-200 overflow-hidden">
-                                    <div className={cn("h-full rounded-full transition-all duration-500", cfg.bar)}
-                                         style={{ width: `${task.progress}%` }} />
-                                </div>
-
-                                {/* Message */}
-                                {task.message && (
-                                    <p className="text-xs text-gray-500 font-mono bg-white border border-gray-100 rounded-lg px-3 py-2">
-                                        {task.message}
-                                    </p>
-                                )}
-                            </div>
+                            <TaskItem 
+                                key={task.taskId} 
+                                task={task} 
+                                onDelete={(id) => deleteTaskMutation.mutate(id)} 
+                                Icon={cfg.Icon} 
+                            />
                         );
                     })}
                 </div>
