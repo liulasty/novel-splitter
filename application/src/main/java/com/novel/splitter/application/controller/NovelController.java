@@ -1,9 +1,7 @@
 package com.novel.splitter.application.controller;
 
 import com.novel.splitter.application.config.AppConfig;
-import com.novel.splitter.application.config.RabbitConfig;
-import com.novel.splitter.application.model.task.SplitTask;
-import com.novel.splitter.application.model.task.SplitTaskMessage;
+import com.novel.splitter.application.service.etl.NovelIngestionService;
 import com.novel.splitter.application.service.task.ProgressSseService;
 import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.domain.model.dto.IngestRequest;
@@ -29,6 +27,8 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 /**
  * 小说文件管理控制器
@@ -42,10 +42,9 @@ import java.util.stream.Stream;
 public class NovelController {
 
     private final TaskService taskService;
-    private final RabbitTemplate rabbitTemplate;
     private final AppConfig appConfig;
     private final ProgressSseService progressSseService;
-    private final com.novel.splitter.application.service.etl.NovelIngestionService novelIngestionService;
+    private final NovelIngestionService novelIngestionService;
 
     /**
      * 接收小说入库进度流
@@ -137,8 +136,8 @@ public class NovelController {
             ext = originalFilename.substring(dotIndex);
         }
         
-        java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
-        String timestamp = java.time.LocalDateTime.now().format(formatter);
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
+        String timestamp = LocalDateTime.now().format(formatter);
         
         return name + "_" + timestamp + ext;
     }
@@ -171,7 +170,7 @@ public class NovelController {
             // 2. Send message to RabbitMQ via IngestionService
             novelIngestionService.ingestAsync(taskId, novelId, novelPath.toAbsolutePath().toString(), maxScenes, version);
             
-            log.info("切分任务已发送到队列, taskId: {}", taskId);
+            log.info("入库任务已发送到队列, taskId: {}", taskId);       
 
             return ResponseEntity.ok(Map.of(
                 "message", "入库任务已提交到队列",
