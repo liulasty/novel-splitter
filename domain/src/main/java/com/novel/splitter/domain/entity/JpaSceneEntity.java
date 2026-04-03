@@ -1,4 +1,4 @@
-package com.novel.splitter.repository.entity;
+package com.novel.splitter.domain.entity;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;

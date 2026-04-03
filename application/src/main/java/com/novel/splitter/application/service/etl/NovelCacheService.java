@@ -1,7 +1,7 @@
 package com.novel.splitter.application.service.etl;
 
 import com.novel.splitter.domain.model.Novel;
-import com.novel.splitter.application.model.ChapterData;
+import com.novel.splitter.domain.model.ChapterData;
 import com.novel.splitter.infrastructure.json.JsonUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;

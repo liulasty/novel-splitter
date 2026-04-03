@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  rabbitmq:
+    restart: unless-stopped
+    volumes:
+      - ${DOCKER_DATA_PATH}/rabbitmq:/var/lib/rabbitmq
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  chromadb:
+    restart: unless-stopped
+    volumes:
+      - ${DOCKER_DATA_PATH}/chromadb:/chroma/chroma
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  postgres:
+    restart: unless-stopped
+    volumes:
+      - ${DOCKER_DATA_PATH}/postgres:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  backend:
+    restart: unless-stopped
+    volumes:
+      - ${APP_DATA_PATH}/embedding/src/main/resources/embedding:/app/embedding/src/main/resources/embedding
+      - ${APP_DATA_PATH}/data/novel-storage:/app/data/novel-storage
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  frontend:
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT}:80"
+    deploy:
+      resources:
+        limits:
+          memory: 256M

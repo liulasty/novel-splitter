@@ -1,6 +1,6 @@
 package com.novel.splitter.application.controller;
 
-import com.novel.splitter.application.model.task.SplitTask;
+import com.novel.splitter.domain.task.SplitTask;
 import com.novel.splitter.application.service.task.TaskService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

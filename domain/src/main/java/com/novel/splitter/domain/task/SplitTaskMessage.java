@@ -1,4 +1,4 @@
-package com.novel.splitter.application.model.task;
+package com.novel.splitter.domain.task;
 
 public class SplitTaskMessage {
     private String taskId;

@@ -1,6 +1,6 @@
 package com.novel.splitter.application.service.task;
 
-import com.novel.splitter.application.model.task.SplitTask;
+import com.novel.splitter.domain.task.SplitTask;
 import com.novel.splitter.application.repository.task.TaskRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;

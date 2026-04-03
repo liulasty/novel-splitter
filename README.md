@@ -135,77 +135,82 @@ graph LR
 
 ---
 
-## 🚀 快速开始与详细配置
+## 🚀 快速开始与全栈 Docker 部署 (Deployment)
+
+本项目支持跨平台的 Docker 一键全栈部署，包括前端、后端、数据库和中间件。
 
 ### 1. 环境准备
-- **JDK 21**：因为用到了虚拟线程和新的 Switch 模式匹配等特性，Java 21 是最低要求。
-- **Maven 3.8+**：用于编译后端代码。
-- **Node.js 20+ & pnpm**：用于运行和编译前端界面（可选，后端已集成编译好的静态文件则不需要）。
+- **Docker & Docker Compose**：必须安装。
+- **Java 21 & Maven 3.8+**：用于本地编译后端。
+- **Node.js 22+**：用于本地编译前端（可选，脚本中会通过容器编译）。
 
-### 2. 编译项目
-打开终端（CMD 或 PowerShell），执行以下命令：
+### 2. 配置环境参数
+在项目根目录的 `config/` 文件夹下，根据 `.env.example` 模板创建 `.env.dev` 或 `.env.prod`，并填入必要的大模型 API Key 等信息。
 
 ```bash
-# 1. 下载并进入项目
-cd novel-splitter
-
-# 2. 编译整个后端项目（这会下载依赖包，可能需要几分钟）
-mvn clean package -DskipTests
-```
-看到 `BUILD SUCCESS` 即代表编译成功。
-
-### 3. 高级环境变量配置 (.env)
-为了使用真实的大模型（如 Gemini 或 DeepSeek），并调整系统行为，你需要在项目根目录下创建一个名为 `.env` 的文件（可复制 `.env.example`）。
-
-以下是核心配置说明：
-
-```env
-# ====== LLM 客户端配置 ======
-# Gemini API Key (目前免费且上下文窗口极大，推荐首选)
-GEMINI_API_KEY=your_gemini_api_key
-# 防止 Gemini 回答过早截断的最大 Token 数，建议设为 8192
-GEMINI_MAX_OUTPUT_TOKENS=8192
-
-# DeepSeek API Key (性价比高，中文效果好)
-DEEPSEEK_API_KEY=your_deepseek_api_key
-
-# Coze Bot 配置 (适合将知识库放在 Coze 上托管的用户)
-COZE_API_KEY=your_coze_token
-COZE_BOT_ID=your_bot_id
-
-# ====== 系统路径与核心配置 ======
-# 小说存储根目录，默认在项目下的 novel-storage
-STORAGE_ROOT=./novel-storage
+cp config/.env.example config/.env.dev
+# 编辑 config/.env.dev，填入 API Key 及其他自定义配置
 ```
 
-### 4. `application.yml` 高级配置 (按需修改)
-除了 `.env`，部分系统行为定义在 `application/src/main/resources/application.yml` 中：
-*   **大文件上传限制**：小说 TXT 往往很大，若上传失败，请检查或调大 YAML 中的 `spring.servlet.multipart.max-file-size` (默认 50MB) 和 `max-request-size`。
-*   **Token 组装预算**：在 `assembler` 配置块中，可以修改 `maxContextTokens` 来控制发送给大模型的上下文总量。系统默认使用 `SimpleTokenCounter` (按字符数 * 1.5 估算)。
-*   **小说 ID 规范 (Novel ID Normalization)**：系统底层逻辑会自动剥离上传文件的 `.txt` 后缀作为知识库的唯一 ID（如 `novel.txt` -> `novel`），在查询 RAG 和向量库时需保持一致。
+### 3. 一键编译与打包镜像
+我们提供了跨平台的编译脚本。在根目录下执行：
 
-### 5. 运行服务
+**Windows (CMD/PowerShell):**
+```cmd
+.\scripts\build.bat
+# 或
+.\scripts\build.ps1
+```
 
-**启动后端与 Web 界面：**
+**Linux / macOS:**
 ```bash
-java -jar application/target/application-1.0.0-SNAPSHOT.jar
+./scripts/build.sh
 ```
-当看到 `Started NovelSplitApplication in ...` 字样时，打开浏览器访问：
-👉 **http://localhost:8080/**
 
-在可视化界面上，你可以完成：上传文件 -> 开始切分 -> 知识库管理 -> 在线 Chat 对话等完整流程。
+### 4. 启动服务
+你可以选择启动开发环境或生产环境。生产环境会自动应用资源限制和自动重启策略。
 
-**极客命令行模式：**
-如果不想用 Web 界面，也可以直接用命令触发切分任务：
+**Windows:**
+```cmd
+# 启动开发环境
+.\scripts\deploy.bat dev latest
+
+# 启动生产环境
+.\scripts\deploy.bat prod latest
+```
+
+**Linux / macOS:**
 ```bash
-java -jar application/target/application-1.0.0-SNAPSHOT.jar --file="D:\books\斗破苍穹.txt" --version="v1"
+./scripts/deploy.sh prod latest
+```
+
+当所有容器启动完成后，访问：
+👉 **http://localhost:80** (前端界面)
+👉 **http://localhost:8080/swagger-ui/index.html** (后端 API 文档)
+👉 **http://localhost:15672** (RabbitMQ 管理面板，默认账号密码见配置)
+
+### 5. 停止服务
+执行对应的 stop 脚本即可优雅关闭并移除容器：
+
+**Windows:**
+```cmd
+.\scripts\stop.bat prod
+```
+
+**Linux / macOS:**
+```bash
+./scripts/stop.sh prod
 ```
 
 ---
 
-## ❓ 常见问题与 RAG 原理说明 (FAQ)
+## 🛠 本地开发与高级配置
 
-**Q: 什么是 RAG？为什么我不直接把整本小说发给大模型？**
+如果您希望在本地进行开发，而非使用 Docker 部署，或想了解更详细的环境变量配置、多环境切换方法及脚本使用原理，请参阅 [使用指南 (USAGE.md)](USAGE.md)。
+
+---
+
+## ❓ 常见问题与 RAG 原理说明 (FAQ)
 A: RAG (Retrieval-Augmented Generation，检索增强生成) 是目前让 AI 读懂超大私有数据的主流技术。虽然现在有些大模型支持 100万甚至 200万 Token 的上下文，但直接丢整本小说不仅**极度昂贵**，还会导致模型**注意力失焦（Lost in the middle）**，导致回答幻觉。本项目通过“先切分、再检索、后组装”的 RAG 机制，以极低的成本提供最准确的小说细节问答。
 
 **Q: 为什么不直接用 LangChain 或 LlamaIndex？**

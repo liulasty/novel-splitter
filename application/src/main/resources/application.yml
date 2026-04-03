@@ -1,11 +1,11 @@
 server:
-  port: 8080
+  port: ${BACKEND_PORT:8080}
 
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/novel_splitter
-    username: postgres
-    password: password
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:novel_splitter}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:password}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
@@ -16,10 +16,10 @@ spring:
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
   rabbitmq:
-    host: localhost
-    port: 5672
-    username: user
-    password: password
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:user}
+    password: ${RABBITMQ_PASSWORD:password}
   servlet:
     multipart:
       max-file-size: 50MB
@@ -76,7 +76,7 @@ embedding:
     # model-path: "D:/path/to/model.onnx"
     # vocab-path: "D:/path/to/vocab.txt"
 chroma:
-  url: http://localhost:8000
+  url: ${CHROMA_URL:http://localhost:8000}
   collection: novel-splitter
 
 assembler:

@@ -1,6 +1,6 @@
 package com.novel.splitter.application.repository.task;
 
-import com.novel.splitter.application.model.task.SplitTask;
+import com.novel.splitter.domain.task.SplitTask;
 import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;

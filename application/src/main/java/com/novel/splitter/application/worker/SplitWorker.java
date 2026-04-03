@@ -1,9 +1,9 @@
 package com.novel.splitter.application.worker;
 
 import com.novel.splitter.application.config.RabbitConfig;
-import com.novel.splitter.application.model.task.SplitTask;
-import com.novel.splitter.application.model.task.SplitTaskMessage;
-import com.novel.splitter.application.model.task.EmbedTaskMessage;
+import com.novel.splitter.domain.task.SplitTask;
+import com.novel.splitter.domain.task.SplitTaskMessage;
+import com.novel.splitter.domain.task.EmbedTaskMessage;
 import com.novel.splitter.application.service.etl.NovelCacheService;
 import com.novel.splitter.application.service.etl.NovelIngestionService;
 import com.novel.splitter.application.service.task.ProgressSseService;

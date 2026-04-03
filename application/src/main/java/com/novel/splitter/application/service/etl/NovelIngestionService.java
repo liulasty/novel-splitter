@@ -10,7 +10,7 @@ import com.novel.splitter.infrastructure.progress.IngestProgress;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import com.novel.splitter.application.config.RabbitConfig;
-import com.novel.splitter.application.model.task.SplitTaskMessage;
+import com.novel.splitter.domain.task.SplitTaskMessage;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 
@@ -117,7 +117,7 @@ public class NovelIngestionService {
             com.novel.splitter.domain.model.Chapter chapter = chapters.get(i);
             
             // Load chapter data from cache
-            com.novel.splitter.application.model.ChapterData chapterData = novelCacheService.loadChapter(taskId, chapter.getIndex());
+            com.novel.splitter.domain.model.ChapterData chapterData = novelCacheService.loadChapter(taskId, chapter.getIndex());
             
             List<Scene> chapterScenes = sceneAssembler.assembleChapter(chapter, chapterData.getParagraphs(), novel.getTitle());
             scenes.addAll(chapterScenes);

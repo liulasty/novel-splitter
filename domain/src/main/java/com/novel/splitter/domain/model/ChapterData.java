@@ -1,7 +1,5 @@
-package com.novel.splitter.application.model;
+package com.novel.splitter.domain.model;
 
-import com.novel.splitter.domain.model.Chapter;
-import com.novel.splitter.domain.model.RawParagraph;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

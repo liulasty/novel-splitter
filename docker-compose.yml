@@ -1,65 +1,73 @@
-# Docker Compose 文件版本 3.8，兼容主流 Docker 版本
 version: '3.8'
 
 services:
-  # RabbitMQ 消息队列服务
   rabbitmq:
     image: rabbitmq:3-management
     container_name: rabbitmq
-    ports:
-      - "5672:5672"   # 应用程序连接 RabbitMQ 使用的 AMQP 端口
-      - "15672:15672" # 浏览器访问 Web 管理界面端口
     environment:
-      RABBITMQ_DEFAULT_USER: user   # 默认管理员账号
-      RABBITMQ_DEFAULT_PASS: password # 默认管理员密码
-    # 挂载 D 盘目录作为数据卷，实现数据持久化
-    volumes:
-      - D:\docker_data\rabbitmq:/var/lib/rabbitmq
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    networks:
+      - appnet
 
-  # ChromaDB 向量数据库服务（RAG 场景常用）
   chromadb:
     image: chromadb/chroma:latest
     container_name: chromadb
-    ports:
-      - "8000:8000" # API 访问端口
-    volumes:
-      # 挂载 D 盘目录存储向量数据，容器删除数据不丢失
-      - D:\docker_data\chromadb:/chroma/chroma
     environment:
-      - IS_PERSISTENT=TRUE    # 开启持久化存储
-      - PERSIST_DIRECTORY=/chroma/chroma # 容器内数据存储路径
+      - IS_PERSISTENT=TRUE
+      - PERSIST_DIRECTORY=/chroma/chroma
+    networks:
+      - appnet
 
-  # PostgreSQL 关系型数据库服务
   postgres:
     image: postgres:15
     container_name: postgres
-    ports:
-      - "5432:5432"
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: novel_splitter
-    volumes:
-      - D:\docker_data\postgres:/var/lib/postgresql/data
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    networks:
+      - appnet
 
-  # novel-splitter 应用服务
-  novel-splitter:
+  backend:
+    image: novel-splitter-backend:latest
+    container_name: backend
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: novel-splitter
-    ports:
-      - "8080:8080"
     depends_on:
       - rabbitmq
       - chromadb
       - postgres
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/novel_splitter
-      - SPRING_RABBITMQ_HOST=rabbitmq
-      - CHROMA_URL=http://chromadb:8000
-    volumes:
-      - D:\soft\novel-splitter\embedding\src\main\resources\embedding:/app/embedding/src/main/resources/embedding
-      - D:\soft\novel-splitter\data\novel-storage:/app/data/novel-storage
-      
-# 注意：不再使用匿名数据卷，直接绑定宿主机 D 盘路径
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - RABBITMQ_HOST=${RABBITMQ_HOST}
+      - RABBITMQ_PORT=${RABBITMQ_PORT}
+      - RABBITMQ_USER=${RABBITMQ_USER}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+      - CHROMA_URL=${CHROMA_URL}
+      - BACKEND_PORT=${BACKEND_PORT}
+      - COZE_API_KEY=${COZE_API_KEY}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    networks:
+      - appnet
+
+  frontend:
+    image: novel-splitter-frontend:latest
+    container_name: frontend
+    build:
+      context: ./novel-splitter-web
+      dockerfile: Dockerfile
+    depends_on:
+      - backend
+    networks:
+      - appnet
+
+networks:
+  appnet:
+    driver: bridge

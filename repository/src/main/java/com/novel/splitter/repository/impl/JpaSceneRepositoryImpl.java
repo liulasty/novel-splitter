@@ -6,7 +6,7 @@ import com.novel.splitter.domain.model.Scene;
 import com.novel.splitter.domain.model.SceneMetadata;
 import com.novel.splitter.repository.api.JpaSceneRepository;
 import com.novel.splitter.repository.api.SceneRepository;
-import com.novel.splitter.repository.entity.JpaSceneEntity;
+import com.novel.splitter.domain.entity.JpaSceneEntity;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
