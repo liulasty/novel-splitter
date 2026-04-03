@@ -71,10 +71,8 @@ embedding:
   store:
     type: chroma # memory or chroma
   onnx:
-    # 直接指向您现有的文件
-    model-path: "d:/soft/novel-splitter/embedding/src/main/resources/embedding/model.onnx"
-    # model-path: "D:/path/to/model.onnx"
-    # vocab-path: "D:/path/to/vocab.txt"
+    # 留空以使用 classpath 中的内置模型，或通过环境变量注入外部路径
+    model-path: ${EMBEDDING_ONNX_MODEL_PATH:}
 chroma:
   url: ${CHROMA_URL:http://localhost:8000}
   collection: novel-splitter
@@ -86,7 +84,7 @@ assembler:
 
 splitter:
   storage:
-    root-path: "d:/soft/novel-splitter/data/novel-storage"
+    root-path: ${STORAGE_ROOT_PATH:data/novel-storage}
     
   rule:
     target-length: 1200

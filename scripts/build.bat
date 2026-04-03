@@ -1,13 +1,38 @@
 @echo off
-setlocal
+setlocal enabledelayedexpansion
+cls
+echo ==============================================
+echo          START BUILD PROCESS
+echo ==============================================
 
-echo Building backend...
+echo.
+echo [STEP 1] Maven clean package...
 call mvn clean package -DskipTests
-if %errorlevel% neq 0 exit /b %errorlevel%
+if %errorlevel% neq 0 (
+    echo.
+    echo [ERROR] Maven build failed!
+    pause
+    exit /b 1
+)
+echo [INFO] Maven build success!
 
-echo Building Docker images...
-docker-compose build
-if %errorlevel% neq 0 exit /b %errorlevel%
+echo.
+echo [STEP 2] Docker build...
+call docker-compose build backend
+if %errorlevel% neq 0 (
+    echo.
+    echo [ERROR] Docker build failed!
+    pause
+    exit /b 1
+)
+echo [INFO] Docker build success!
 
-echo Build complete.
+echo.
+echo ==============================================
+echo          BUILD ALL SUCCESSFUL!
+echo    Run: docker-compose up -d
+echo ==============================================
+echo.
+
+pause
 endlocal

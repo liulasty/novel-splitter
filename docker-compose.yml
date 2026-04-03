@@ -9,6 +9,12 @@ services:
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
     networks:
       - appnet
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   chromadb:
     image: chromadb/chroma:latest
@@ -18,6 +24,12 @@ services:
       - PERSIST_DIRECTORY=/chroma/chroma
     networks:
       - appnet
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   postgres:
     image: postgres:15
@@ -28,6 +40,12 @@ services:
       POSTGRES_DB: ${DB_NAME}
     networks:
       - appnet
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   backend:
     image: novel-splitter-backend:latest
@@ -36,9 +54,12 @@ services:
       context: .
       dockerfile: Dockerfile
     depends_on:
-      - rabbitmq
-      - chromadb
-      - postgres
+      rabbitmq:
+        condition: service_healthy
+      chromadb:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     environment:
       - DB_HOST=${DB_HOST}
       - DB_PORT=${DB_PORT}
@@ -54,8 +75,13 @@ services:
       - COZE_API_KEY=${COZE_API_KEY}
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - STORAGE_ROOT_PATH=/app/data/novel-storage
+      - JAVA_OPTS=${JAVA_OPTS:--Xmx1g -Xms512m}
+    volumes:
+      - ./data:/app/data
     networks:
       - appnet
+    restart: unless-stopped
 
   frontend:
     image: novel-splitter-frontend:latest
@@ -65,8 +91,11 @@ services:
       dockerfile: Dockerfile
     depends_on:
       - backend
+    environment:
+      - BACKEND_URL=http://backend:${BACKEND_PORT:-8080}
     networks:
       - appnet
+    restart: unless-stopped
 
 networks:
   appnet:

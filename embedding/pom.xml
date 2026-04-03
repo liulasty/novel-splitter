@@ -44,4 +44,16 @@
         </dependency>
     </dependencies>
 
+
+
+    <!-- pom.xml 中可以这样写 -->
+    <repositories>
+        <repository>
+            <id>aliyun-public</id>
+            <url>https://maven.aliyun.com/repository/public</url>
+            <releases><enabled>true</enabled></releases>
+            <snapshots><enabled>false</enabled></snapshots>
+        </repository>
+    </repositories>
+
 </project>
