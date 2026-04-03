@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
     UploadCloud, FileText, Loader2, CheckCircle,
-    AlertCircle, Clock, Trash2, Zap, Database, GitBranch
+    AlertCircle, Clock, Zap, Database, GitBranch
 } from "lucide-react";
 import { novelApi } from "@/api/novelApi";
 import { taskApi } from "@/api/taskApi";

@@ -3,6 +3,7 @@ package com.novel.splitter.application.service.etl;
 import com.novel.splitter.domain.model.Chapter;
 import com.novel.splitter.domain.model.Novel;
 import com.novel.splitter.domain.model.RawParagraph;
+import com.novel.splitter.application.model.ChapterData;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -20,11 +21,17 @@ import java.util.regex.Pattern;
 @Slf4j
 public class LocalNovelLoader {
 
+    private final NovelCacheService novelCacheService;
+
+    public LocalNovelLoader(NovelCacheService novelCacheService) {
+        this.novelCacheService = novelCacheService;
+    }
+
     // Matches "第123章 标题" or "第一章 标题"
     // Handles spaces: "第 1 章"
-    private static final Pattern CHAPTER_PATTERN = Pattern.compile("^\\s*第\\s*[0-9零一二三四五六七八九十百千万]+\s*[章回].*");
+    private static final Pattern CHAPTER_PATTERN = Pattern.compile("^\\s*第\\s*[0-9零一二三四五六七八九十百千万]+\\s*[章回].*");
 
-    public Novel load(Path path) throws IOException {
+    public Novel load(String taskId, Path path) throws IOException {
         log.info("Loading novel from: {}", path);
         String fileName = path.getFileName().toString();
         // Use the full filename without extension as the title to ensure uniqueness and matching with storage
@@ -40,7 +47,7 @@ public class LocalNovelLoader {
         }
 
         List<Chapter> chapters = new ArrayList<>();
-        List<RawParagraph> paragraphs = new ArrayList<>();
+        List<RawParagraph> currentChapterParagraphs = new ArrayList<>();
         
         try (BufferedReader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
             String line;
@@ -56,9 +63,14 @@ public class LocalNovelLoader {
                 if (!isEmpty && CHAPTER_PATTERN.matcher(content).matches()) {
                     // Close previous chapter
                     if (currentChapterBuilder != null) {
-                         chapters.add(currentChapterBuilder
+                         Chapter finishedChapter = currentChapterBuilder
                                  .endParagraphIndex(lineIndex - 1)
-                                 .build());
+                                 .build();
+                         chapters.add(finishedChapter);
+                         if (taskId != null) {
+                             novelCacheService.saveChapter(taskId, finishedChapter.getIndex(), new ChapterData(finishedChapter, new ArrayList<>(currentChapterParagraphs)));
+                         }
+                         currentChapterParagraphs.clear();
                     }
                     
                     // Start new chapter
@@ -69,7 +81,7 @@ public class LocalNovelLoader {
                 }
                 
                 // Add paragraph
-                paragraphs.add(RawParagraph.builder()
+                currentChapterParagraphs.add(RawParagraph.builder()
                         .index(lineIndex)
                         .content(content)
                         .isEmpty(isEmpty)
@@ -80,19 +92,23 @@ public class LocalNovelLoader {
             
             // Close last chapter
             if (currentChapterBuilder != null) {
-                chapters.add(currentChapterBuilder
+                Chapter finishedChapter = currentChapterBuilder
                         .endParagraphIndex(lineIndex - 1)
-                        .build());
+                        .build();
+                chapters.add(finishedChapter);
+                if (taskId != null) {
+                    novelCacheService.saveChapter(taskId, finishedChapter.getIndex(), new ChapterData(finishedChapter, new ArrayList<>(currentChapterParagraphs)));
+                }
             }
         }
         
-        log.info("Loaded novel '{}' by '{}'. Chapters: {}, Paragraphs: {}", title, author, chapters.size(), paragraphs.size());
+        log.info("Loaded novel '{}' by '{}'. Chapters: {}", title, author, chapters.size());
         
         return Novel.builder()
                 .title(title)
                 .author(author)
                 .chapters(chapters)
-                .paragraphs(paragraphs)
+                .paragraphs(new ArrayList<>()) // Return empty paragraphs to save memory
                 .build();
     }
 }

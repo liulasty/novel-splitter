@@ -107,16 +107,29 @@ public class SceneAssembler {
      * 切分单个章节
      */
     private List<Scene> splitChapterToScenes(Chapter chapter, List<RawParagraph> allParagraphs, String novelName) {
-        List<Scene> chapterScenes = new ArrayList<>();
-        
-        // 1. 获取本章节的原始段落
         int start = chapter.getStartParagraphIndex();
         int end = chapter.getEndParagraphIndex();
         if (start > end || start >= allParagraphs.size()) {
-            return chapterScenes;
+            return new ArrayList<>();
         }
         end = Math.min(end, allParagraphs.size() - 1);
         List<RawParagraph> chapterParagraphs = allParagraphs.subList(start, end + 1);
+        return splitChapterParagraphsToScenes(chapter, chapterParagraphs, novelName);
+    }
+
+    /**
+     * 组装单个章节的 Scene (支持流式处理)
+     */
+    public List<Scene> assembleChapter(Chapter chapter, List<RawParagraph> chapterParagraphs, String novelName) {
+        return splitChapterParagraphsToScenes(chapter, chapterParagraphs, novelName);
+    }
+
+    private List<Scene> splitChapterParagraphsToScenes(Chapter chapter, List<RawParagraph> chapterParagraphs, String novelName) {
+        List<Scene> chapterScenes = new ArrayList<>();
+        
+        if (chapterParagraphs == null || chapterParagraphs.isEmpty()) {
+            return chapterScenes;
+        }
 
         // 2. 构建语义段 (合并对话等)
         List<SemanticSegment> segments = segmentBuilder.build(chapterParagraphs);
@@ -124,6 +137,7 @@ public class SceneAssembler {
         // 3. 基于规则切分
         List<SemanticSegment> buffer = new ArrayList<>();
         int currentLength = 0;
+        int start = chapterParagraphs.get(0).getIndex();
         int sceneStartParaIdx = start; // 记录当前 Scene 的起始段落索引
         String previousContext = ""; // 记录上一个 Scene 的上下文 (Phase 3 Requirement)
 
@@ -209,7 +223,7 @@ public class SceneAssembler {
 
         // 计算质量得分 (简单的 PPL 模拟：结尾是否完整)
         double qualityScore = 1.0;
-        if (text.length() > 0) {
+        if (text.length() >= 2) {
             char lastChar = text.charAt(text.length() - 2); // 倒数第二个字符（排除换行符）
             if (lastChar != '。' && lastChar != '”' && lastChar != '！' && lastChar != '？' && lastChar != '.' && lastChar != '}') {
                 qualityScore = 0.7; // 结尾不完整，降权

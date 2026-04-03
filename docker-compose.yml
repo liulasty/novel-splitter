@@ -29,4 +29,37 @@ services:
       - IS_PERSISTENT=TRUE    # 开启持久化存储
       - PERSIST_DIRECTORY=/chroma/chroma # 容器内数据存储路径
 
+  # PostgreSQL 关系型数据库服务
+  postgres:
+    image: postgres:15
+    container_name: postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: novel_splitter
+    volumes:
+      - D:\docker_data\postgres:/var/lib/postgresql/data
+
+  # novel-splitter 应用服务
+  novel-splitter:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: novel-splitter
+    ports:
+      - "8080:8080"
+    depends_on:
+      - rabbitmq
+      - chromadb
+      - postgres
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/novel_splitter
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - CHROMA_URL=http://chromadb:8000
+    volumes:
+      - D:\soft\novel-splitter\embedding\src\main\resources\embedding:/app/embedding/src/main/resources/embedding
+      - D:\soft\novel-splitter\data\novel-storage:/app/data/novel-storage
+      
 # 注意：不再使用匿名数据卷，直接绑定宿主机 D 盘路径

@@ -11,6 +11,8 @@ public class SplitTask {
     private String message;
     private long createdAt;
     private long updatedAt;
+    private int totalScenes;
+    private java.util.concurrent.atomic.AtomicInteger completedScenes = new java.util.concurrent.atomic.AtomicInteger(0);
 
     public enum TaskStatus {
         PENDING,
@@ -73,4 +75,9 @@ public class SplitTask {
 
     public long getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(long updatedAt) { this.updatedAt = updatedAt; }
+
+    public int getTotalScenes() { return totalScenes; }
+    public void setTotalScenes(int totalScenes) { this.totalScenes = totalScenes; }
+
+    public java.util.concurrent.atomic.AtomicInteger getCompletedScenes() { return completedScenes; }
 }

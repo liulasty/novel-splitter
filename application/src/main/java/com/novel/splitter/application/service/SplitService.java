@@ -9,8 +9,6 @@ import com.novel.splitter.pipeline.stages.SplitStage;
 import com.novel.splitter.pipeline.stages.ValidationStage;
 import com.novel.splitter.repository.api.NovelRepository;
 import com.novel.splitter.repository.api.SceneRepository;
-import com.novel.splitter.repository.impl.LocalFileNovelRepository;
-import com.novel.splitter.repository.impl.LocalFileSceneRepository;
 import com.novel.splitter.validation.impl.LengthValidator;
 import org.springframework.stereotype.Service;
 
@@ -20,7 +18,7 @@ import java.nio.file.Paths;
 
 /**
  * 切分服务
- * 负责构建和执行 Pipeline
+ * 负责构建和执行 Pipeline，包括加载、切分、验证和保存场景
  */
 @Service
 public class SplitService {
@@ -30,14 +28,11 @@ public class SplitService {
     private final SceneRepository sceneRepository;
     private final com.novel.splitter.embedding.api.EmbeddingService embeddingService;
 
-    public SplitService(AppConfig appConfig, com.novel.splitter.embedding.api.EmbeddingService embeddingService) {
+    public SplitService(AppConfig appConfig, com.novel.splitter.embedding.api.EmbeddingService embeddingService, NovelRepository novelRepository, SceneRepository sceneRepository) {
         this.appConfig = appConfig;
         this.embeddingService = embeddingService;
-        
-        // 初始化 Repository（这里简单起见直接实例化，也可以配置为 Bean）
-        String storageRoot = appConfig.getStorage().getRootPath();
-        this.novelRepository = new LocalFileNovelRepository();
-        this.sceneRepository = new LocalFileSceneRepository(storageRoot);
+        this.novelRepository = novelRepository;
+        this.sceneRepository = sceneRepository;
     }
 
     /**

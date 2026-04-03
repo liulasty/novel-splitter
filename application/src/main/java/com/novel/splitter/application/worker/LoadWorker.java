@@ -48,7 +48,7 @@ public class LoadWorker {
             String rootPath = appConfig.getStorage().getRootPath();
             Path novelPath = Paths.get(rootPath, task.getFileName());
             
-            Novel novel = ingestionService.loadPhase(novelPath, (progress, info) -> {
+            Novel novel = ingestionService.loadPhase(taskId, novelPath, (progress, info) -> {
                 progressSseService.send(taskId, progress, info, "RUNNING");
                 taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, progress, info);
             });

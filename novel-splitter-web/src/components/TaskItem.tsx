@@ -1,12 +1,12 @@
 import { Trash2, RotateCw, FileText, Scissors, Database } from "lucide-react";
 import { useTaskProgress } from "@/hooks/useTaskProgress";
 import { cn } from "@/lib/utils";
-import { SplitTask } from "@/api/taskApi";
+import type { SplitTask } from "@/api/taskApi";
 import { novelApi } from "@/api/novelApi";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { LucideIcon } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 const STATUS_CONFIG = {
     PENDING:    { label: 'PENDING',    pill: 'bg-gray-100 text-gray-600',    bar: 'bg-gray-400' },

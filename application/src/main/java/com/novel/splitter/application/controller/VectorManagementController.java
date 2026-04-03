@@ -1,6 +1,5 @@
 package com.novel.splitter.application.controller;
 
-import com.novel.splitter.domain.model.embedding.VectorRecord;
 import com.novel.splitter.embedding.api.EmbeddingService;
 import com.novel.splitter.embedding.api.VectorStore;
 import io.swagger.v3.oas.annotations.Operation;
@@ -11,7 +10,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Map;
 
 /**

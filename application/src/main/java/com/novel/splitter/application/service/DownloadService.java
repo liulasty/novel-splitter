@@ -5,7 +5,6 @@ import com.novel.splitter.downloader.api.NovelDownloader;
 import com.novel.splitter.downloader.core.DownloaderFactory;
 import com.novel.splitter.domain.model.downloader.DownloadChapter;
 import com.novel.splitter.domain.model.downloader.SiteRule;
-import com.novel.splitter.repository.api.NovelRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 

@@ -36,6 +36,7 @@ import java.util.function.BiConsumer;
 public class NovelIngestionService {
 
     private final LocalNovelLoader novelLoader;
+    private final NovelCacheService novelCacheService;
     private final EmbeddingService embeddingService;
     private final VectorStore vectorStore;
     private final SceneRepository sceneRepository;
@@ -58,7 +59,7 @@ public class NovelIngestionService {
      * 执行入库流程 (兼容旧接口)
      */
     public void ingest(Path novelPath, int maxScenes) {
-        ingest(novelPath, maxScenes, null, null);
+        ingest(java.util.UUID.randomUUID().toString(), novelPath, maxScenes, null, null);
     }
 
     /**
@@ -68,17 +69,17 @@ public class NovelIngestionService {
      * @param version   版本标识 (可选)
      */
     public void ingest(Path novelPath, int maxScenes, String version) {
-        ingest(novelPath, maxScenes, version, null);
+        ingest(java.util.UUID.randomUUID().toString(), novelPath, maxScenes, version, null);
     }
 
-    public void ingest(Path novelPath, int maxScenes, String version, BiConsumer<Integer, String> rawProgressCallback) {
+    public void ingest(String taskId, Path novelPath, int maxScenes, String version, BiConsumer<Integer, String> rawProgressCallback) {
         BiConsumer<Integer, String> progressCallback = rawProgressCallback != null 
                 ? rawProgressCallback 
                 : (p, msg) -> log.debug("[Ingest Progress {}%] {}", p, msg);
 
         try {
-            Novel novel = loadPhase(novelPath, progressCallback);
-            splitPhase(novel, maxScenes, version, progressCallback);
+            Novel novel = loadPhase(taskId, novelPath, progressCallback);
+            splitPhase(taskId, novel, maxScenes, version, progressCallback);
             embedPhase(novel.getTitle(), version, progressCallback);
         } catch (java.io.IOException e) {
             log.error("[Ingest] 文件读取失败，不可重试: {}", novelPath, e);
@@ -92,24 +93,53 @@ public class NovelIngestionService {
         }
     }
 
-    public Novel loadPhase(Path novelPath, BiConsumer<Integer, String> progressCallback) throws Exception {
-        log.info("=== Start Load Phase for: {} ===", novelPath);
+    public Novel loadPhase(String taskId, Path novelPath, BiConsumer<Integer, String> progressCallback) throws Exception {
+        log.info("=== Start Load Phase for: {} (taskId: {}) ===", novelPath, taskId);
         progressCallback.accept(IngestProgress.LOAD_START, "开始读取文件...");
-        Novel novel = novelLoader.load(novelPath);
-        progressCallback.accept(IngestProgress.LOAD_END, String.format("文件读取完成，共 %d 个段落", novel.getParagraphs().size()));
+        Novel novel = novelLoader.load(taskId, novelPath);
+        progressCallback.accept(IngestProgress.LOAD_END, String.format("文件读取完成，共 %d 个章节", novel.getChapters().size()));
         return novel;
     }
 
-    public List<Scene> splitPhase(Novel novel, int maxScenes, String version, BiConsumer<Integer, String> progressCallback) {
+    public List<Long> splitPhase(String taskId, Novel novel, int maxScenes, String version, BiConsumer<Integer, String> progressCallback) {
         log.info("=== Start Split Phase for: {} ===", novel.getTitle());
-        List<Scene> scenes = sceneAssembler.assemble(novel.getChapters(), novel.getParagraphs(), novel.getTitle(), progressCallback);
+        
+        List<Scene> scenes = new ArrayList<>();
+        List<com.novel.splitter.domain.model.Chapter> chapters = novel.getChapters();
+        int totalChapters = chapters.size();
+        int scenesCount = 0;
+        
+        if (progressCallback != null) {
+            progressCallback.accept(IngestProgress.CHAPTER_END, String.format("准备逐章切分，共 %d 章", totalChapters));
+        }
+
+        for (int i = 0; i < totalChapters; i++) {
+            com.novel.splitter.domain.model.Chapter chapter = chapters.get(i);
+            
+            // Load chapter data from cache
+            com.novel.splitter.application.model.ChapterData chapterData = novelCacheService.loadChapter(taskId, chapter.getIndex());
+            
+            List<Scene> chapterScenes = sceneAssembler.assembleChapter(chapter, chapterData.getParagraphs(), novel.getTitle());
+            scenes.addAll(chapterScenes);
+            scenesCount += chapterScenes.size();
+            
+            if (progressCallback != null && (i % 10 == 0 || i == totalChapters - 1)) {
+                int progress = IngestProgress.calc(IngestProgress.SCENE_START, IngestProgress.SCENE_END, i + 1, totalChapters);
+                progressCallback.accept(progress, String.format("正在切分章节：%d/%d，已生成 %d 个场景", i + 1, totalChapters, scenesCount));
+            }
+            
+            if (maxScenes > 0 && scenes.size() >= maxScenes) {
+                break;
+            }
+        }
+
         log.info("Generated {} scenes from novel '{}'", scenes.size(), novel.getTitle());
 
-        progressCallback.accept(IngestProgress.VALIDATE_END, String.format("质检完成：保留 %d/%d 个有效场景", scenes.size(), scenes.size()));
+        progressCallback.accept(IngestProgress.VALIDATE_END, String.format("切分完成：共 %d 个有效场景", scenes.size()));
 
         if (scenes.isEmpty()) {
             log.warn("No scenes generated! Check split rules or input file.");
-            return scenes;
+            return new ArrayList<>();
         }
 
         if (maxScenes > 0 && scenes.size() > maxScenes) {
@@ -125,15 +155,10 @@ public class NovelIngestionService {
         });
 
         progressCallback.accept(IngestProgress.SAVE_START, "正在保存场景到本地存储...");
-        List<Scene> existingScenes = sceneRepository.loadScenes(novel.getTitle(), finalVersion);
-        if (existingScenes != null && !existingScenes.isEmpty()) {
-            progressCallback.accept(IngestProgress.SAVE_END, "检测到已有本地存储，跳过重复保存");
-        } else {
-            log.info("Saving scenes to repository (version: {})...", finalVersion);
-            sceneRepository.saveScenes(novel.getTitle(), finalVersion, scenes);
-            progressCallback.accept(IngestProgress.SAVE_END, String.format("本地存储完成，共 %d 个场景", scenes.size()));
-        }
-        return scenes;
+        List<Long> sceneIds = sceneRepository.saveScenes(novel.getTitle(), finalVersion, scenes);
+        progressCallback.accept(IngestProgress.SAVE_END, String.format("本地存储完成，共 %d 个场景", scenes.size()));
+        
+        return sceneIds;
     }
 
     public void embedPhase(String novelTitle, String version, BiConsumer<Integer, String> progressCallback) {
@@ -147,6 +172,24 @@ public class NovelIngestionService {
         processBatches(scenes, progressCallback);
         progressCallback.accept(100, "入库完成");
         log.info("=== Ingestion Completed Successfully ===");
+    }
+    
+    public void embedPhaseBatch(List<Long> sceneIds) {
+        if (sceneIds == null || sceneIds.isEmpty()) return;
+        List<Scene> scenes = sceneRepository.findByIds(sceneIds);
+        if (scenes == null || scenes.isEmpty()) return;
+
+        try {
+            List<String> texts = new ArrayList<>();
+            for (Scene scene : scenes) {
+                texts.add(scene.getText());
+            }
+            List<float[]> embeddings = embeddingService.embedBatch(texts);
+            vectorStore.saveBatch(scenes, embeddings);
+        } catch (Exception e) {
+            log.error("Error processing embed batch (Scene IDs: {}-...)", sceneIds.get(0), e);
+            throw new RuntimeException("Batch embed processing failed", e); 
+        }
     }
     
     private void processBatches(List<Scene> scenes, BiConsumer<Integer, String> progressCallback) {

@@ -12,11 +12,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.web.client.RestClient;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**

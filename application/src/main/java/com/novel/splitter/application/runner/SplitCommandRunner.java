@@ -5,9 +5,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
-
-import java.util.concurrent.Callable;
-
 /**
  * CLI 入口
  * 使用 picocli 解析命令行参数（需要引入 picocli 依赖，或者简单手动解析）
