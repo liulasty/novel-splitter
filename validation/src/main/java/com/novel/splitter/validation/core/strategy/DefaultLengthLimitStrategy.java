@@ -1,4 +1,4 @@
-package com.novel.splitter.core.strategy;
+package com.novel.splitter.validation.core.strategy;
 
 /**
  * 默认长度限制策略

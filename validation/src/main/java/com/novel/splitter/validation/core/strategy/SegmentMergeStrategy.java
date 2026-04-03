@@ -1,4 +1,4 @@
-package com.novel.splitter.core.strategy;
+package com.novel.splitter.validation.core.strategy;
 
 import com.novel.splitter.domain.model.RawParagraph;
 import java.util.List;

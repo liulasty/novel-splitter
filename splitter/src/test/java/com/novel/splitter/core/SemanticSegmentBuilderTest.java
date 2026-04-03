@@ -2,6 +2,7 @@ package com.novel.splitter.core;
 
 import com.novel.splitter.domain.model.RawParagraph;
 import com.novel.splitter.domain.model.SemanticSegment;
+import com.novel.splitter.validation.core.SemanticSegmentBuilder;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;

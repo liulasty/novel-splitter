@@ -3,6 +3,7 @@ package com.novel.splitter.core;
 import com.novel.splitter.domain.model.RawParagraph;
 import com.novel.splitter.domain.model.SemanticSegment;
 import com.novel.splitter.embedding.api.EmbeddingService;
+import com.novel.splitter.validation.core.SemanticSegmentBuilder;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;

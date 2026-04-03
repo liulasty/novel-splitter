@@ -45,6 +45,7 @@ public class NovelController {
     private final RabbitTemplate rabbitTemplate;
     private final AppConfig appConfig;
     private final ProgressSseService progressSseService;
+    private final com.novel.splitter.application.service.etl.NovelIngestionService novelIngestionService;
 
     /**
      * 接收小说入库进度流
@@ -167,9 +168,8 @@ public class NovelController {
             // 1. Create task in DB
             taskService.createTask(taskId, novelId, request.getFileName(), maxScenes, version);
             
-            // 2. Send message to RabbitMQ
-            SplitTaskMessage message = new SplitTaskMessage(taskId, novelId, novelPath.toAbsolutePath().toString(), maxScenes, version);
-            rabbitTemplate.convertAndSend(RabbitConfig.SPLIT_TASK_QUEUE, message);
+            // 2. Send message to RabbitMQ via IngestionService
+            novelIngestionService.ingestAsync(taskId, novelPath.toAbsolutePath().toString(), maxScenes, version);
             
             log.info("切分任务已发送到队列, taskId: {}", taskId);
 

@@ -3,6 +3,7 @@ package com.novel.splitter.domain.model;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.ToString;
+import lombok.extern.jackson.Jacksonized;
 
 /**
  * 章节
@@ -12,6 +13,7 @@ import lombok.ToString;
  */
 @Getter
 @Builder
+@Jacksonized
 @ToString
 public class Chapter {
     /**

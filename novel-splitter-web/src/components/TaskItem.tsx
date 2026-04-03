@@ -1,10 +1,12 @@
-import { Trash2, RotateCw } from "lucide-react";
+import { Trash2, RotateCw, FileText, Scissors, Database } from "lucide-react";
 import { useTaskProgress } from "@/hooks/useTaskProgress";
 import { cn } from "@/lib/utils";
 import { SplitTask } from "@/api/taskApi";
 import { novelApi } from "@/api/novelApi";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+
+import { LucideIcon } from "lucide-react";
 
 const STATUS_CONFIG = {
     PENDING:    { label: 'PENDING',    pill: 'bg-gray-100 text-gray-600',    bar: 'bg-gray-400' },
@@ -13,7 +15,13 @@ const STATUS_CONFIG = {
     FAILED:     { label: 'FAILED',     pill: 'bg-red-100 text-red-700',       bar: 'bg-red-500' },
 } as const;
 
-export function TaskItem({ task, onDelete, Icon }: { task: SplitTask, onDelete: (id: string) => void, Icon: any }) {
+const STEPS = [
+    { id: 'LOAD', label: '加载文档', icon: FileText, threshold: 15 },
+    { id: 'SPLIT', label: '语义切分', icon: Scissors, threshold: 63 },
+    { id: 'EMBED', label: '向量入库', icon: Database, threshold: 100 }
+];
+
+export function TaskItem({ task, onDelete, Icon }: { task: SplitTask, onDelete: (id: string) => void, Icon: LucideIcon }) {
     const queryClient = useQueryClient();
     
     // Only connect to SSE if the task is not yet finished
@@ -29,14 +37,47 @@ export function TaskItem({ task, onDelete, Icon }: { task: SplitTask, onDelete: 
     
     const cfg = STATUS_CONFIG[currentStatus as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.PENDING;
 
+    const normalizedStatus = 
+        (currentStatus === 'SUCCESS' || currentStatus === 'COMPLETED') ? 'SUCCESS' :
+        currentStatus === 'FAILED' ? 'FAILED' :
+        (currentStatus === 'PROCESSING' || currentStatus === 'RUNNING') ? 'RUNNING' : 'PENDING';
+
+    const activeIndex = currentProgress < 15 ? 0 : currentProgress < 63 ? 1 : 2;
+
+    const getStepState = (index: number) => {
+        if (normalizedStatus === 'SUCCESS') return 'completed';
+        if (normalizedStatus === 'FAILED') {
+            if (index < activeIndex) return 'completed';
+            if (index === activeIndex) return 'failed';
+            return 'pending';
+        }
+        if (index < activeIndex) return 'completed';
+        if (index === activeIndex) return normalizedStatus === 'RUNNING' ? 'loading' : 'pending';
+        return 'pending';
+    };
+
+    let progressWidth = 0;
+    if (normalizedStatus === 'SUCCESS') {
+        progressWidth = 100;
+    } else {
+        if (currentProgress < 15) {
+            progressWidth = (currentProgress / 15) * 50;
+        } else if (currentProgress < 63) {
+            progressWidth = 50 + ((currentProgress - 15) / (63 - 15)) * 50;
+        } else {
+            progressWidth = 100;
+        }
+    }
+
     const retryMutation = useMutation({
         mutationFn: novelApi.ingestNovel,
         onSuccess: (data) => {
             toast.success(`重新入库已触发：${data.message}`);
             queryClient.invalidateQueries({ queryKey: ['tasks'] });
         },
-        onError: (error: any) => {
-            toast.error(`重试失败：${error.response?.data?.error || error.message}`);
+        onError: (error: Error | { response?: { data?: { error?: string } }, message: string }) => {
+            const err = error as { response?: { data?: { error?: string } }, message: string };
+            toast.error(`重试失败：${err.response?.data?.error || err.message}`);
         },
     });
 
@@ -107,18 +148,47 @@ export function TaskItem({ task, onDelete, Icon }: { task: SplitTask, onDelete: 
                 </p>
             )}
 
-            {/* Stage History Timeline */}
-            {!isFinished && progressState.stageHistory.length > 0 && (
-                <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[10px] text-gray-500 font-mono bg-white border border-gray-100 rounded-lg px-3 py-2">
-                    {progressState.stageHistory.map((msg, idx) => (
-                        <span key={idx} className="flex items-center gap-1">
-                            <span className="text-green-500">✓</span> {msg}
-                            {idx < progressState.stageHistory.length - 1 && <span className="text-gray-300 ml-1">→</span>}
-                        </span>
-                    ))}
-                    <span className="flex items-center gap-1 ml-1 animate-pulse text-blue-500">...</span>
+            {/* Stepper UI replacing Stage History Timeline */}
+            <div className="mt-8 mb-4 px-6">
+                <div className="relative flex items-center justify-between w-full">
+                    {/* Background line */}
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-[3px] bg-gray-200 rounded-full" />
+                    
+                    {/* Active line */}
+                    <div 
+                        className={cn("absolute left-0 top-1/2 -translate-y-1/2 h-[3px] rounded-full transition-all duration-500", cfg.bar)}
+                        style={{ width: `${progressWidth}%` }}
+                    />
+
+                    {STEPS.map((step, index) => {
+                        const state = getStepState(index);
+                        const Icon = step.icon;
+                        
+                        return (
+                            <div key={step.id} className="relative z-10 flex flex-col items-center">
+                                <div className={cn(
+                                    "w-8 h-8 rounded-full flex items-center justify-center border-[2.5px] transition-all duration-500",
+                                    state === 'completed' ? "border-teal-500 text-teal-600 bg-teal-50" :
+                                    state === 'loading' ? "border-blue-500 text-blue-600 bg-blue-50 shadow-[0_0_0_4px_rgba(59,130,246,0.1)]" :
+                                    state === 'failed' ? "border-red-500 text-red-600 bg-red-50" :
+                                    "border-gray-200 text-gray-400 bg-white"
+                                )}>
+                                    {state === 'loading' ? <Icon className="w-4 h-4 animate-pulse" /> : <Icon className="w-4 h-4" />}
+                                </div>
+                                <span className={cn(
+                                    "text-[10px] font-bold absolute -bottom-5 whitespace-nowrap transition-colors duration-500",
+                                    state === 'completed' ? "text-teal-600" :
+                                    state === 'loading' ? "text-blue-600" :
+                                    state === 'failed' ? "text-red-600" :
+                                    "text-gray-400"
+                                )}>
+                                    {step.label}
+                                </span>
+                            </div>
+                        );
+                    })}
                 </div>
-            )}
+            </div>
         </div>
     );
 }

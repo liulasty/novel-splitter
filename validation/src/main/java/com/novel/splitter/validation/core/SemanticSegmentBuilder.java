@@ -1,13 +1,13 @@
-package com.novel.splitter.core;
+package com.novel.splitter.validation.core;
 
 import com.novel.splitter.domain.model.RawParagraph;
 import com.novel.splitter.domain.model.SemanticSegment;
-import com.novel.splitter.core.strategy.DialogueStrategy;
-import com.novel.splitter.core.strategy.SegmentMergeStrategy;
-import com.novel.splitter.core.strategy.LengthLimitStrategy;
-import com.novel.splitter.core.strategy.DefaultDialogueStrategy;
-import com.novel.splitter.core.strategy.DefaultSegmentMergeStrategy;
-import com.novel.splitter.core.strategy.DefaultLengthLimitStrategy;
+import com.novel.splitter.validation.core.strategy.DialogueStrategy;
+import com.novel.splitter.validation.core.strategy.SegmentMergeStrategy;
+import com.novel.splitter.validation.core.strategy.LengthLimitStrategy;
+import com.novel.splitter.validation.core.strategy.DefaultDialogueStrategy;
+import com.novel.splitter.validation.core.strategy.DefaultSegmentMergeStrategy;
+import com.novel.splitter.validation.core.strategy.DefaultLengthLimitStrategy;
 
 import java.util.ArrayList;
 import java.util.List;

@@ -1,6 +1,7 @@
 package com.novel.splitter.core;
 
 import com.novel.splitter.domain.model.RawParagraph;
+import com.novel.splitter.validation.core.SemanticSegmentBuilder;
 
 /**
  * 段落相关性评分器

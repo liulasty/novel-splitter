@@ -9,6 +9,7 @@ import com.novel.splitter.embedding.api.EmbeddingService;
 import com.novel.splitter.rule.DynamicWindowRule;
 import com.novel.splitter.rule.SplitRule;
 import com.novel.splitter.infrastructure.progress.IngestProgress;
+import com.novel.splitter.validation.core.SemanticSegmentBuilder;
 
 import java.util.ArrayList;
 import java.util.List;

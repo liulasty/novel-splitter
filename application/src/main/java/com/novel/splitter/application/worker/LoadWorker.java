@@ -1,5 +1,6 @@
 package com.novel.splitter.application.worker;
 
+import com.novel.splitter.application.config.AppConfig;
 import com.novel.splitter.application.config.RabbitConfig;
 import com.novel.splitter.application.model.task.SplitTask;
 import com.novel.splitter.application.model.task.SplitTaskMessage;
@@ -8,30 +9,31 @@ import com.novel.splitter.application.service.etl.NovelIngestionService;
 import com.novel.splitter.application.service.task.ProgressSseService;
 import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.domain.model.Novel;
-import com.novel.splitter.domain.model.Scene;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class SplitWorker {
+public class LoadWorker {
 
     private final NovelIngestionService ingestionService;
     private final TaskService taskService;
     private final ProgressSseService progressSseService;
     private final NovelCacheService novelCacheService;
     private final RabbitTemplate rabbitTemplate;
+    private final AppConfig appConfig;
 
-    @RabbitListener(queues = RabbitConfig.SPLIT_TASK_QUEUE)
-    public void processSplitTask(SplitTaskMessage message) {
+    @RabbitListener(queues = RabbitConfig.LOAD_TASK_QUEUE)
+    public void processLoadTask(SplitTaskMessage message) {
         String taskId = message.getTaskId();
-        log.info("SplitWorker 接收到切分任务, taskId: {}", taskId);
+        log.info("LoadWorker 接收到加载任务, taskId: {}", taskId);
         
         try {
             SplitTask task = taskService.getTask(taskId);
@@ -40,22 +42,26 @@ public class SplitWorker {
                 return;
             }
 
-            Novel novel = novelCacheService.load(taskId);
+            taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, 5, "开始读取文件...");
+            progressSseService.send(taskId, 5, "开始读取文件...", "RUNNING");
+
+            String rootPath = appConfig.getStorage().getRootPath();
+            Path novelPath = Paths.get(rootPath, task.getFileName());
             
-            List<Scene> scenes = ingestionService.splitPhase(novel, task.getMaxScenes(), task.getVersion(), (progress, info) -> {
+            Novel novel = ingestionService.loadPhase(novelPath, (progress, info) -> {
                 progressSseService.send(taskId, progress, info, "RUNNING");
                 taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, progress, info);
             });
-            
-            novelCacheService.remove(taskId); // 清理缓存
 
-            // Send to embed queue
-            rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "embed", message);
-            log.info("任务 {} Split 阶段完成，已发送至 Embed 队列", taskId);
+            novelCacheService.save(taskId, novel);
+
+            // Send to split queue
+            rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "split", message);
+            log.info("任务 {} Load 阶段完成，已发送至 Split 队列", taskId);
             
         } catch (Exception e) {
             log.error("处理任务 {} 时发生异常", taskId, e);
-            taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.FAILED, 0, "切分失败: " + e.getMessage());
+            taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.FAILED, 0, "读取失败: " + e.getMessage());
             progressSseService.send(taskId, -1, e.getMessage(), "FAILED");
             progressSseService.complete(taskId);
         }

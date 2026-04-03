@@ -3,35 +3,27 @@ package com.novel.splitter.application.worker;
 import com.novel.splitter.application.config.RabbitConfig;
 import com.novel.splitter.application.model.task.SplitTask;
 import com.novel.splitter.application.model.task.SplitTaskMessage;
-import com.novel.splitter.application.service.etl.NovelCacheService;
 import com.novel.splitter.application.service.etl.NovelIngestionService;
 import com.novel.splitter.application.service.task.ProgressSseService;
 import com.novel.splitter.application.service.task.TaskService;
-import com.novel.splitter.domain.model.Novel;
-import com.novel.splitter.domain.model.Scene;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
-
-import java.util.List;
 
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class SplitWorker {
+public class EmbedWorker {
 
     private final NovelIngestionService ingestionService;
     private final TaskService taskService;
     private final ProgressSseService progressSseService;
-    private final NovelCacheService novelCacheService;
-    private final RabbitTemplate rabbitTemplate;
 
-    @RabbitListener(queues = RabbitConfig.SPLIT_TASK_QUEUE)
-    public void processSplitTask(SplitTaskMessage message) {
+    @RabbitListener(queues = RabbitConfig.EMBED_TASK_QUEUE)
+    public void processEmbedTask(SplitTaskMessage message) {
         String taskId = message.getTaskId();
-        log.info("SplitWorker 接收到切分任务, taskId: {}", taskId);
+        log.info("EmbedWorker 接收到向量化任务, taskId: {}", taskId);
         
         try {
             SplitTask task = taskService.getTask(taskId);
@@ -40,22 +32,19 @@ public class SplitWorker {
                 return;
             }
 
-            Novel novel = novelCacheService.load(taskId);
-            
-            List<Scene> scenes = ingestionService.splitPhase(novel, task.getMaxScenes(), task.getVersion(), (progress, info) -> {
+            ingestionService.embedPhase(task.getNovelId(), task.getVersion(), (progress, info) -> {
                 progressSseService.send(taskId, progress, info, "RUNNING");
                 taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, progress, info);
             });
             
-            novelCacheService.remove(taskId); // 清理缓存
-
-            // Send to embed queue
-            rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "embed", message);
-            log.info("任务 {} Split 阶段完成，已发送至 Embed 队列", taskId);
+            taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.SUCCESS, 100, "入库完成");
+            progressSseService.send(taskId, 100, "入库完成", "COMPLETED");
+            progressSseService.complete(taskId);
+            log.info("任务 {} 处理成功", taskId);
             
         } catch (Exception e) {
             log.error("处理任务 {} 时发生异常", taskId, e);
-            taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.FAILED, 0, "切分失败: " + e.getMessage());
+            taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.FAILED, 0, "向量化失败: " + e.getMessage());
             progressSseService.send(taskId, -1, e.getMessage(), "FAILED");
             progressSseService.complete(taskId);
         }

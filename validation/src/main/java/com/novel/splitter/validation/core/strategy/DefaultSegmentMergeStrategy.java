@@ -1,7 +1,7 @@
-package com.novel.splitter.core.strategy;
+package com.novel.splitter.validation.core.strategy;
 
 import com.novel.splitter.domain.model.RawParagraph;
-import com.novel.splitter.core.SemanticSegmentBuilder;
+import com.novel.splitter.validation.core.SemanticSegmentBuilder;
 import java.util.List;
 
 /**

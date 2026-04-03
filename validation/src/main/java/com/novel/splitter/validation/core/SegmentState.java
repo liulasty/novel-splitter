@@ -1,4 +1,4 @@
-package com.novel.splitter.core;
+package com.novel.splitter.validation.core;
 
 import com.novel.splitter.domain.model.RawParagraph;
 import com.novel.splitter.domain.model.SemanticSegment;
