@@ -192,11 +192,19 @@ public class NovelIngestionService {
 
         try {
             List<String> texts = new ArrayList<>();
+            List<Scene> validScenes = new ArrayList<>();
             for (Scene scene : scenes) {
-                texts.add(scene.getText());
+                if (scene.getText() != null && !scene.getText().trim().isEmpty()) {
+                    texts.add(scene.getText());
+                    validScenes.add(scene);
+                } else {
+                    log.warn("Skipping scene ID {} due to empty text", scene.getId());
+                }
             }
+            if (validScenes.isEmpty()) return;
+
             List<float[]> embeddings = embeddingService.embedBatch(texts);
-            vectorStore.saveBatch(scenes, embeddings);
+            vectorStore.saveBatch(validScenes, embeddings);
         } catch (Exception e) {
             log.error("Error processing embed batch (Scene IDs: {}-...)", sceneIds.get(0), e);
             throw new RuntimeException("Batch embed processing failed", e); 
@@ -219,17 +227,28 @@ public class NovelIngestionService {
             try {
                 // 3.1 Extract texts
                 List<String> texts = new ArrayList<>();
+                List<Scene> validBatchScenes = new ArrayList<>();
                 for (Scene scene : batchScenes) {
-                    texts.add(scene.getText());
+                    if (scene.getText() != null && !scene.getText().trim().isEmpty()) {
+                        texts.add(scene.getText());
+                        validBatchScenes.add(scene);
+                    } else {
+                        log.warn("Skipping scene ID {} due to empty text in processBatches", scene.getId());
+                    }
+                }
+                
+                if (validBatchScenes.isEmpty()) {
+                    batchIndex++;
+                    continue;
                 }
                 
                 // 3.2 Embed (Batch)
                 List<float[]> embeddings = embeddingService.embedBatch(texts);
                 
                 // 3.3 Store (Batch)
-                vectorStore.saveBatch(batchScenes, embeddings);
+                vectorStore.saveBatch(validBatchScenes, embeddings);
                 
-                int currentProcessed = processedCount.addAndGet(batchScenes.size());
+                int currentProcessed = processedCount.addAndGet(validBatchScenes.size());
                 
                 // 每批次结束线性上报
                 // 限频规则：如果 totalBatches > 50，每 5 批上报一次，避免消息过密

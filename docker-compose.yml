@@ -49,6 +49,21 @@ services:
       timeout: 5s
       retries: 5
 
+  # 轻量级数据库管理界面
+  adminer:
+    image: adminer:latest
+    container_name: adminer
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+      ADMINER_DESIGN: pepa-linha
+    networks:
+      - appnet
+    ports:
+      - "${ADMINER_PORT:-8081}:8080"
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
   backend:
     image: novel-splitter-backend:latest
     container_name: backend
@@ -79,8 +94,10 @@ services:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - STORAGE_ROOT_PATH=/app/data/novel-storage
       - JAVA_OPTS=${JAVA_OPTS:--Xmx1g -Xms512m}
+      - LOG_PATH=/app/logs
     volumes:
       - ./data:/app/data
+      - ./logs:/app/logs
     networks:
       - appnet
     ports:

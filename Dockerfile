@@ -11,7 +11,7 @@ RUN --mount=type=cache,target=/root/.m2 \
 
 # 提取 Spring Boot 分层 (极大优化后续 Docker 镜像拉取和构建速度)
 WORKDIR /app/application/target
-RUN java -Djarmode=layertools -jar application-1.0.0-SNAPSHOT.jar extract
+RUN java -Djarmode=layertools -jar application-*.jar extract
 
 # 第二阶段：最小运行时镜像
 FROM eclipse-temurin:21-jre-jammy

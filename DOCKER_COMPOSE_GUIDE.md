@@ -8,29 +8,38 @@
 
 ## 🚀 1. 启动服务
 
-### 1.1 一键启动所有服务（推荐）
-这是最常用的启动命令。它会在后台启动所有的容器（包括数据库、消息队列、后端和前端）。
+### 1.1 一键启动开发环境（带热加载、本地端口暴露）
+开发环境除了启动基础服务外，还会挂载本地数据卷以便调试。
 
 ```bash
-docker-compose up -d
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml --env-file config/.env.dev up -d
 ```
 *参数解释：*
+* `-f`：指定使用的 Compose 配置文件。后面跟多个文件会进行配置合并。
+* `--env-file`：显式指定环境变量文件（开发环境使用 `config/.env.dev`）。
 * `-d`：(detach) 表示在后台运行容器。如果不加这个参数，日志会一直霸占你的命令行窗口，一旦关闭窗口服务就会停止。
 
-### 1.2 强制重新创建并启动所有服务
-如果你修改了 `docker-compose.yml` 或者 `.env` 环境变量文件，需要让容器应用最新的配置，使用这个命令：
+### 1.2 一键启动生产环境（资源限制、无本地挂载）
+如果你要部署到线上，推荐使用生产环境配置，它增加了内存限制和自动重启策略。
 
 ```bash
-docker-compose up -d --force-recreate
+docker-compose -f docker-compose.yml -f docker-compose.prod.yml --env-file config/.env.prod up -d
 ```
 
-### 1.3 启动单个特定服务
+### 1.3 强制重新创建并启动所有服务
+如果你修改了 `docker-compose.yml` 或者 `config/.env.dev` 环境变量文件，需要让容器应用最新的配置，使用这个命令（以开发环境为例）：
+
+```bash
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml --env-file config/.env.dev up -d --force-recreate
+```
+
+### 1.4 启动单个特定服务
 如果你只想单独启动某一个服务（例如只启动数据库 `postgres`）：
 
 ```bash
-docker-compose up -d postgres
+docker-compose --env-file config/.env.dev up -d postgres
 ```
-*(注：可用的服务名包括 `postgres`, `rabbitmq`, `chromadb`, `backend`, `frontend`)*
+*(注：可用的服务名包括 `postgres`, `rabbitmq`, `chromadb`, `backend`, `frontend`, `adminer`)*
 
 ---
 
@@ -114,10 +123,10 @@ docker-compose build backend
 ```
 
 ### 5.3 构建并立即启动（一气呵成）
-修改代码后，最常用的“更新并重启”组合拳：
+修改代码后，最常用的“更新并重启”组合拳（以开发环境为例）：
 
 ```bash
-docker-compose up -d --build backend
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml --env-file config/.env.dev up -d --build backend
 ```
 *(这个命令会自动先帮你 build 后端镜像，然后再把后端容器跑起来)*
 
@@ -160,7 +169,14 @@ docker-compose ps
 ```
 这个命令会列出所有服务的状态（State），如果你看到状态是 `Up` 说明运行正常；如果是 `Exit` 说明容器已经退出（通常是启动报错了，需要用 `logs` 命令看原因）。
 
-### 7.2 进入容器内部（高级）
+### 7.2 访问 PostgreSQL 数据库可视化界面
+本项目集成了轻量级的数据库管理工具 `Adminer`。
+1. 在浏览器中打开 `http://localhost:8081`（或你在 `.env` 中配置的 `ADMINER_PORT`）。
+2. 在登录页面，系统（System）选择 **PostgreSQL**。
+3. 服务器（Server）输入 **`postgres`**（重要！这是 Docker 内部的服务名，不要填 localhost）。
+4. 用户名、密码、数据库名填写 `.env` 中配置的信息（默认全是 `postgres` 和 `novel_splitter`）。
+
+### 7.3 进入容器内部（高级）
 如果你需要进入后端容器内部执行某些 Linux 命令（比如查看配置文件是否正确）：
 
 ```bash

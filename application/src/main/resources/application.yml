@@ -1,6 +1,13 @@
 server:
   port: ${BACKEND_PORT:8080}
 
+logging:
+  file:
+    name: ${LOG_PATH:logs}/novel-splitter.log
+  level:
+    root: INFO
+    com.novel.splitter: DEBUG
+
 spring:
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:novel_splitter}
@@ -106,16 +113,6 @@ splitter:
         catalog-url: "https://www.test.com/book/456"
         chapter-list-selector: "div.list > a"
         content-selector: "div.read-content"
-# "www.xinghuowxw.com":
-      #    {
-      #        "chapterPath": "/html/body/div[2]/section/div[3]/div/ul",
-      #        "checkUrl": "https://www.xinghuowxw.com/book/B7KB.html",
-      #        "contentPath": "/html/body/div[2]/main/section/article",
-      #        "nextLoop":true,
-      #        "nextUrlPath":"/html/body/div[2]/main/div/a[3]",
-      #        "nextPathText":"下一页",
-      #        "nextLoopCnt":15
-      #    }
       - domain: "https://www.xinghuowxw.com"
         catalog-url: "https://www.xinghuowxw.com/book/8T77.html"
         chapter-list-selector: "div.list > a"
