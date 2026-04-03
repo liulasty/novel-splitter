@@ -14,7 +14,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 @SpringBootApplication
 @EnableConfigurationProperties
 @ComponentScan("com.novel.splitter")
-@EntityScan("com.novel.splitter.repository.entity")
+@EntityScan({"com.novel.splitter.domain.entity", "com.novel.splitter.repository.entity"})
 @EnableJpaRepositories("com.novel.splitter.repository.api")
 public class NovelSplitApplication {
     public static void main(String[] args) {

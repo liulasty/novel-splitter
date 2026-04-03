@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class JpaSceneRepositoryImpl implements SceneRepository {
+public class SceneRepositoryImpl implements SceneRepository {
 
     private final JpaSceneRepository jpaSceneRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
