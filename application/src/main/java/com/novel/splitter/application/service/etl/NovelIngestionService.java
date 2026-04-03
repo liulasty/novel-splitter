@@ -72,6 +72,17 @@ public class NovelIngestionService {
         ingest(java.util.UUID.randomUUID().toString(), novelPath, maxScenes, version, null);
     }
 
+    /**
+     * 兼容旧版调用的入库流程 (向后兼容)
+     * @param novelPath 本地 TXT 文件路径
+     * @param maxScenes 最大处理场景数 (-1 表示不限制)
+     * @param version   版本标识 (可选)
+     * @param rawProgressCallback 进度回调
+     */
+    public void ingest(Path novelPath, int maxScenes, String version, BiConsumer<Integer, String> rawProgressCallback) {
+        ingest(java.util.UUID.randomUUID().toString(), novelPath, maxScenes, version, rawProgressCallback);
+    }
+
     public void ingest(String taskId, Path novelPath, int maxScenes, String version, BiConsumer<Integer, String> rawProgressCallback) {
         BiConsumer<Integer, String> progressCallback = rawProgressCallback != null 
                 ? rawProgressCallback 
