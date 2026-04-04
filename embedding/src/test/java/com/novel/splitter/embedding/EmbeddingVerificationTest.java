@@ -10,6 +10,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.Arrays;
 
+import java.util.Collections;
+
 @Slf4j
 @SpringBootTest(classes = EmbeddingTestConfig.class)
 public class EmbeddingVerificationTest {
@@ -21,7 +23,7 @@ public class EmbeddingVerificationTest {
     public void testSmoke() {
         // 8️⃣ 系统级 smoke test
         log.info("Running System Smoke Test");
-        float[] vector = embeddingService.embed("萧炎");
+        float[] vector = embeddingService.embedBatch(Collections.singletonList("萧炎")).get(0);
         System.out.println("Smoke Test Result for '萧炎': " + Arrays.toString(vector));
         assertNotNull(vector);
         assertTrue(vector.length > 0);
@@ -31,7 +33,7 @@ public class EmbeddingVerificationTest {
     public void testDimension() {
         log.info("Running Case 1: Dimension Verification");
         String text = "你好";
-        float[] vector = embeddingService.embed(text);
+        float[] vector = embeddingService.embedBatch(Collections.singletonList(text)).get(0);
         
         assertNotNull(vector, "Vector should not be null");
         // BGE-Small-ZH should be 512. Base/Large are 768 or 1024.
@@ -51,8 +53,8 @@ public class EmbeddingVerificationTest {
     public void testStability() {
         log.info("Running Case 2: Stability Verification");
         String text = "你好";
-        float[] v1 = embeddingService.embed(text);
-        float[] v2 = embeddingService.embed(text);
+        float[] v1 = embeddingService.embedBatch(Collections.singletonList(text)).get(0);
+        float[] v2 = embeddingService.embedBatch(Collections.singletonList(text)).get(0);
         
         double similarity = cosineSimilarity(v1, v2);
         log.info("Self-similarity: {}", similarity);
@@ -66,8 +68,8 @@ public class EmbeddingVerificationTest {
         String text1 = "你好";
         String text2 = "再见";
         
-        float[] v1 = embeddingService.embed(text1);
-        float[] v2 = embeddingService.embed(text2);
+        float[] v1 = embeddingService.embedBatch(Collections.singletonList(text1)).get(0);
+        float[] v2 = embeddingService.embedBatch(Collections.singletonList(text2)).get(0);
         
         double similarity = cosineSimilarity(v1, v2);
         log.info("Similarity between '{}' and '{}': {}", text1, text2, similarity);

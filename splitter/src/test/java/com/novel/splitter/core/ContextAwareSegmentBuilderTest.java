@@ -76,17 +76,18 @@ class ContextAwareSegmentBuilderTest {
     void testSemanticMergeWithEmbedding() {
         EmbeddingService mockEmbeddingService = new EmbeddingService() {
             @Override
-            public float[] embed(String text) {
-                if (text.contains("A")) {
-                    return new float[]{1.0f, 0.0f, 0.0f}; // Simulating high similarity for A and B if we change B
-                } else if (text.contains("B")) {
-                    return new float[]{0.9f, 0.1f, 0.0f}; // Cosine similarity ~ 0.99 > 0.85
-                }
-                return new float[]{0.0f, 1.0f, 0.0f};
-            }
-            @Override
             public List<float[]> embedBatch(List<String> texts) {
-                return null;
+                List<float[]> result = new ArrayList<>();
+                for (String text : texts) {
+                    if (text.contains("A")) {
+                        result.add(new float[]{1.0f, 0.0f, 0.0f}); // Simulating high similarity for A and B if we change B
+                    } else if (text.contains("B")) {
+                        result.add(new float[]{0.9f, 0.1f, 0.0f}); // Cosine similarity ~ 0.99 > 0.85
+                    } else {
+                        result.add(new float[]{0.0f, 1.0f, 0.0f});
+                    }
+                }
+                return result;
             }
         };
         ContextAwareSegmentBuilder semanticBuilder = new ContextAwareSegmentBuilder(mockEmbeddingService);
@@ -106,17 +107,18 @@ class ContextAwareSegmentBuilderTest {
     void testSemanticCutWithEmbedding() {
         EmbeddingService mockEmbeddingService = new EmbeddingService() {
             @Override
-            public float[] embed(String text) {
-                if (text.contains("A")) {
-                    return new float[]{1.0f, 0.0f, 0.0f}; 
-                } else if (text.contains("C")) {
-                    return new float[]{0.0f, 1.0f, 0.0f}; // Cosine similarity 0.0 < 0.65
-                }
-                return new float[]{0.0f, 0.0f, 1.0f};
-            }
-            @Override
             public List<float[]> embedBatch(List<String> texts) {
-                return null;
+                List<float[]> result = new ArrayList<>();
+                for (String text : texts) {
+                    if (text.contains("A")) {
+                        result.add(new float[]{1.0f, 0.0f, 0.0f}); 
+                    } else if (text.contains("C")) {
+                        result.add(new float[]{0.0f, 1.0f, 0.0f}); // Cosine similarity 0.0 < 0.65
+                    } else {
+                        result.add(new float[]{0.0f, 0.0f, 1.0f});
+                    }
+                }
+                return result;
             }
         };
         ContextAwareSegmentBuilder semanticBuilder = new ContextAwareSegmentBuilder(mockEmbeddingService);

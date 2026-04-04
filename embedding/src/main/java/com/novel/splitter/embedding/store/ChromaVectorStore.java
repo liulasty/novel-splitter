@@ -69,6 +69,12 @@ public class ChromaVectorStore implements VectorStore {
                                 if (s.getMetadata().getVersion() != null) {
                                     map.put("version", s.getMetadata().getVersion());
                                 }
+                                if (s.getMetadata().getParentSceneId() != null) {
+                                    map.put("parent_scene_id", s.getMetadata().getParentSceneId());
+                                }
+                                if (s.getMetadata().getChunkType() != null) {
+                                    map.put("chunk_type", s.getMetadata().getChunkType());
+                                }
                             }
                             return map;
                         })

@@ -28,10 +28,28 @@ public class OnnxEmbeddingService implements EmbeddingService {
     private final Tokenizer tokenizer;
 
     @Override
-    public float[] embed(String text) {
-        if (text == null || text.trim().isEmpty()) {
-            return new float[0]; 
+    public List<float[]> embedBatch(List<String> texts) {
+        if (texts == null || texts.isEmpty()) {
+            return Collections.emptyList();
         }
+
+        int batchSize = texts.size();
+        long[][] inputIdsBatch = new long[batchSize][];
+        long[][] attentionMaskBatch = new long[batchSize][];
+        long[][] tokenTypeIdsBatch = new long[batchSize][];
+
+        // 1. Tokenize all texts
+        for (int i = 0; i < batchSize; i++) {
+            TokenizedInput input = tokenizer.tokenize(texts.get(i));
+            inputIdsBatch[i] = input.getInputIds();
+            attentionMaskBatch[i] = input.getAttentionMask();
+            tokenTypeIdsBatch[i] = input.getTokenTypeIds();
+        }
+
+        // 2. Prepare Batched Tensors
+        // The length of each tokenized input is fixed to MAX_LENGTH (512) in Tokenizer
+        int seqLength = inputIdsBatch[0].length;
+        long[] shape = new long[]{batchSize, seqLength};
 
         OnnxTensor inputIdsTensor = null;
         OnnxTensor attentionMaskTensor = null;
@@ -39,43 +57,46 @@ public class OnnxEmbeddingService implements EmbeddingService {
         OrtSession.Result result = null;
 
         try {
-            // 1. Tokenize
-            TokenizedInput input = tokenizer.tokenize(text);
-            
-            // 2. Prepare Tensors
-            long[] inputIds = input.getInputIds();
-            long[] attentionMask = input.getAttentionMask();
-            long[] tokenTypeIds = input.getTokenTypeIds();
-            
-            long[] shape = new long[]{1, inputIds.length};
-            
-            // Create tensors
-            inputIdsTensor = OnnxTensor.createTensor(modelHolder.getEnv(), LongBuffer.wrap(inputIds), shape);
-            attentionMaskTensor = OnnxTensor.createTensor(modelHolder.getEnv(), LongBuffer.wrap(attentionMask), shape);
-            tokenTypeIdsTensor = OnnxTensor.createTensor(modelHolder.getEnv(), LongBuffer.wrap(tokenTypeIds), shape);
-            
+            // Flatten 2D arrays to 1D for Tensor creation
+            long[] flatInputIds = new long[batchSize * seqLength];
+            long[] flatAttentionMask = new long[batchSize * seqLength];
+            long[] flatTokenTypeIds = new long[batchSize * seqLength];
+
+            for (int i = 0; i < batchSize; i++) {
+                System.arraycopy(inputIdsBatch[i], 0, flatInputIds, i * seqLength, seqLength);
+                System.arraycopy(attentionMaskBatch[i], 0, flatAttentionMask, i * seqLength, seqLength);
+                System.arraycopy(tokenTypeIdsBatch[i], 0, flatTokenTypeIds, i * seqLength, seqLength);
+            }
+
+            inputIdsTensor = OnnxTensor.createTensor(modelHolder.getEnv(), LongBuffer.wrap(flatInputIds), shape);
+            attentionMaskTensor = OnnxTensor.createTensor(modelHolder.getEnv(), LongBuffer.wrap(flatAttentionMask), shape);
+            tokenTypeIdsTensor = OnnxTensor.createTensor(modelHolder.getEnv(), LongBuffer.wrap(flatTokenTypeIds), shape);
+
             Map<String, OnnxTensor> inputs = new HashMap<>();
             inputs.put("input_ids", inputIdsTensor);
             inputs.put("attention_mask", attentionMaskTensor);
             inputs.put("token_type_ids", tokenTypeIdsTensor);
-            
-            // 3. Run Inference
+
+            // 3. Run Inference (True Batching)
             result = modelHolder.getSession().run(inputs);
-            
+
             // 4. Extract Output
-            // Assuming the first output is last_hidden_state or pooler_output.
-            // BGE-Small-ZH output 0 is usually last_hidden_state [1, 512, 512]
-            float[][][] lastHiddenState = (float[][][]) result.get(0).getValue(); 
-            
-            // 5. Pooling (CLS Strategy for BGE)
-            float[] clsEmbedding = lastHiddenState[0][0];
-            
-            // 6. Normalize (L2)
-            return normalize(clsEmbedding);
-            
+            // Output shape is [batchSize, seqLength, hiddenSize]
+            float[][][] lastHiddenState = (float[][][]) result.get(0).getValue();
+
+            // 5. Pooling and Normalize
+            List<float[]> embeddings = new ArrayList<>(batchSize);
+            for (int i = 0; i < batchSize; i++) {
+                // CLS Pooling: get the first token's embedding for each sequence in the batch
+                float[] clsEmbedding = lastHiddenState[i][0];
+                embeddings.add(normalize(clsEmbedding));
+            }
+
+            return embeddings;
+
         } catch (Exception e) {
-            log.error("Embedding failed for text: {}", text, e);
-            throw new RuntimeException("Embedding failed", e);
+            log.error("Batch embedding failed for {} texts", batchSize, e);
+            throw new RuntimeException("Batch embedding failed", e);
         } finally {
             try {
                 if (result != null) result.close();
@@ -86,18 +107,6 @@ public class OnnxEmbeddingService implements EmbeddingService {
                 log.warn("Error closing ONNX resources", e);
             }
         }
-    }
-
-    @Override
-    public List<float[]> embedBatch(List<String> texts) {
-        if (texts == null || texts.isEmpty()) {
-            return Collections.emptyList();
-        }
-        List<float[]> results = new ArrayList<>(texts.size());
-        for (String text : texts) {
-            results.add(embed(text));
-        }
-        return results;
     }
 
     private float[] normalize(float[] v) {

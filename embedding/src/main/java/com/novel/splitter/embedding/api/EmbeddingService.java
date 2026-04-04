@@ -11,15 +11,7 @@ import java.util.List;
 public interface EmbeddingService {
 
     /**
-     * 单文本嵌入
-     *
-     * @param text 文本内容
-     * @return 向量数据 (float 数组)
-     */
-    float[] embed(String text);
-
-    /**
-     * 批量文本嵌入
+     * 批量文本嵌入 (强制使用批处理)
      *
      * @param texts 文本列表
      * @return 向量列表

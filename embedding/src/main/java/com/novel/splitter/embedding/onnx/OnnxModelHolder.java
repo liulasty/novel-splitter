@@ -28,6 +28,9 @@ public class OnnxModelHolder {
     @org.springframework.beans.factory.annotation.Value("${embedding.onnx.model-path:}")
     private String externalModelPath;
 
+    @org.springframework.beans.factory.annotation.Value("${embedding.onnx.provider:CPUExecutionProvider}")
+    private String provider;
+
     private static final String MODEL_RESOURCE_DIR = "embedding/";
     private static final String MODEL_FILE = "model.onnx";
     private static final String MODEL_DATA_FILE = "model.onnx_data";
@@ -69,7 +72,19 @@ public class OnnxModelHolder {
 
             log.info("Loading ONNX Model from {}", modelPathToUse);
             
-            this.session = env.createSession(modelPathToUse, new OrtSession.SessionOptions());
+            OrtSession.SessionOptions options = new OrtSession.SessionOptions();
+            if ("CUDAExecutionProvider".equalsIgnoreCase(provider)) {
+                try {
+                    options.addCUDA(0); // device id 0
+                    log.info("ONNX configured with CUDAExecutionProvider");
+                } catch (Exception e) {
+                    log.warn("Failed to add CUDAExecutionProvider, falling back to CPU. Error: {}", e.getMessage());
+                }
+            } else {
+                log.info("ONNX configured with default CPUExecutionProvider");
+            }
+            
+            this.session = env.createSession(modelPathToUse, options);
             
             log.info("ONNX Model loaded successfully. Inputs: {}", session.getInputNames());
             

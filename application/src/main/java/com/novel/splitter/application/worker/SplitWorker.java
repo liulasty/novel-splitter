@@ -29,6 +29,9 @@ public class SplitWorker {
     private final NovelCacheService novelCacheService;
     private final RabbitTemplate rabbitTemplate;
 
+    @org.springframework.beans.factory.annotation.Value("${splitter.ingestion.batch-size:10}")
+    private int batchSize;
+
     @RabbitListener(queues = RabbitConfig.SPLIT_TASK_QUEUE)
     public void processSplitTask(SplitTaskMessage message) {
         String taskId = message.getTaskId();
@@ -37,8 +40,8 @@ public class SplitWorker {
         try {
             SplitTask task = taskService.getTask(taskId);
             if (task == null) {
-                log.error("任务 {} 不存在", taskId);
-                return;
+                log.warn("任务 {} 在内存中不存在，可能由于服务重启，正在尝试自动重建...", taskId);
+                task = taskService.createTask(taskId, message.getNovelId(), message.getFilePath(), message.getMaxScenes(), message.getVersion());
             }
 
             Novel novel = novelCacheService.load(taskId);
@@ -64,7 +67,6 @@ public class SplitWorker {
             taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, 65, "正在分发向量化任务...");
 
             // Send batches to embed queue
-            int batchSize = 10;
             for (int i = 0; i < sceneIds.size(); i += batchSize) {
                 int end = Math.min(i + batchSize, sceneIds.size());
                 List<Long> batch = new ArrayList<>(sceneIds.subList(i, end));

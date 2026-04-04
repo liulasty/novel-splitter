@@ -44,6 +44,9 @@ public class SceneMetadata {
     /** 角色/功能 (e.g., "narration", "dialogue") */
     private String role;
 
+    /** 父级 Scene ID (用于 Parent-Child Chunking 检索) */
+    private String parentSceneId;
+
     /** 信息密度得分 */
     private Double densityScore;
 

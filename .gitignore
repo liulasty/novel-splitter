@@ -28,6 +28,7 @@ data
 
 # 日志文件
 logs
+*.log
 
 # target
  target

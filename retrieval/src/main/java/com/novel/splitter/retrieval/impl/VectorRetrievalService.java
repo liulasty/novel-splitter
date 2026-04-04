@@ -31,7 +31,7 @@ public class VectorRetrievalService implements RetrievalService {
         log.info("Processing retrieval query: '{}' (topK={})", query.getQuestion(), query.getTopK());
 
         // 1. Embedding
-        float[] queryVector = embeddingService.embed(query.getQuestion());
+        float[] queryVector = embeddingService.embedBatch(Collections.singletonList(query.getQuestion())).get(0);
 
         // 2. Vector Search
         Map<String, Object> filter = new HashMap<>();
@@ -76,12 +76,25 @@ public class VectorRetrievalService implements RetrievalService {
                         .collect(Collectors.toMap(Scene::getId, s -> s, (v1, v2) -> v1));
                 
                 for (VectorRecord r : entry.getValue()) {
-                    Scene s = sceneMap.get(r.getChunkId());
+                    String targetId = r.getChunkId();
+                    if (r.getMetadata() != null && r.getMetadata().containsKey("parent_scene_id")) {
+                        targetId = (String) r.getMetadata().get("parent_scene_id");
+                    }
+                    
+                    Scene s = sceneMap.get(targetId);
                     if (s != null) {
-                        s.setScore(r.getScore());
-                        hydratedScenes.put(r.getChunkId(), s);
+                        // Deduplicate: keep the highest score for the parent scene
+                        if (hydratedScenes.containsKey(targetId)) {
+                            Scene existing = hydratedScenes.get(targetId);
+                            if (r.getScore() > existing.getScore()) {
+                                existing.setScore(r.getScore());
+                            }
+                        } else {
+                            s.setScore(r.getScore());
+                            hydratedScenes.put(targetId, s);
+                        }
                     } else {
-                        log.warn("Scene {} not found in file product {}/{}", r.getChunkId(), novel, version);
+                        log.warn("Scene {} not found in file product {}/{}", targetId, novel, version);
                     }
                 }
             } catch (Exception e) {
@@ -89,10 +102,23 @@ public class VectorRetrievalService implements RetrievalService {
             }
         }
 
-        // Restore order based on vector search results
-        return processingOrder.stream()
-                .map(r -> hydratedScenes.get(r.getChunkId()))
-                .filter(Objects::nonNull)
-                .collect(Collectors.toList());
+        // Restore order based on vector search results, avoiding duplicates
+        List<Scene> resultList = new ArrayList<>();
+        Set<String> seenIds = new HashSet<>();
+        for (VectorRecord r : processingOrder) {
+            String targetId = r.getChunkId();
+            if (r.getMetadata() != null && r.getMetadata().containsKey("parent_scene_id")) {
+                targetId = (String) r.getMetadata().get("parent_scene_id");
+            }
+            if (!seenIds.contains(targetId)) {
+                Scene s = hydratedScenes.get(targetId);
+                if (s != null) {
+                    resultList.add(s);
+                    seenIds.add(targetId);
+                }
+            }
+        }
+        
+        return resultList;
     }
 }

@@ -3,6 +3,7 @@ package com.novel.splitter.application.service.etl;
 import com.novel.splitter.core.SceneAssembler;
 import com.novel.splitter.domain.model.Novel;
 import com.novel.splitter.domain.model.Scene;
+import com.novel.splitter.domain.model.SceneMetadata;
 import com.novel.splitter.embedding.api.EmbeddingService;
 import com.novel.splitter.embedding.api.VectorStore;
 import com.novel.splitter.repository.api.SceneRepository;
@@ -43,11 +44,17 @@ public class NovelIngestionService {
     private final com.novel.splitter.application.service.task.ProgressSseService progressSseService;
     private final RabbitTemplate rabbitTemplate;
     
-    // 实例化切分器 (也可配置为 Bean)
+    // 实例化切分器。
+    // 注意：这里使用无参构造，未注入 EmbeddingService。
+    // 设计考量：如果注入 EmbeddingService，SplitWorker 将在切分阶段同步调用 ONNX 推理（每一段一次），
+    // 这会导致切分耗时大幅增加，与系统的异步化初衷相悖。
+    // 因此，当前的语义切分（B3 阶段的余弦相似度计算）默认不启用，纯规则切分足以应对大多数场景。
+    // 如需分析和打分，建议在独立的质量分析阶段使用向量模型。
     private final SceneAssembler sceneAssembler = new SceneAssembler();
     
     // 批处理大小 (根据显存和 Chroma 性能调整)
-    private static final int BATCH_SIZE = 10; 
+    @org.springframework.beans.factory.annotation.Value("${splitter.ingestion.batch-size:10}")
+    private int batchSize; 
 
     public void ingestAsync(String taskId, String novelId, String novelPathStr, int maxScenes, String version) {
         SplitTaskMessage message = new SplitTaskMessage(taskId, novelId, novelPathStr, maxScenes, version);
@@ -192,19 +199,22 @@ public class NovelIngestionService {
 
         try {
             List<String> texts = new ArrayList<>();
-            List<Scene> validScenes = new ArrayList<>();
+            List<Scene> validChildScenes = new ArrayList<>();
             for (Scene scene : scenes) {
                 if (scene.getText() != null && !scene.getText().trim().isEmpty()) {
-                    texts.add(scene.getText());
-                    validScenes.add(scene);
+                    List<Scene> children = createChildChunks(scene);
+                    for (Scene child : children) {
+                        texts.add(child.getText());
+                        validChildScenes.add(child);
+                    }
                 } else {
                     log.warn("Skipping scene ID {} due to empty text", scene.getId());
                 }
             }
-            if (validScenes.isEmpty()) return;
+            if (validChildScenes.isEmpty()) return;
 
             List<float[]> embeddings = embeddingService.embedBatch(texts);
-            vectorStore.saveBatch(validScenes, embeddings);
+            vectorStore.saveBatch(validChildScenes, embeddings);
         } catch (Exception e) {
             log.error("Error processing embed batch (Scene IDs: {}-...)", sceneIds.get(0), e);
             throw new RuntimeException("Batch embed processing failed", e); 
@@ -217,27 +227,30 @@ public class NovelIngestionService {
         
         log.info("Starting embedding and storage for {} scenes...", total);
         
-        int totalBatches = (int) Math.ceil((double) total / BATCH_SIZE);
+        int totalBatches = (int) Math.ceil((double) total / batchSize);
         int batchIndex = 0;
 
-        for (int i = 0; i < total; i += BATCH_SIZE) {
-            int end = Math.min(i + BATCH_SIZE, total);
+        for (int i = 0; i < total; i += batchSize) {
+            int end = Math.min(i + batchSize, total);
             List<Scene> batchScenes = scenes.subList(i, end);
             
             try {
                 // 3.1 Extract texts
                 List<String> texts = new ArrayList<>();
-                List<Scene> validBatchScenes = new ArrayList<>();
+                List<Scene> validChildScenes = new ArrayList<>();
                 for (Scene scene : batchScenes) {
                     if (scene.getText() != null && !scene.getText().trim().isEmpty()) {
-                        texts.add(scene.getText());
-                        validBatchScenes.add(scene);
+                        List<Scene> children = createChildChunks(scene);
+                        for (Scene child : children) {
+                            texts.add(child.getText());
+                            validChildScenes.add(child);
+                        }
                     } else {
                         log.warn("Skipping scene ID {} due to empty text in processBatches", scene.getId());
                     }
                 }
                 
-                if (validBatchScenes.isEmpty()) {
+                if (validChildScenes.isEmpty()) {
                     batchIndex++;
                     continue;
                 }
@@ -246,9 +259,9 @@ public class NovelIngestionService {
                 List<float[]> embeddings = embeddingService.embedBatch(texts);
                 
                 // 3.3 Store (Batch)
-                vectorStore.saveBatch(validBatchScenes, embeddings);
+                vectorStore.saveBatch(validChildScenes, embeddings);
                 
-                int currentProcessed = processedCount.addAndGet(validBatchScenes.size());
+                int currentProcessed = processedCount.addAndGet(batchScenes.size());
                 
                 // 每批次结束线性上报
                 // 限频规则：如果 totalBatches > 50，每 5 批上报一次，避免消息过密
@@ -268,5 +281,55 @@ public class NovelIngestionService {
             }
             batchIndex++;
         }
+    }
+    
+    private List<Scene> createChildChunks(Scene parent) {
+        List<Scene> children = new ArrayList<>();
+        String text = parent.getText();
+        
+        // 按照 150 字左右切分子块，重叠 30 字，提升向量召回精度
+        int chunkSize = 150;
+        int overlap = 30;
+        
+        if (text.length() <= chunkSize) {
+            children.add(createChildScene(parent, text, 0));
+            return children;
+        }
+        
+        int index = 0;
+        int childIdx = 0;
+        while (index < text.length()) {
+            int end = Math.min(index + chunkSize, text.length());
+            String chunkText = text.substring(index, end);
+            children.add(createChildScene(parent, chunkText, childIdx++));
+            
+            if (end == text.length()) {
+                break;
+            }
+            index = end - overlap;
+        }
+        return children;
+    }
+
+    private Scene createChildScene(Scene parent, String text, int childIndex) {
+        Scene child = new Scene();
+        child.setId(java.util.UUID.randomUUID().toString());
+        child.setText(text);
+        child.setChapterIndex(parent.getChapterIndex());
+        child.setChapterTitle(parent.getChapterTitle());
+        child.setStartParagraphIndex(parent.getStartParagraphIndex());
+        child.setEndParagraphIndex(parent.getEndParagraphIndex());
+        
+        SceneMetadata parentMeta = parent.getMetadata();
+        SceneMetadata childMeta = new SceneMetadata();
+        if (parentMeta != null) {
+            childMeta.setNovel(parentMeta.getNovel());
+            childMeta.setVersion(parentMeta.getVersion());
+        }
+        childMeta.setParentSceneId(parent.getId());
+        childMeta.setChunkType("child_chunk");
+        child.setMetadata(childMeta);
+        
+        return child;
     }
 }

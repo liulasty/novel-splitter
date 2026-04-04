@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Collections;
 import java.util.Map;
 
 /**
@@ -58,7 +59,7 @@ public class VectorManagementController {
             if (request.getQuery() == null || request.getQuery().isBlank()) {
                 return ResponseEntity.badRequest().body("Query is required");
             }
-            float[] embedding = embeddingService.embed(request.getQuery());
+            float[] embedding = embeddingService.embedBatch(Collections.singletonList(request.getQuery())).get(0);
             return ResponseEntity.ok(vectorStore.search(embedding, request.getTopK(), request.getFilter()));
         } catch (Exception e) {
             log.error("向量搜索失败", e);

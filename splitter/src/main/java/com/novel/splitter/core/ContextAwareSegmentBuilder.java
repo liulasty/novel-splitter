@@ -127,8 +127,8 @@ public class ContextAwareSegmentBuilder extends SemanticSegmentBuilder {
                 return null;
             }
 
-            float[] v1 = embeddingService.embed(content1);
-            float[] v2 = embeddingService.embed(content2);
+            float[] v1 = embeddingService.embedBatch(java.util.Collections.singletonList(content1)).get(0);
+            float[] v2 = embeddingService.embedBatch(java.util.Collections.singletonList(content2)).get(0);
             
             if (v1 == null || v2 == null || v1.length == 0 || v2.length == 0) {
                 log.warn("Embedding result is null or empty, falling back to rule-based merge evaluation.");

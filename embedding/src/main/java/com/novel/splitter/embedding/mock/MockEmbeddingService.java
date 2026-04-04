@@ -23,17 +23,12 @@ public class MockEmbeddingService implements EmbeddingService {
     }
 
     @Override
-    public float[] embed(String text) {
-        log.debug("Mock embedding for text: {}...", text.substring(0, Math.min(20, text.length())));
-        return generateRandomVector(dimension);
-    }
-
-    @Override
     public List<float[]> embedBatch(List<String> texts) {
         log.info("Mock embedding batch for {} items", texts.size());
         List<float[]> result = new ArrayList<>(texts.size());
         for (String text : texts) {
-            result.add(embed(text));
+            log.debug("Mock embedding for text: {}...", text.substring(0, Math.min(20, text.length())));
+            result.add(generateRandomVector(dimension));
         }
         return result;
     }

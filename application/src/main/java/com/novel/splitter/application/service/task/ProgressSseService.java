@@ -1,7 +1,9 @@
 package com.novel.splitter.application.service.task;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.novel.splitter.domain.task.SplitTask;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -15,6 +17,9 @@ public class ProgressSseService {
 
     private final ConcurrentHashMap<String, SseEmitter> emitters = new ConcurrentHashMap<>();
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Autowired
+    private TaskService taskService;
 
     public SseEmitter connect(String taskId) {
         // 超时 300000ms (5分钟)
@@ -30,6 +35,25 @@ public class ProgressSseService {
             emitter.completeWithError(e);
             emitters.remove(taskId);
         });
+
+        // Send initial progress snapshot immediately upon connection
+        SplitTask task = taskService.getTask(taskId);
+        if (task != null) {
+            try {
+                Map<String, Object> payload = new HashMap<>();
+                payload.put("taskId", taskId);
+                payload.put("progress", task.getProgress());
+                payload.put("message", task.getMessage());
+                payload.put("status", task.getStatus() != null ? task.getStatus().name() : "PENDING");
+                payload.put("timestamp", System.currentTimeMillis());
+                
+                emitter.send(SseEmitter.event()
+                        .name("progress")
+                        .data(objectMapper.writeValueAsString(payload)));
+            } catch (Exception e) {
+                log.warn("Failed to send initial SSE progress for taskId: {}", taskId, e);
+            }
+        }
 
         return emitter;
     }
