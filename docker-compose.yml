@@ -7,10 +7,6 @@ services:
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
     networks:
       - appnet
-    ports:
-      - "${RABBITMQ_PORT:-5672}:5672"
-      - "15672:15672"
-    restart: unless-stopped
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "ping"]
       interval: 30s
@@ -23,13 +19,8 @@ services:
     environment:
       - IS_PERSISTENT=TRUE
       - PERSIST_DIRECTORY=/data
-    volumes:
-      - ./data/chroma:/data
     networks:
       - appnet
-    ports:
-      - "8000:8000"
-    restart: unless-stopped
 
   postgres:
     image: postgres:15
@@ -40,16 +31,12 @@ services:
       POSTGRES_DB: ${DB_NAME}
     networks:
       - appnet
-    ports:
-      - "${DB_PORT:-5432}:5432"
-    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # 轻量级数据库管理界面
   adminer:
     image: adminer:latest
     container_name: adminer
@@ -58,11 +45,8 @@ services:
       ADMINER_DESIGN: pepa-linha
     networks:
       - appnet
-    ports:
-      - "${ADMINER_PORT:-8081}:8080"
     depends_on:
       - postgres
-    restart: unless-stopped
 
   backend:
     image: novel-splitter-backend:latest
@@ -78,31 +62,34 @@ services:
       chromadb:
         condition: service_started
     environment:
-      - DB_HOST=${DB_HOST}
-      - DB_PORT=${DB_PORT}
-      - DB_NAME=${DB_NAME}
-      - DB_USER=${DB_USER}
-      - DB_PASSWORD=${DB_PASSWORD}
-      - RABBITMQ_HOST=${RABBITMQ_HOST}
-      - RABBITMQ_PORT=${RABBITMQ_PORT}
-      - RABBITMQ_USER=${RABBITMQ_USER}
-      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
-      - CHROMA_URL=${CHROMA_URL}
-      - BACKEND_PORT=${BACKEND_PORT}
-      - COZE_API_KEY=${COZE_API_KEY}
-      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - STORAGE_ROOT_PATH=/app/data/novel-storage
-      - JAVA_OPTS=${JAVA_OPTS:--Xmx1g -Xms512m}
-      - LOG_PATH=/app/logs
-    volumes:
-      - ./data:/app/data
-      - ./logs:/app/logs
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      DB_HOST: postgres
+      DB_PORT: ${DB_PORT}
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: ${RABBITMQ_PORT}
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      CHROMA_URL: http://chromadb:${CHROMA_PORT}
+      BACKEND_PORT: ${BACKEND_PORT}
+      NOVEL_LLM_PROVIDER: ${NOVEL_LLM_PROVIDER:-deepseek}
+      COZE_BASE_URL: ${COZE_BASE_URL}
+      COZE_API_KEY: ${COZE_API_KEY}
+      COZE_BOT_ID: ${COZE_BOT_ID}
+      COZE_USER_ID: ${COZE_USER_ID}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL}
+      GEMINI_BASE_URL: ${GEMINI_BASE_URL}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${GEMINI_MODEL}
+      STORAGE_ROOT_PATH: /app/data/novel-storage
+      JAVA_OPTS: ${JAVA_OPTS:--Xmx1g -Xms512m}
+      LOG_PATH: /app/logs
     networks:
       - appnet
-    ports:
-      - "${BACKEND_PORT:-8080}:8080"
-    restart: unless-stopped
 
   frontend:
     image: novel-splitter-frontend:latest
@@ -116,9 +103,6 @@ services:
       - BACKEND_URL=http://backend:${BACKEND_PORT:-8080}
     networks:
       - appnet
-    ports:
-      - "80:80"
-    restart: unless-stopped
 
 networks:
   appnet:

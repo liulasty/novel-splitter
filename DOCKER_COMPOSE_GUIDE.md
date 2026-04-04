@@ -176,10 +176,26 @@ docker-compose ps
 3. 服务器（Server）输入 **`postgres`**（重要！这是 Docker 内部的服务名，不要填 localhost）。
 4. 用户名、密码、数据库名填写 `.env` 中配置的信息（默认全是 `postgres` 和 `novel_splitter`）。
 
-### 7.3 进入容器内部（高级）
-如果你需要进入后端容器内部执行某些 Linux 命令（比如查看配置文件是否正确）：
+## 💡 8. 简单配置修改与常见问题 (FAQ)
 
-```bash
-docker-compose exec backend /bin/sh
-```
-*(输入 `exit` 或按 `Ctrl + D` 退出容器)*
+### 8.1 快速修改配置 (无需重构代码)
+本项目支持通过 `.env` 环境变量文件进行“热修改”。
+1. 打开 `config/.env.dev`。
+2. **修改大模型 API Key**：直接修改 `DEEPSEEK_API_KEY` 或 `GEMINI_API_KEY`。
+3. **修改服务端口**：若本地 80 或 8080 端口被占用，修改 `FRONTEND_PORT` 或 `BACKEND_PORT`。
+4. 修改后，仅需运行重新创建服务的命令即可生效：
+   ```bash
+   docker-compose -f docker-compose.yml -f docker-compose.dev.yml --env-file config/.env.dev up -d
+   ```
+
+### 8.2 常见错误：`java.net.UnknownHostException: postgres`
+- **如果你在本地 IDE (如 IntelliJ IDEA) 中运行后端**：
+  - 报错原因是 Windows/Mac 宿主机不知道 `postgres` 这个域名。
+  - **解决**：确保你的本地 `.env.dev` 文件中设置了 `DB_HOST=localhost`。因为 Docker Compose 已经将数据库的 `5432` 端口暴露到了你的宿主机 `localhost`。
+- **如果你在 Docker Desktop 中运行后端**：
+  - 报错原因是 Docker 内部环境变量解析失败或换行符导致了字符串错误（如 `postgres\r`）。
+  - **解决**：检查 `.env.dev` 文件的换行符是否为 **LF**（在 VS Code 右下角修改），并将路径配置中的反斜杠（`\`）全部改为正斜杠（`/`）。
+
+### 8.3 路径挂载报错
+- 确保 `config/.env.dev` 中的 `DOCKER_DATA_PATH` 和 `APP_DATA_PATH` 使用正斜杠（`/`），如 `D:/soft/novel-splitter`，不要使用反斜杠 `\`。
+- 如果 Docker 报无权限，请进入 Docker Desktop 设置的 **Resources -> File Sharing** 中添加对应盘符。

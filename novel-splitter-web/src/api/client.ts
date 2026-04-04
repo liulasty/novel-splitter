@@ -1,11 +1,10 @@
 import axios from 'axios';
 
 export const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
-  timeout: Number(import.meta.env.VITE_API_TIMEOUT) || 300000, // Default to 5 minutes to match proxy timeout
+  baseURL: '/api',
+  timeout: Number(import.meta.env.VITE_API_TIMEOUT) || 300000,
 });
 
-// 开发模式日志开关
 const enableApiLog = import.meta.env.VITE_ENABLE_API_LOG === 'true';
 
 if (enableApiLog) {

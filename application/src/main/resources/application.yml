@@ -10,6 +10,7 @@ logging:
 
 spring:
   datasource:
+    # 默认使用 localhost 方便本地开发，在 Docker 中通过环境变量 DB_HOST=postgres 覆盖
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:novel_splitter}
     username: ${DB_USER:postgres}
     password: ${DB_PASSWORD:password}
@@ -25,8 +26,8 @@ spring:
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
     port: ${RABBITMQ_PORT:5672}
-    username: ${RABBITMQ_USER:user}
-    password: ${RABBITMQ_PASSWORD:password}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
   servlet:
     multipart:
       max-file-size: 50MB
@@ -34,7 +35,7 @@ spring:
 
 novel:
   llm:
-    provider: deepseek # deepseek, ollama, gemini or coze
+    provider: ${NOVEL_LLM_PROVIDER:deepseek}
 
 llm:
   coze:

@@ -144,13 +144,31 @@ graph LR
 - **Java 21 & Maven 3.8+**：用于本地编译后端。
 - **Node.js 22+**：用于本地编译前端（可选，脚本中会通过容器编译）。
 
-### 2. 配置环境参数
-在项目根目录的 `config/` 文件夹下，根据 `.env.example` 模板创建 `.env.dev` 或 `.env.prod`，并填入必要的大模型 API Key 等信息。
+### 2. 简单修改配置 (必读)
+本项目统一使用 `config/` 目录下的环境文件作为配置来源：
+
+- `config/.env.dev`：开发环境
+- `config/.env.prod`：生产环境
+- `config/.env.example`：模板文件
+
+首次使用时，请先复制模板并填写必要的大模型 API Key、路径和端口。
 
 ```bash
 cp config/.env.example config/.env.dev
-# 编辑 config/.env.dev，填入 API Key 及其他自定义配置
 ```
+
+如需生产环境配置，可再复制一份：
+
+```bash
+cp config/.env.example config/.env.prod
+```
+
+**关键配置项说明：**
+- `NOVEL_LLM_PROVIDER`：选择你想用的大模型供应商（可选：`deepseek`, `gemini`, `ollama`, `coze`）。
+- `*_API_KEY`：填入对应大模型的 API Key。
+- `APP_DATA_PATH` 和 `DOCKER_DATA_PATH`：请尽量使用正斜杠路径，例如 `D:/soft/novel-splitter`、`D:/docker_data`。
+- `DB_HOST`、`RABBITMQ_HOST`、`CHROMA_URL`：在本地直跑 Spring Boot 时保持 `localhost`；使用 Docker 部署时，Compose 会自动改写为容器内部服务地址，无需手动切换。
+- 根目录 `.env` 不再作为运行时主入口，本地与 Docker 都以 `config/.env.dev` / `config/.env.prod` 为准。
 
 ### 3. 一键编译与打包镜像
 我们提供了跨平台的编译脚本。在根目录下执行：
@@ -168,6 +186,12 @@ cp config/.env.example config/.env.dev
 ```
 
 ### 4. 启动服务
+Compose 文件职责已经拆分：
+
+- `docker-compose.yml`：基础共享定义
+- `docker-compose.dev.yml`：开发环境端口与挂载
+- `docker-compose.prod.yml`：生产环境端口、挂载、重启策略与资源限制
+
 你可以选择启动开发环境或生产环境。生产环境会自动应用资源限制和自动重启策略。
 
 **Windows:**
@@ -188,6 +212,7 @@ cp config/.env.example config/.env.dev
 👉 **http://localhost:80** (前端界面)
 👉 **http://localhost:8080/swagger-ui/index.html** (后端 API 文档)
 👉 **http://localhost:15672** (RabbitMQ 管理面板，默认账号密码见配置)
+👉 **http://localhost:8081** (Adminer 数据库管理界面)
 
 ### 5. 停止服务
 执行对应的 stop 脚本即可优雅关闭并移除容器：
@@ -205,6 +230,16 @@ cp config/.env.example config/.env.dev
 ---
 
 ## 🛠 本地开发与高级配置
+
+本地直跑 Spring Boot 时，应用会按 `SPRING_PROFILES_ACTIVE` 自动读取 `config/.env.dev` 或 `config/.env.prod`：
+
+- 未设置时默认读取 `config/.env.dev`
+- 设置 `SPRING_PROFILES_ACTIVE=prod` 时读取 `config/.env.prod`
+
+前端浏览器侧统一访问相对路径 `/api`：
+
+- 本地前端开发由 Vite 代理到 `VITE_API_PROXY_TARGET`
+- Docker 部署由 Nginx 反向代理到后端容器
 
 如果您希望在本地进行开发，而非使用 Docker 部署，或想了解更详细的环境变量配置、多环境切换方法及脚本使用原理，请参阅 [使用指南 (USAGE.md)](USAGE.md)。
 
