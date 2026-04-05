@@ -1,6 +1,6 @@
 package com.novel.splitter.application.controller;
 
-import com.novel.splitter.application.service.DownloadService;
+import com.novel.splitter.application.service.download.DownloadService;
 import com.novel.splitter.domain.model.dto.DownloadRequest;
 import com.novel.splitter.domain.model.dto.DownloadResponse;
 import io.swagger.v3.oas.annotations.Operation;

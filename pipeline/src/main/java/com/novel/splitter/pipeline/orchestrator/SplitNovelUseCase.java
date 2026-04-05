@@ -10,6 +10,7 @@ import com.novel.splitter.infrastructure.progress.IngestProgress;
 import com.novel.splitter.repository.api.SceneRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -25,6 +26,30 @@ public class SplitNovelUseCase {
     private final SceneRepository sceneRepository;
     
     private final SceneAssembler sceneAssembler = new SceneAssembler();
+
+    @Value("${splitter.rule.min-length:200}")
+    private int minLength;
+
+    @Value("${splitter.rule.max-length:3000}")
+    private int maxLength;
+
+    private List<Scene> filterByLength(List<Scene> scenes) {
+        List<Scene> valid = new ArrayList<>();
+        for (Scene s : scenes) {
+            int len = s.getText() == null ? 0 : s.getText().length();
+            if (len < minLength) {
+                log.warn("Scene {} (chapter {}) too short: {} chars, skipping",
+                        s.getId(), s.getChapterTitle(), len);
+                continue;
+            }
+            if (len > maxLength) {
+                log.warn("Scene {} (chapter {}) too long: {} chars, will be chunked downstream",
+                        s.getId(), s.getChapterTitle(), len);
+            }
+            valid.add(s);
+        }
+        return valid;
+    }
 
     public List<Long> split(String taskId, Novel novel, int maxScenes, String version, BiConsumer<Integer, String> progressCallback) {
         log.info("=== Start Split Phase for: {} ===", novel.getTitle());
@@ -61,11 +86,12 @@ public class SplitNovelUseCase {
         log.info("Generated {} scenes from novel '{}'", scenes.size(), novel.getTitle());
 
         if (progressCallback != null) {
-            progressCallback.accept(IngestProgress.VALIDATE_END, String.format("切分完成：共 %d 个有效场景", scenes.size()));
+            progressCallback.accept(IngestProgress.VALIDATE_END, String.format("切分完成：共 %d 个初步场景", scenes.size()));
         }
 
+        scenes = filterByLength(scenes);
         if (scenes.isEmpty()) {
-            log.warn("No scenes generated! Check split rules or input file.");
+            log.warn("All scenes filtered out after length validation for: {}", novel.getTitle());
             return new ArrayList<>();
         }
 

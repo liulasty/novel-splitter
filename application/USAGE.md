@@ -18,20 +18,6 @@ mvn clean package -DskipTests
 
 ## 3. 运行方式
 
-### 3.1 命令行模式 (CLI)
-适用于批量处理或脚本调用。
-
-```bash
-java -jar application/target/application-1.0.0-SNAPSHOT.jar \
-  --file="D:/books/my_novel.txt" \
-  --version="v1-basic"
-```
-
-**参数说明**：
-- `--file`: 小说文件的绝对路径（支持 .txt）。
-- `--version`: 切分策略版本标识（用于区分不同的输出目录，默认为 v1-default）。
-
-### 3.2 Web 服务模式
 启动服务后，通过 REST API 触发任务。
 
 **启动服务**：
@@ -40,14 +26,12 @@ java -jar application/target/application-1.0.0-SNAPSHOT.jar
 ```
 （默认端口 8080，可在 `application.yml` 中修改）
 
-**调用接口**：
+**调用入库接口**：
 ```bash
-curl -X POST http://localhost:8080/api/v1/split \
-  -H "Content-Type: application/json" \
-  -d '{
-    "filePath": "D:/books/my_novel.txt",
-    "version": "v2-web"
-  }'
+curl -X POST http://localhost:8080/api/novels/ingest \
+  -H "Content-Type: multipart/form-data" \
+  -F "file=@/path/to/your/novel.txt" \
+  -F "version=v1"
 ```
 
 ## 4. 配置说明
