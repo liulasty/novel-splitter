@@ -31,6 +31,13 @@ export interface IngestRequest {
   maxScenes: number; // 0 for all
 }
 
+export interface DownloadAndIngestRequest {
+  url: string;
+  name: string;
+  version: string;
+  maxScenes: number; // 0 for all
+}
+
 export interface NovelUploadResponse {
   message: string;
   error?: string;
