@@ -35,9 +35,10 @@ public class AuthInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        // 如果未配置 Token，则默认放行（或者根据安全需求默认拦截，这里根据题意简单鉴权）
+        // 如果未配置 Token，拒绝访问，防止未配置导致的鉴权绕过（Fail-Closed）
         if (!StringUtils.hasText(authToken)) {
-            return true;
+            log.error("系统未配置鉴权 Token (api.auth.token)，拒绝所有 API 访问。请检查 application.yml 或环境变量配置。");
+            return rejectRequest(request, response, "系统配置错误：未配置鉴权 Token");
         }
 
         String authHeader = request.getHeader("Authorization");
@@ -48,18 +49,22 @@ public class AuthInterceptor implements HandlerInterceptor {
             }
         }
 
+        return rejectRequest(request, response, "未授权访问：无效的 Token");
+    }
+
+    private boolean rejectRequest(HttpServletRequest request, HttpServletResponse response, String message) throws Exception {
         log.warn("API 访问鉴权失败，来源 IP: {}, 请求路径: {}", request.getRemoteAddr(), request.getRequestURI());
 
         // 返回 401 统一响应结构
         response.setStatus(HttpStatus.UNAUTHORIZED.value());
         response.setContentType("application/json;charset=UTF-8");
-        ApiResponse<Void> apiResponse = ApiResponse.error(HttpStatus.UNAUTHORIZED.value(), "未授权访问：无效的 Token");
-        
+        ApiResponse<Void> apiResponse = ApiResponse.error(HttpStatus.UNAUTHORIZED.value(), message);
+
         try (PrintWriter writer = response.getWriter()) {
             writer.write(objectMapper.writeValueAsString(apiResponse));
             writer.flush();
         }
-        
+
         return false;
     }
 }
