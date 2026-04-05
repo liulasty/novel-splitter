@@ -1,8 +1,4 @@
-import axios from 'axios';
-
-const apiClient = axios.create({
-  baseURL: '/api',
-});
+import { apiClient } from './client';
 
 export interface SplitTask {
   taskId: string;

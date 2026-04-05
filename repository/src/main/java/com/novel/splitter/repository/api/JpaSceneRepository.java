@@ -14,6 +14,8 @@ public interface JpaSceneRepository extends JpaRepository<JpaSceneEntity, Long> 
     // Custom query method for SubTask 2.2: "按 ID 列表查询的方法"
     List<JpaSceneEntity> findByIdIn(List<Long> ids);
 
+    List<JpaSceneEntity> findBySceneIdIn(List<String> sceneIds);
+
     List<JpaSceneEntity> findByNovelNameAndVersion(String novelName, String version);
 
     List<JpaSceneEntity> findByNovelName(String novelName);

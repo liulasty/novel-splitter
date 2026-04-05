@@ -8,6 +8,7 @@ import com.novel.splitter.domain.model.ContextBlock;
 import com.novel.splitter.domain.model.Prompt;
 import com.novel.splitter.domain.model.Scene;
 import com.novel.splitter.domain.model.dto.RagDebugResponse;
+import com.novel.splitter.domain.model.dto.RagRequest;
 import com.novel.splitter.domain.model.dto.RetrievalQuery;
 import com.novel.splitter.retrieval.api.RetrievalService;
 import lombok.RequiredArgsConstructor;
@@ -43,6 +44,10 @@ public class RagService {
      */
     public Answer ask(String question, int topK) {
         return ask(question, topK, null, null);
+    }
+
+    public Answer ask(RagRequest request) {
+        return ask(request.getQuestion(), normalizeTopK(request.getTopK()), request.getNovel(), request.getVersion());
     }
 
     /**
@@ -111,6 +116,10 @@ public class RagService {
             log.error("RAG preview failed", e);
             throw new RuntimeException("RAG preview failed", e);
         }
+    }
+
+    public RagDebugResponse preview(RagRequest request) {
+        return preview(request.getQuestion(), normalizeTopK(request.getTopK()), request.getNovel(), request.getVersion());
     }
 
     /**
@@ -224,5 +233,16 @@ public class RagService {
                 .collect(Collectors.toList());
         
         answer.setCitations(validCitations);
+    }
+
+    private int normalizeTopK(int topK) {
+        if (topK > 0) {
+            return topK;
+        }
+        AppConfig.RagConfig ragConfig = appConfig.getRag();
+        if (ragConfig != null && ragConfig.getDefaultTopK() > 0) {
+            return ragConfig.getDefaultTopK();
+        }
+        return 3;
     }
 }

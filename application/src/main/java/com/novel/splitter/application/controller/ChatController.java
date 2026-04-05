@@ -3,11 +3,11 @@ package com.novel.splitter.application.controller;
 import com.novel.splitter.application.service.rag.RagService;
 import com.novel.splitter.domain.model.Answer;
 import com.novel.splitter.domain.model.dto.ChatRequest;
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -31,14 +31,8 @@ public class ChatController {
      */
     @Operation(summary = "发送聊天请求", description = "根据用户输入的问题，从知识库中检索相关内容并生成回答")
     @PostMapping
-    public ResponseEntity<Answer> chat(@RequestBody ChatRequest request) {
+    public Answer chat(@Valid @RequestBody ChatRequest request) {
         log.info("接收到聊天请求: {}", request);
-        try {
-            Answer answer = ragService.ask(request.getQuestion(), request.getTopK(), request.getNovel(), request.getVersion());
-            return ResponseEntity.ok(answer);
-        } catch (Exception e) {
-            log.error("处理聊天请求失败", e);
-            return ResponseEntity.internalServerError().build();
-        }
+        return ragService.ask(request.getQuestion(), request.getTopK(), request.getNovel(), request.getVersion());
     }
 }

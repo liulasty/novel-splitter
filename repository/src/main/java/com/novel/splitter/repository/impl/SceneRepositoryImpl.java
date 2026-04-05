@@ -69,6 +69,12 @@ public class SceneRepositoryImpl implements SceneRepository {
     }
 
     @Override
+    public List<Scene> findBySceneIds(List<String> sceneIds) {
+        List<JpaSceneEntity> entities = jpaSceneRepository.findBySceneIdIn(sceneIds);
+        return entities.stream().map(this::toScene).collect(Collectors.toList());
+    }
+
+    @Override
     @Transactional
     public void deleteVersion(String novelName, String version) {
         jpaSceneRepository.deleteByNovelNameAndVersion(novelName, version);

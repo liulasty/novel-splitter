@@ -1,13 +1,8 @@
-import axios from 'axios';
+import { apiClient } from './client';
 import type { Scene } from '@/types/api';
-
-const apiClient = axios.create({
-  baseURL: '/api',
-});
 
 export const knowledgeApi = {
   getVersions: async (novelName: string): Promise<string[]> => {
-    // Note: URL needs to match backend expectation, assuming path parameter
     const response = await apiClient.get<string[]>(`/knowledge/${encodeURIComponent(novelName)}/versions`);
     return response.data;
   },

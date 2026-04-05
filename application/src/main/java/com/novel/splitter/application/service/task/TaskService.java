@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -37,7 +38,9 @@ public class TaskService {
 
     @Transactional(readOnly = true)
     public List<SplitTask> getAllTasks() {
-        return taskRepository.findAll();
+        List<SplitTask> tasks = taskRepository.findAll();
+        tasks.sort(Comparator.comparing(SplitTask::getCreatedAt).reversed());
+        return tasks;
     }
 
     @Transactional

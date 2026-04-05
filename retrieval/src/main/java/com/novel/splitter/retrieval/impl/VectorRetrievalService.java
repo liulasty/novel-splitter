@@ -71,7 +71,17 @@ public class VectorRetrievalService implements RetrievalService {
             String version = parts[1];
 
             try {
-                List<Scene> scenes = sceneRepository.loadScenes(novel, version);
+                List<String> targetIds = entry.getValue().stream()
+                        .map(r -> {
+                            if (r.getMetadata() != null && r.getMetadata().containsKey("parent_scene_id")) {
+                                return (String) r.getMetadata().get("parent_scene_id");
+                            }
+                            return r.getChunkId();
+                        })
+                        .distinct()
+                        .collect(Collectors.toList());
+
+                List<Scene> scenes = sceneRepository.findBySceneIds(targetIds);
                 Map<String, Scene> sceneMap = scenes.stream()
                         .collect(Collectors.toMap(Scene::getId, s -> s, (v1, v2) -> v1));
                 

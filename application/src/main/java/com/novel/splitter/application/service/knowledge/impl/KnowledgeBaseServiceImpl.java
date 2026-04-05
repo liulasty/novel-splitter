@@ -37,17 +37,18 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
 
     @Override
     public List<Scene> getScenesByNovel(String novelName) {
-        return sceneRepository.findByNovel(novelName);
+        return sceneRepository.findByNovel(normalizeNovelName(novelName));
     }
 
     @Override
     @Transactional
     public void deleteVersion(String novelName, String version) {
-        log.info("Logical deleting version: {}/{}", novelName, version);
-        sceneRepository.deleteVersion(novelName, version);
+        String normalizedNovelName = normalizeNovelName(novelName);
+        log.info("Logical deleting version: {}/{}", normalizedNovelName, version);
+        sceneRepository.deleteVersion(normalizedNovelName, version);
         
         JpaCleanupTaskEntity task = JpaCleanupTaskEntity.builder()
-                .targetId(novelName)
+                .targetId(normalizedNovelName)
                 .targetType("VERSION")
                 .version(version)
                 .status("PENDING")
@@ -56,7 +57,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
 
         CleanupTaskMessage message = CleanupTaskMessage.builder()
                 .cleanupTaskId(task.getId())
-                .targetId(novelName)
+                .targetId(normalizedNovelName)
                 .targetType("VERSION")
                 .version(version)
                 .build();
@@ -68,11 +69,12 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
     @Override
     @Transactional
     public void deleteKnowledgeBase(String novelName) {
-        log.info("Logical deleting knowledge base for: {}", novelName);
-        sceneRepository.deleteNovel(novelName);
+        String normalizedNovelName = normalizeNovelName(novelName);
+        log.info("Logical deleting knowledge base for: {}", normalizedNovelName);
+        sceneRepository.deleteNovel(normalizedNovelName);
         
         JpaCleanupTaskEntity task = JpaCleanupTaskEntity.builder()
-                .targetId(novelName)
+                .targetId(normalizedNovelName)
                 .targetType("NOVEL")
                 .status("PENDING")
                 .build();
@@ -80,7 +82,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
 
         CleanupTaskMessage message = CleanupTaskMessage.builder()
                 .cleanupTaskId(task.getId())
-                .targetId(novelName)
+                .targetId(normalizedNovelName)
                 .targetType("NOVEL")
                 .build();
         
@@ -90,6 +92,13 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
 
     @Override
     public List<String> listVersions(String novelName) {
-        return sceneRepository.listVersions(novelName);
+        return sceneRepository.listVersions(normalizeNovelName(novelName));
+    }
+
+    private String normalizeNovelName(String novelName) {
+        if (novelName != null && novelName.toLowerCase().endsWith(".txt")) {
+            return novelName.substring(0, novelName.length() - 4);
+        }
+        return novelName;
     }
 }

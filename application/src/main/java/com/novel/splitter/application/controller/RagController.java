@@ -4,6 +4,7 @@ import com.novel.splitter.application.service.rag.RagService;
 import com.novel.splitter.domain.model.Answer;
 import com.novel.splitter.domain.model.dto.RagDebugResponse;
 import com.novel.splitter.domain.model.dto.RagRequest;
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -32,8 +33,8 @@ public class RagController {
      */
     @Operation(summary = "RAG问答请求", description = "通过检索增强生成机制，基于小说知识库回答用户问题")
     @PostMapping
-    public Answer ask(@RequestBody RagRequest request) {
-        return ragService.ask(request.getQuestion(), request.getTopK() > 0 ? request.getTopK() : 3, request.getNovel(), request.getVersion());
+    public Answer ask(@Valid @RequestBody RagRequest request) {
+        return ragService.ask(request);
     }
 
     /**
@@ -44,7 +45,7 @@ public class RagController {
      */
     @Operation(summary = "RAG调试预览", description = "获取检索到的上下文信息，不调用大模型生成最终回答，用于调试")
     @PostMapping("/debug")
-    public RagDebugResponse debug(@RequestBody RagRequest request) {
-        return ragService.preview(request.getQuestion(), request.getTopK() > 0 ? request.getTopK() : 3, request.getNovel(), request.getVersion());
+    public RagDebugResponse debug(@Valid @RequestBody RagRequest request) {
+        return ragService.preview(request);
     }
 }

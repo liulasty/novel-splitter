@@ -36,6 +36,13 @@ public interface SceneRepository {
     List<Scene> findByIds(List<Long> ids);
 
     /**
+     * 按 Scene ID (String) 列表查询
+     * @param sceneIds Scene ID 列表
+     * @return Scene 列表
+     */
+    List<Scene> findBySceneIds(List<String> sceneIds);
+
+    /**
      * 删除指定小说的指定版本（删除文件产物）
      * @param novelName 小说名称
      * @param version 版本

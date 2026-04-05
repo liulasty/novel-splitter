@@ -1,12 +1,12 @@
 @echo off
 setlocal enabledelayedexpansion
 
-:: æ•èŽ· Maven ç‰ˆæœ¬
+:: ²¶»ñ Maven °æ±¾
 for /f "delims=" %%i in ('mvn help:evaluate -Dexpression=project.version -q -DforceStdout 2^>nul') do set "VERSION=%%i"
 
-:: è¾“å‡ºç»“æžœ
-echo é¡¹ç›®ç‰ˆæœ¬å·ï¼š%VERSION%
+:: Êä³ö½á¹û
+echo ÏîÄ¿°æ±¾ºÅ£º%VERSION%
 
-:: å…³é”®ï¼šé˜²æ­¢é—ªé€€ï¼Œç­‰å¾…ç”¨æˆ·æŒ‰ä»»æ„é”®é€€å‡º
+:: ¹Ø¼ü£º·ÀÖ¹ÉÁÍË£¬µÈ´ýÓÃ»§°´ÈÎÒâ¼üÍË³ö
 pause >nul
 endlocal

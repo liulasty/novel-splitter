@@ -1,16 +1,15 @@
 package com.novel.splitter.application.controller;
 
-import com.novel.splitter.embedding.api.EmbeddingService;
-import com.novel.splitter.embedding.api.VectorStore;
+import com.novel.splitter.application.model.dto.VectorSearchRequest;
+import com.novel.splitter.application.service.vector.VectorManagementService;
+import com.novel.splitter.domain.model.embedding.VectorRecord;
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import lombok.Data;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -21,11 +20,9 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/admin/vector")
 @RequiredArgsConstructor
-@Slf4j
 public class VectorManagementController {
 
-    private final VectorStore vectorStore;
-    private final EmbeddingService embeddingService;
+    private final VectorManagementService vectorManagementService;
 
     /**
      * 获取向量数据库统计信息
@@ -34,16 +31,8 @@ public class VectorManagementController {
      */
     @Operation(summary = "获取向量数据库统计信息", description = "获取当前向量数据库中的向量总数及数据库实现类型")
     @GetMapping("/stats")
-    public ResponseEntity<Map<String, Object>> getStats() {
-        try {
-            return ResponseEntity.ok(Map.of(
-                "count", vectorStore.count(),
-                "type", vectorStore.getClass().getSimpleName()
-            ));
-        } catch (Exception e) {
-            log.error("获取向量数据库统计信息失败", e);
-            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
-        }
+    public Map<String, Object> getStats() {
+        return vectorManagementService.getStats();
     }
 
     /**
@@ -54,17 +43,8 @@ public class VectorManagementController {
      */
     @Operation(summary = "执行向量相似度搜索", description = "根据查询文本进行嵌入转换，并在向量数据库中搜索最相似的记录")
     @PostMapping("/search")
-    public ResponseEntity<?> search(@RequestBody VectorSearchRequest request) {
-        try {
-            if (request.getQuery() == null || request.getQuery().isBlank()) {
-                return ResponseEntity.badRequest().body("Query is required");
-            }
-            float[] embedding = embeddingService.embedBatch(Collections.singletonList(request.getQuery())).get(0);
-            return ResponseEntity.ok(vectorStore.search(embedding, request.getTopK(), request.getFilter()));
-        } catch (Exception e) {
-            log.error("向量搜索失败", e);
-            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
-        }
+    public List<VectorRecord> search(@Valid @RequestBody VectorSearchRequest request) {
+        return vectorManagementService.search(request);
     }
 
     /**
@@ -75,9 +55,8 @@ public class VectorManagementController {
      */
     @Operation(summary = "删除向量数据", description = "根据指定的过滤条件删除向量数据库中的记录")
     @DeleteMapping
-    public ResponseEntity<Void> delete(@RequestBody Map<String, Object> filter) {
-        vectorStore.delete(filter);
-        return ResponseEntity.ok().build();
+    public void delete(@RequestBody Map<String, Object> filter) {
+        vectorManagementService.delete(filter);
     }
     
     /**
@@ -87,18 +66,7 @@ public class VectorManagementController {
      */
     @Operation(summary = "重置向量数据库", description = "清空向量数据库中的所有数据")
     @PostMapping("/reset")
-    public ResponseEntity<Void> reset() {
-        vectorStore.reset();
-        return ResponseEntity.ok().build();
-    }
-
-    /**
-     * 向量搜索请求实体类
-     */
-    @Data
-    public static class VectorSearchRequest {
-        private String query;
-        private int topK = 5;
-        private Map<String, Object> filter;
+    public void reset() {
+        vectorManagementService.reset();
     }
 }

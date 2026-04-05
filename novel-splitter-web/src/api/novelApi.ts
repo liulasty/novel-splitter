@@ -1,9 +1,5 @@
-import axios from 'axios';
+import { apiClient } from './client';
 import type { IngestRequest, NovelUploadResponse } from '@/types/api';
-
-const apiClient = axios.create({
-  baseURL: '/api',
-});
 
 export const novelApi = {
   getNovels: async (): Promise<string[]> => {

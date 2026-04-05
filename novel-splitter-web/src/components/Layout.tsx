@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { MessageSquare, Database, FileInput, Settings, Bug, Server, Menu, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import TokenManager from './TokenManager';
 
 export default function Layout() {
   const location = useLocation();
@@ -112,6 +113,9 @@ export default function Layout() {
       <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in fade-in duration-500">
         <Outlet />
       </main>
+      
+      {/* Token 管理组件 */}
+      <TokenManager />
     </div>
   );
 }

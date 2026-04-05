@@ -85,6 +85,7 @@ services:
       GEMINI_BASE_URL: ${GEMINI_BASE_URL}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       GEMINI_MODEL: ${GEMINI_MODEL}
+      API_AUTH_TOKEN: ${API_AUTH_TOKEN}
       STORAGE_ROOT_PATH: /app/data/novel-storage
       JAVA_OPTS: ${JAVA_OPTS:--Xmx1g -Xms512m}
       LOG_PATH: /app/logs

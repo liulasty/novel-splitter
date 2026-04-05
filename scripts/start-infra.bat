@@ -1,32 +1,68 @@
-@echo off
+﻿@echo off
 setlocal enabledelayedexpansion
-chcp 65001 >nul
 
+:: 切换到脚本所在目录的上一级（项目根目录）
 cd /d "%~dp0.."
 
+:: 设置颜色 (0A = 黑底绿字，适合终端风格)
+color 0A
+cls
+
 echo ========================================================
-echo   Novel Splitter - 基础依赖启动脚本 (Windows 11)
+echo   Novel Splitter - Infrastructure Startup (Windows 11)
 echo ========================================================
-echo.
-echo 此脚本仅启动依赖的基础设施组件 (PostgreSQL, RabbitMQ, ChromaDB, Adminer)。
-echo 适用于您在本地 IDE (如 IDEA) 中直接运行后端，并在终端运行前端的纯本地开发场景。
 echo.
 
-echo [1/2] 正在拉起基础服务...
+:: 1. 预检查：确保 Docker Desktop 正在运行
+echo [PRE-CHECK] Checking Docker status...
+docker info >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [ERROR] Docker is not running! Please start Docker Desktop first.
+    echo.
+    pause
+    exit /b 1
+)
+echo [OK] Docker is running.
+echo.
+
+:: 2. 清理：尝试停止并移除旧容器（防止配置变更不生效）
+echo [1/3] Stopping existing infrastructure (if any)...
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml --env-file config/.env.dev down >nul 2>&1
+
+:: 3. 启动：启动服务
+echo [2/3] Starting infrastructure services...
+echo       - PostgreSQL
+echo       - RabbitMQ
+echo       - ChromaDB
+echo       - Adminer
+echo.
 docker-compose -f docker-compose.yml -f docker-compose.dev.yml --env-file config/.env.dev up -d postgres rabbitmq chromadb adminer
 
 if %errorlevel% neq 0 (
     echo.
-    echo [错误] 启动基础服务失败，请检查 Docker 状态！
+    echo [ERROR] Failed to start infrastructure! Check Docker logs.
+    echo.
     pause
     exit /b 1
 )
 
+:: 4. 状态检查
 echo.
-echo [2/2] 基础依赖容器已在后台启动成功！
-echo ========================================================
-echo 现在您可以自由地在本地 IDE 启动后端以及通过 npm 启动前端了。
-echo ========================================================
-echo.
+echo [3/3] Verifying running containers...
+docker ps --filter "name=postgres" --filter "name=rabbitmq" --filter "name=chromadb" --filter "name=adminer" --format "table {{.Names}}\t{{.Status}}"
 
+echo.
+echo ========================================================
+echo [SUCCESS] All infrastructure services started successfully!
+echo ========================================================
+echo.
+echo You can now:
+echo  1. Run Backend in IDE (IntelliJ IDEA)
+echo  2. Run Frontend: npm run dev
+echo.
+echo ========================================================
+
+:: 优雅的暂停 (不显示 "按任意键继续...")
+<nul set /p dummy=Press any key to exit...
+pause >nul
 endlocal

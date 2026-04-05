@@ -1,17 +1,16 @@
 package com.novel.splitter.application.controller;
 
-import com.novel.splitter.domain.task.SplitTask;
-import com.novel.splitter.domain.task.TaskProgressEvent;
 import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.application.service.task.TaskSseService;
+import com.novel.splitter.domain.task.SplitTask;
+import com.novel.splitter.domain.task.TaskProgressEvent;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.util.Comparator;
 import java.util.List;
 
 @RestController
@@ -31,27 +30,21 @@ public class TaskController {
 
     @GetMapping
     @Operation(summary = "获取所有切分任务列表")
-    public ResponseEntity<List<SplitTask>> getAllTasks() {
-        List<SplitTask> tasks = taskService.getAllTasks();
-        tasks.sort(Comparator.comparing(SplitTask::getCreatedAt).reversed());
-        return ResponseEntity.ok(tasks);
+    public List<SplitTask> getAllTasks() {
+        return taskService.getAllTasks();
     }
 
     @GetMapping("/{taskId}")
     @Operation(summary = "获取单个切分任务状态")
-    public ResponseEntity<SplitTask> getTask(@PathVariable String taskId) {
-        SplitTask task = taskService.getTask(taskId);
-        if (task == null) {
-            return ResponseEntity.notFound().build();
-        }
-        return ResponseEntity.ok(task);
+    public SplitTask getTask(@PathVariable String taskId) {
+        return taskService.getTask(taskId);
     }
 
     @DeleteMapping("/{taskId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "删除单个切分任务记录")
-    public ResponseEntity<Void> deleteTask(@PathVariable String taskId) {
+    public void deleteTask(@PathVariable String taskId) {
         taskService.deleteTask(taskId);
-        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{taskId}/stream")
@@ -62,8 +55,7 @@ public class TaskController {
 
     @GetMapping("/{taskId}/events")
     @Operation(summary = "获取单个切分任务的历史事件日志")
-    public ResponseEntity<List<TaskProgressEvent>> getTaskEvents(@PathVariable String taskId) {
-        List<TaskProgressEvent> events = taskService.getTaskEvents(taskId);
-        return ResponseEntity.ok(events);
+    public List<TaskProgressEvent> getTaskEvents(@PathVariable String taskId) {
+        return taskService.getTaskEvents(taskId);
     }
 }

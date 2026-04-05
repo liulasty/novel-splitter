@@ -1,3 +1,7 @@
+api:
+  auth:
+    token: ${API_AUTH_TOKEN:}
+
 server:
   port: ${BACKEND_PORT:8080}
 
