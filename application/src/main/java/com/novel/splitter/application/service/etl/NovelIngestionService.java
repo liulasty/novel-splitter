@@ -41,7 +41,6 @@ public class NovelIngestionService {
     private final EmbeddingService embeddingService;
     private final VectorStore vectorStore;
     private final SceneRepository sceneRepository;
-    private final com.novel.splitter.application.service.task.ProgressSseService progressSseService;
     private final RabbitTemplate rabbitTemplate;
     
     // 实例化切分器。

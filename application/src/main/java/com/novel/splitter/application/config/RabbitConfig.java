@@ -13,14 +13,21 @@ import org.springframework.context.annotation.Configuration;
 public class RabbitConfig {
 
     public static final String EXCHANGE_NAME = "novel.task.exchange";
+    public static final String NOTIFY_EXCHANGE_NAME = "novel.task.notify.exchange";
     
     public static final String LOAD_TASK_QUEUE = "novel.task.load";
     public static final String SPLIT_TASK_QUEUE = "novel.task.split";
     public static final String EMBED_TASK_QUEUE = "novel.task.embed";
+    public static final String CLEANUP_TASK_QUEUE = "novel.task.cleanup";
 
     @Bean
     public DirectExchange taskExchange() {
         return new DirectExchange(EXCHANGE_NAME);
+    }
+
+    @Bean
+    public org.springframework.amqp.core.FanoutExchange notifyExchange() {
+        return new org.springframework.amqp.core.FanoutExchange(NOTIFY_EXCHANGE_NAME);
     }
 
     @Bean
@@ -39,6 +46,11 @@ public class RabbitConfig {
     }
 
     @Bean
+    public Queue cleanupTaskQueue() {
+        return new Queue(CLEANUP_TASK_QUEUE, true);
+    }
+
+    @Bean
     public Binding loadBinding(Queue loadTaskQueue, DirectExchange taskExchange) {
         return BindingBuilder.bind(loadTaskQueue).to(taskExchange).with("load");
     }
@@ -51,6 +63,22 @@ public class RabbitConfig {
     @Bean
     public Binding embedBinding(Queue embedTaskQueue, DirectExchange taskExchange) {
         return BindingBuilder.bind(embedTaskQueue).to(taskExchange).with("embed");
+    }
+
+    @Bean
+    public Binding cleanupBinding(Queue cleanupTaskQueue, DirectExchange taskExchange) {
+        return BindingBuilder.bind(cleanupTaskQueue).to(taskExchange).with("cleanup");
+    }
+
+    @Bean
+    public Queue notifyTaskQueue() {
+        // Create an anonymous, non-durable, exclusive, auto-delete queue for each instance
+        return new org.springframework.amqp.core.AnonymousQueue();
+    }
+
+    @Bean
+    public Binding notifyBinding(Queue notifyTaskQueue, org.springframework.amqp.core.FanoutExchange notifyExchange) {
+        return BindingBuilder.bind(notifyTaskQueue).to(notifyExchange);
     }
 
     @Bean

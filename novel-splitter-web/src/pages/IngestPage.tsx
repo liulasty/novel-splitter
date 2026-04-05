@@ -9,6 +9,7 @@ import { taskApi } from "@/api/taskApi";
 import { cn } from "@/lib/utils";
 import { toast } from 'sonner';
 import { TaskItem } from "@/components/TaskItem";
+import { TaskDetailDrawer } from "@/components/TaskDetailDrawer";
 
 const STATUS_CONFIG = {
     PENDING:    { label: 'PENDING',    pill: 'bg-gray-100 text-gray-600',    bar: 'bg-gray-400',  Icon: Clock },
@@ -25,11 +26,17 @@ export default function IngestPage() {
     const [maxScenes, setMaxScenes] = useState(0);
     const [ingestStatus, setIngestStatus] = useState<string>("");
     const [isError, setIsError] = useState(false);
+    const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
     const { data: tasks = [] } = useQuery({
         queryKey: ['tasks'],
         queryFn: taskApi.getAllTasks,
-        refetchInterval: 3000,
+        refetchInterval: (query) => {
+            const list = query.state.data;
+            if (!list || list.length === 0) return 10000;
+            const hasActive = list.some((t: any) => t.status === 'PENDING' || t.status === 'PROCESSING');
+            return hasActive ? 2000 : 10000;
+        },
     });
 
     const uploadMutation = useMutation({
@@ -203,12 +210,19 @@ export default function IngestPage() {
                                 key={task.taskId} 
                                 task={task} 
                                 onDelete={(id) => deleteTaskMutation.mutate(id)} 
+                                onViewLogs={(id) => setSelectedTaskId(id)}
                                 Icon={cfg.Icon} 
                             />
                         );
                     })}
                 </div>
             </div>
+
+            {/* Task Detail Drawer */}
+            <TaskDetailDrawer 
+                taskId={selectedTaskId} 
+                onClose={() => setSelectedTaskId(null)} 
+            />
         </div>
     );
 }

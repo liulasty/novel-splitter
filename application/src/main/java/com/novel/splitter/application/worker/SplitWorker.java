@@ -6,7 +6,6 @@ import com.novel.splitter.domain.task.SplitTaskMessage;
 import com.novel.splitter.domain.task.EmbedTaskMessage;
 import com.novel.splitter.application.service.etl.NovelCacheService;
 import com.novel.splitter.application.service.etl.NovelIngestionService;
-import com.novel.splitter.application.service.task.ProgressSseService;
 import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.domain.model.Novel;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +24,6 @@ public class SplitWorker {
 
     private final NovelIngestionService ingestionService;
     private final TaskService taskService;
-    private final ProgressSseService progressSseService;
     private final NovelCacheService novelCacheService;
     private final RabbitTemplate rabbitTemplate;
 
@@ -47,7 +45,6 @@ public class SplitWorker {
             Novel novel = novelCacheService.load(taskId);
             
             List<Long> sceneIds = ingestionService.splitPhase(taskId, novel, task.getMaxScenes(), task.getVersion(), (progress, info) -> {
-                progressSseService.send(taskId, progress, info, "RUNNING");
                 taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, progress, info);
             });
             
@@ -56,8 +53,6 @@ public class SplitWorker {
             if (sceneIds == null || sceneIds.isEmpty()) {
                 log.warn("任务 {} 切分后没有场景，直接标记为成功", taskId);
                 taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.SUCCESS, 100, "切分完成，无有效场景");
-                progressSseService.send(taskId, 100, "切分完成，无有效场景", "COMPLETED");
-                progressSseService.complete(taskId);
                 return;
             }
 
@@ -79,8 +74,6 @@ public class SplitWorker {
         } catch (Exception e) {
             log.error("处理任务 {} 时发生异常", taskId, e);
             taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.FAILED, 0, "切分失败: " + e.getMessage());
-            progressSseService.send(taskId, -1, e.getMessage(), "FAILED");
-            progressSseService.complete(taskId);
         }
     }
 }

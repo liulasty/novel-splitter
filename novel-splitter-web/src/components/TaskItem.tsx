@@ -1,5 +1,4 @@
-import { Trash2, RotateCw, FileText, Scissors, Database } from "lucide-react";
-import { useTaskProgress } from "@/hooks/useTaskProgress";
+import { Trash2, RotateCw, FileText, Scissors, Database, ScrollText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { SplitTask } from "@/api/taskApi";
 import { novelApi } from "@/api/novelApi";
@@ -21,26 +20,30 @@ const STEPS = [
     { id: 'EMBED', label: '向量入库', icon: Database, threshold: 100 }
 ];
 
-export function TaskItem({ task, onDelete, Icon }: { task: SplitTask, onDelete: (id: string) => void, Icon: LucideIcon }) {
+export function TaskItem({ 
+    task, 
+    onDelete, 
+    onViewLogs,
+    Icon 
+}: { 
+    task: SplitTask, 
+    onDelete: (id: string) => void, 
+    onViewLogs: (taskId: string) => void,
+    Icon: LucideIcon 
+}) {
     const queryClient = useQueryClient();
     
-    // Only connect to SSE if the task is not yet finished
-    const isFinished = task.status === 'SUCCESS' || task.status === 'FAILED';
-    const sseTaskId = isFinished ? null : task.taskId;
-    
-    const progressState = useTaskProgress(sseTaskId);
-
-    // Merge database state with live SSE state
-    const currentProgress = isFinished ? task.progress : progressState.progress;
-    const currentMessage = isFinished ? task.message : (progressState.message || task.message);
-    const currentStatus = isFinished ? task.status : (progressState.status === 'PENDING' ? task.status : progressState.status);
+    // DB is the single source of truth
+    const currentProgress = task.progress;
+    const currentMessage = task.message;
+    const currentStatus = task.status;
     
     const cfg = STATUS_CONFIG[currentStatus as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.PENDING;
 
     const normalizedStatus = 
-        (currentStatus === 'SUCCESS' || currentStatus === 'COMPLETED') ? 'SUCCESS' :
+        currentStatus === 'SUCCESS' ? 'SUCCESS' :
         currentStatus === 'FAILED' ? 'FAILED' :
-        (currentStatus === 'PROCESSING' || currentStatus === 'RUNNING') ? 'RUNNING' : 'PENDING';
+        currentStatus === 'PROCESSING' ? 'RUNNING' : 'PENDING';
 
     const activeIndex = currentProgress < 15 ? 0 : currentProgress < 63 ? 1 : 2;
 
@@ -107,6 +110,13 @@ export function TaskItem({ task, onDelete, Icon }: { task: SplitTask, onDelete: 
                 </div>
                 <div className="flex items-center gap-3">
                     <span className="text-xs text-gray-400">{new Date(task.createdAt).toLocaleString()}</span>
+                    <button
+                        onClick={() => onViewLogs(task.taskId)}
+                        className="w-6 h-6 rounded-md bg-violet-50 hover:bg-violet-100 flex items-center justify-center transition-colors"
+                        title="查看日志"
+                    >
+                        <ScrollText className="w-3 h-3 text-violet-500" />
+                    </button>
                     {currentStatus === 'FAILED' && (
                         <button
                             onClick={handleRetry}

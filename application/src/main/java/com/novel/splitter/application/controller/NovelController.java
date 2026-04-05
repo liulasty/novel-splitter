@@ -2,7 +2,6 @@ package com.novel.splitter.application.controller;
 
 import com.novel.splitter.application.config.AppConfig;
 import com.novel.splitter.application.service.etl.NovelIngestionService;
-import com.novel.splitter.application.service.task.ProgressSseService;
 import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.domain.model.dto.IngestRequest;
 import io.swagger.v3.oas.annotations.Operation;
@@ -10,11 +9,9 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -42,17 +39,7 @@ public class NovelController {
 
     private final TaskService taskService;
     private final AppConfig appConfig;
-    private final ProgressSseService progressSseService;
     private final NovelIngestionService novelIngestionService;
-
-    /**
-     * 接收小说入库进度流
-     */
-    @Operation(summary = "获取入库进度SSE流", description = "返回SSE流以实时推送进度")
-    @GetMapping(value = "/progress/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter streamProgress(@RequestParam("taskId") String taskId) {
-        return progressSseService.connect(taskId);
-    }
 
     /**
      * 获取存储路径

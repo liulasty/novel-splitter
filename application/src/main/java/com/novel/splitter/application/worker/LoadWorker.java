@@ -6,7 +6,6 @@ import com.novel.splitter.domain.task.SplitTask;
 import com.novel.splitter.domain.task.SplitTaskMessage;
 import com.novel.splitter.application.service.etl.NovelCacheService;
 import com.novel.splitter.application.service.etl.NovelIngestionService;
-import com.novel.splitter.application.service.task.ProgressSseService;
 import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.domain.model.Novel;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +24,6 @@ public class LoadWorker {
 
     private final NovelIngestionService ingestionService;
     private final TaskService taskService;
-    private final ProgressSseService progressSseService;
     private final NovelCacheService novelCacheService;
     private final RabbitTemplate rabbitTemplate;
     private final AppConfig appConfig;
@@ -43,13 +41,11 @@ public class LoadWorker {
             }
 
             taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, 5, "开始读取文件...");
-            progressSseService.send(taskId, 5, "开始读取文件...", "RUNNING");
 
             String rootPath = appConfig.getStorage().getRootPath();
             Path novelPath = Paths.get(rootPath, task.getFileName());
             
             Novel novel = ingestionService.loadPhase(taskId, novelPath, (progress, info) -> {
-                progressSseService.send(taskId, progress, info, "RUNNING");
                 taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, progress, info);
             });
 
@@ -62,8 +58,6 @@ public class LoadWorker {
         } catch (Exception e) {
             log.error("处理任务 {} 时发生异常", taskId, e);
             taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.FAILED, 0, "读取失败: " + e.getMessage());
-            progressSseService.send(taskId, -1, e.getMessage(), "FAILED");
-            progressSseService.complete(taskId);
         }
     }
 }

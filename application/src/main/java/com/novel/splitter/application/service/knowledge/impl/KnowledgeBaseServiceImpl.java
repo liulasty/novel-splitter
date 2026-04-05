@@ -1,12 +1,18 @@
 package com.novel.splitter.application.service.knowledge.impl;
 
+import com.novel.splitter.application.config.RabbitConfig;
 import com.novel.splitter.application.service.knowledge.KnowledgeBaseService;
+import com.novel.splitter.domain.entity.JpaCleanupTaskEntity;
 import com.novel.splitter.domain.model.Scene;
+import com.novel.splitter.domain.task.CleanupTaskMessage;
 import com.novel.splitter.embedding.api.VectorStore;
+import com.novel.splitter.repository.api.JpaCleanupTaskRepository;
 import com.novel.splitter.repository.api.SceneRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -23,6 +29,8 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
 
     private final SceneRepository sceneRepository;
     private final VectorStore vectorStore;
+    private final JpaCleanupTaskRepository cleanupTaskRepository;
+    private final RabbitTemplate rabbitTemplate;
     
     @org.springframework.beans.factory.annotation.Value("${splitter.storage.root-path}")
     private String novelStoragePath;
@@ -33,61 +41,51 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
     }
 
     @Override
+    @Transactional
     public void deleteVersion(String novelName, String version) {
-        log.info("Deleting version: {}/{}", novelName, version);
+        log.info("Logical deleting version: {}/{}", novelName, version);
         sceneRepository.deleteVersion(novelName, version);
-        vectorStore.delete(Map.of("novel", novelName, "version", version));
+        
+        JpaCleanupTaskEntity task = JpaCleanupTaskEntity.builder()
+                .targetId(novelName)
+                .targetType("VERSION")
+                .version(version)
+                .status("PENDING")
+                .build();
+        cleanupTaskRepository.save(task);
+
+        CleanupTaskMessage message = CleanupTaskMessage.builder()
+                .cleanupTaskId(task.getId())
+                .targetId(novelName)
+                .targetType("VERSION")
+                .version(version)
+                .build();
+        
+        rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "cleanup", message);
+        log.info("Sent cleanup task {} to MQ", task.getId());
     }
 
     @Override
+    @Transactional
     public void deleteKnowledgeBase(String novelName) {
-        log.info("Deleting knowledge base for: {}", novelName);
+        log.info("Logical deleting knowledge base for: {}", novelName);
         sceneRepository.deleteNovel(novelName);
-        vectorStore.delete(Map.of("novel", novelName));
         
-        try {
-            // Delete raw file
-            // Strategy: Check 'raw' subdirectory first (Downloader), then root (Uploader)
-            java.nio.file.Path rootDir = Paths.get(novelStoragePath);
-            java.nio.file.Path rawDir = rootDir.resolve("raw");
-            
-            // 1. Check in 'raw' subdirectory
-            boolean deleted = deleteFileIfExists(rawDir, novelName);
-            
-            // 2. If not found/deleted in 'raw', check in root directory
-            if (!deleted) {
-                deleted = deleteFileIfExists(rootDir, novelName);
-            }
-            
-            if (deleted) {
-                log.info("Successfully deleted raw file for novel: {}", novelName);
-            } else {
-                log.warn("Raw file not found for deletion: {}", novelName);
-            }
-        } catch (Exception e) {
-            log.error("Failed to delete raw file for novel: " + novelName, e);
-            // Don't throw, partial success is better
-        }
-    }
+        JpaCleanupTaskEntity task = JpaCleanupTaskEntity.builder()
+                .targetId(novelName)
+                .targetType("NOVEL")
+                .status("PENDING")
+                .build();
+        cleanupTaskRepository.save(task);
 
-    private boolean deleteFileIfExists(java.nio.file.Path dir, String novelName) throws java.io.IOException {
-        // Try with .txt extension
-        java.nio.file.Path path = dir.resolve(novelName + ".txt");
-        if (Files.exists(path)) {
-            Files.delete(path);
-            log.info("Deleted raw file: {}", path);
-            return true;
-        }
+        CleanupTaskMessage message = CleanupTaskMessage.builder()
+                .cleanupTaskId(task.getId())
+                .targetId(novelName)
+                .targetType("NOVEL")
+                .build();
         
-        // Try exact match
-        path = dir.resolve(novelName);
-        if (Files.exists(path)) {
-            Files.delete(path);
-            log.info("Deleted raw file: {}", path);
-            return true;
-        }
-        
-        return false;
+        rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "cleanup", message);
+        log.info("Sent cleanup task {} to MQ", task.getId());
     }
 
     @Override

@@ -33,7 +33,28 @@ docker-compose -f docker-compose.yml -f docker-compose.prod.yml --env-file confi
 docker-compose -f docker-compose.yml -f docker-compose.dev.yml --env-file config/.env.dev up -d --force-recreate
 ```
 
-### 1.4 启动单个特定服务
+### 1.4 一键即时调试（前端+后端代码修改）
+针对日常开发修改了代码，提供了一键热重载并挂载日志的专属脚本：
+
+**Windows 11 (PowerShell/CMD)**
+```cmd
+.\scripts\debug.bat
+# 或者
+.\scripts\debug.ps1
+```
+**说明：** 该脚本会自动重新构建 `backend` 和 `frontend` 容器，然后立即在控制台输出它们的实时日志，不会中断 `postgres` 或 `rabbitmq` 的运行，非常适合快速迭代。
+
+### 1.5 本地 IDE 开发：仅启动基础依赖
+如果你希望完全在本地运行代码（例如在 IDEA 里跑 Spring Boot，在终端跑 npm run dev），你可以使用专属脚本，**只**启动依赖组件（数据库、消息队列、向量库），不启动前后端容器：
+
+**Windows 11 (PowerShell/CMD)**
+```cmd
+.\scripts\start-infra.bat
+# 或者
+.\scripts\start-infra.ps1
+```
+
+### 1.6 启动单个特定服务
 如果你只想单独启动某一个服务（例如只启动数据库 `postgres`）：
 
 ```bash

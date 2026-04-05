@@ -4,7 +4,6 @@ import com.novel.splitter.application.config.RabbitConfig;
 import com.novel.splitter.domain.task.SplitTask;
 import com.novel.splitter.domain.task.EmbedTaskMessage;
 import com.novel.splitter.application.service.etl.NovelIngestionService;
-import com.novel.splitter.application.service.task.ProgressSseService;
 import com.novel.splitter.application.service.task.TaskService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,7 +17,6 @@ public class EmbedWorker {
 
     private final NovelIngestionService ingestionService;
     private final TaskService taskService;
-    private final ProgressSseService progressSseService;
 
     @RabbitListener(queues = RabbitConfig.EMBED_TASK_QUEUE)
     public void processEmbedTask(EmbedTaskMessage message) {
@@ -48,20 +46,15 @@ public class EmbedWorker {
             
             // 为了避免过多更新导致数据库压力和前端频繁刷新，可以加上一定限制
             taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, progress, info);
-            progressSseService.send(taskId, progress, info, "RUNNING");
             
             if (completed >= total) {
                 taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.SUCCESS, 100, "入库完成");
-                progressSseService.send(taskId, 100, "入库完成", "COMPLETED");
-                progressSseService.complete(taskId);
                 log.info("任务 {} 处理成功", taskId);
             }
             
         } catch (Exception e) {
             log.error("处理任务 {} 时发生异常", taskId, e);
             taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.FAILED, 0, "向量化失败: " + e.getMessage());
-            progressSseService.send(taskId, -1, e.getMessage(), "FAILED");
-            progressSseService.complete(taskId);
         }
     }
 }

@@ -1,12 +1,15 @@
 package com.novel.splitter.application.controller;
 
 import com.novel.splitter.domain.task.SplitTask;
+import com.novel.splitter.domain.task.TaskProgressEvent;
 import com.novel.splitter.application.service.task.TaskService;
+import com.novel.splitter.application.service.task.TaskSseService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.Comparator;
 import java.util.List;
@@ -18,10 +21,12 @@ import java.util.List;
 public class TaskController {
 
     private final TaskService taskService;
+    private final TaskSseService taskSseService;
 
     @Autowired
-    public TaskController(TaskService taskService) {
+    public TaskController(TaskService taskService, TaskSseService taskSseService) {
         this.taskService = taskService;
+        this.taskSseService = taskSseService;
     }
 
     @GetMapping
@@ -47,5 +52,18 @@ public class TaskController {
     public ResponseEntity<Void> deleteTask(@PathVariable String taskId) {
         taskService.deleteTask(taskId);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{taskId}/stream")
+    @Operation(summary = "建立 SSE 连接获取任务实时日志")
+    public SseEmitter streamTaskProgress(@PathVariable String taskId) {
+        return taskSseService.connect(taskId);
+    }
+
+    @GetMapping("/{taskId}/events")
+    @Operation(summary = "获取单个切分任务的历史事件日志")
+    public ResponseEntity<List<TaskProgressEvent>> getTaskEvents(@PathVariable String taskId) {
+        List<TaskProgressEvent> events = taskService.getTaskEvents(taskId);
+        return ResponseEntity.ok(events);
     }
 }
