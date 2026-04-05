@@ -1,4 +1,4 @@
-package com.novel.splitter.application.service.chroma;
+package com.novel.splitter.embedding.admin;
 
 import com.novel.splitter.embedding.api.VectorStore;
 import lombok.RequiredArgsConstructor;
@@ -14,7 +14,7 @@ import java.util.Map;
 public class ChromaAdminServiceImpl implements ChromaAdminService {
 
     private final VectorStore vectorStore;
-    private final ChromaApiClient chromaApiClient;
+    private final ChromaProxyPort chromaProxyPort;
 
     @Override
     public ResponseEntity<Map<String, Object>> getStats() {
@@ -58,7 +58,7 @@ public class ChromaAdminServiceImpl implements ChromaAdminService {
     @Override
     public ResponseEntity<Map<String, Object>> healthcheck() {
         try {
-            Map<String, Object> response = chromaApiClient.getMap("/api/v2/healthcheck");
+            Map<String, Object> response = chromaProxyPort.getMap("/api/v2/healthcheck");
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             log.error("获取Chroma健康状态失败", e);
@@ -69,7 +69,7 @@ public class ChromaAdminServiceImpl implements ChromaAdminService {
     @Override
     public ResponseEntity<Map<String, String>> version() {
         try {
-            String version = chromaApiClient.getString("/api/v2/version");
+            String version = chromaProxyPort.getString("/api/v2/version");
             return ResponseEntity.ok(Map.of("version", version != null ? version.replace("\"", "") : "unknown"));
         } catch (Exception e) {
             log.error("获取Chroma版本失败", e);
@@ -80,36 +80,11 @@ public class ChromaAdminServiceImpl implements ChromaAdminService {
     @Override
     public ResponseEntity<Map<String, Object>> heartbeat() {
         try {
-            Map<String, Object> response = chromaApiClient.getMap("/api/v2/heartbeat");
+            Map<String, Object> response = chromaProxyPort.getMap("/api/v2/heartbeat");
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             log.error("获取Chroma心跳失败", e);
             return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
         }
-    }
-
-    @Override
-    public ResponseEntity<?> proxyGet(String path) {
-        return chromaApiClient.get(path);
-    }
-
-    @Override
-    public ResponseEntity<?> proxyPost(String path, Object body) {
-        return chromaApiClient.post(path, body);
-    }
-
-    @Override
-    public ResponseEntity<?> proxyPut(String path, Object body) {
-        return chromaApiClient.put(path, body);
-    }
-
-    @Override
-    public ResponseEntity<?> proxyPatch(String path, Object body) {
-        return chromaApiClient.patch(path, body);
-    }
-
-    @Override
-    public ResponseEntity<?> proxyDelete(String path) {
-        return chromaApiClient.delete(path);
     }
 }

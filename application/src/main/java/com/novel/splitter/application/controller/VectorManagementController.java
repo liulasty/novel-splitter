@@ -1,7 +1,7 @@
 package com.novel.splitter.application.controller;
 
-import com.novel.splitter.application.model.dto.VectorSearchRequest;
-import com.novel.splitter.application.service.vector.VectorManagementService;
+import com.novel.splitter.domain.model.dto.VectorSearchRequest;
+import com.novel.splitter.embedding.admin.VectorManagementService;
 import com.novel.splitter.domain.model.embedding.VectorRecord;
 import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;

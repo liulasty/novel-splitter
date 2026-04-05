@@ -1,5 +1,6 @@
 package com.novel.splitter.application.service.chroma;
 
+import com.novel.splitter.embedding.admin.ChromaProxyPort;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
@@ -14,7 +15,7 @@ import java.util.Map;
 
 @Component
 @Slf4j
-public class ChromaApiClient {
+public class ChromaHttpProxy implements ChromaProxyPort {
 
     private final RestClient restClient = RestClient.builder().build();
 

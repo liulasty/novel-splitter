@@ -1,4 +1,4 @@
-package com.novel.splitter.application.model.dto;
+package com.novel.splitter.domain.model.dto;
 
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
