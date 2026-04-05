@@ -3,7 +3,7 @@ package com.novel.splitter.application.worker;
 import com.novel.splitter.application.config.RabbitConfig;
 import com.novel.splitter.domain.task.SplitTask;
 import com.novel.splitter.domain.task.EmbedTaskMessage;
-import com.novel.splitter.application.usecase.ingestion.EmbedNovelUseCase;
+import com.novel.splitter.pipeline.orchestrator.EmbedNovelUseCase;
 import com.novel.splitter.application.service.task.TaskService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

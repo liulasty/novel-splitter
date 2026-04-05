@@ -1,6 +1,6 @@
-package com.novel.splitter.application.usecase.ingestion;
+package com.novel.splitter.pipeline.orchestrator;
 
-import com.novel.splitter.application.service.etl.LocalNovelLoader;
+import com.novel.splitter.pipeline.etl.LocalNovelLoader;
 import com.novel.splitter.domain.model.Novel;
 import com.novel.splitter.infrastructure.progress.IngestProgress;
 import lombok.RequiredArgsConstructor;

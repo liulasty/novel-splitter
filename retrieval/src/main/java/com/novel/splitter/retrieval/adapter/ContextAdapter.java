@@ -1,4 +1,4 @@
-package com.novel.splitter.application.service.rag;
+package com.novel.splitter.retrieval.adapter;
 
 import com.novel.splitter.domain.model.ContextBlock;
 import com.novel.splitter.domain.model.Scene;

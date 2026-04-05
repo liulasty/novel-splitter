@@ -1,4 +1,4 @@
-package com.novel.splitter.application.service.etl;
+package com.novel.splitter.pipeline.etl;
 
 public class IngestException extends RuntimeException {
 

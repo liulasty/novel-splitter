@@ -1,6 +1,5 @@
-package com.novel.splitter.application.service.rag;
+package com.novel.splitter.retrieval.impl;
 
-import com.novel.splitter.application.config.AppConfig;
 import com.novel.splitter.assembler.api.ContextAssembler;
 import com.novel.splitter.assembler.config.AssemblerConfig;
 import com.novel.splitter.domain.model.Answer;
@@ -11,9 +10,11 @@ import com.novel.splitter.domain.model.Scene;
 import com.novel.splitter.domain.model.dto.RagDebugResponse;
 import com.novel.splitter.domain.model.dto.RagRequest;
 import com.novel.splitter.domain.model.dto.RetrievalQuery;
+import com.novel.splitter.llm.client.robust.RobustLlmClient;
 import com.novel.splitter.retrieval.api.AnswerPolicyClassifier;
+import com.novel.splitter.retrieval.api.RagFacade;
 import com.novel.splitter.retrieval.api.RetrievalService;
-import com.novel.splitter.retrieval.impl.RetrievalQueryBuilder;
+import com.novel.splitter.retrieval.config.RagProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -26,7 +27,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * RAG 服务
+ * RAG 服务实现
  * <p>
  * 编排检索、上下文组装和 LLM 调用，提供端到端的问答能力。
  * </p>
@@ -34,25 +35,24 @@ import java.util.stream.Collectors;
 @Service
 @Slf4j
 @RequiredArgsConstructor
-public class RagService {
+public class RagServiceImpl implements RagFacade {
 
     private final RetrievalService retrievalService;
     private final RobustLlmClient llmClient;
     private final ContextAssembler contextAssembler;
-    private final AppConfig appConfig;
+    private final RagProperties ragProperties;
     private final AssemblerConfig assemblerConfig;
     private final AnswerPolicyClassifier policyClassifier;
     private final RetrievalQueryBuilder queryBuilder;
 
-    /**
-     * 提出问题并获取回答 (兼容旧接口)
-     */
-    public Answer ask(String question, int topK) {
-        return ask(question, topK, null, null);
-    }
-
+    @Override
     public Answer ask(RagRequest request) {
         return ask(request.getQuestion(), normalizeTopK(request.getTopK()), request.getNovel(), request.getVersion());
+    }
+
+    @Override
+    public RagDebugResponse preview(RagRequest request) {
+        return preview(request.getQuestion(), normalizeTopK(request.getTopK()), request.getNovel(), request.getVersion());
     }
 
     /**
@@ -64,7 +64,7 @@ public class RagService {
      * @param version  版本 (可选)
      * @return 调试信息
      */
-    public RagDebugResponse preview(String question, int topK, String novel, String version) {
+    private RagDebugResponse preview(String question, int topK, String novel, String version) {
         long startTime = System.currentTimeMillis();
         StopWatch stopWatch = new StopWatch("RAG Debug");
         Map<String, Object> stats = new HashMap<>();
@@ -81,8 +81,7 @@ public class RagService {
         try {
             // 1. 检索 (Retrieval)
             stopWatch.start("1. Retrieval");
-            AppConfig.RagConfig ragConfig = appConfig.getRag();
-            int actualTopK = topK > 0 ? topK : ragConfig.getDefaultTopK();
+            int actualTopK = topK > 0 ? topK : ragProperties.getDefaultTopK();
 
             // Normalize novel ID
             String novelId = novel;
@@ -112,10 +111,10 @@ public class RagService {
 
             // 3. 构建 Prompt
             Prompt prompt = Prompt.builder()
-                    .systemInstruction(ragConfig.getSystemInstruction())
+                    .systemInstruction(ragProperties.getSystemInstruction())
                     .userQuestion(question)
                     .contextBlocks(contextBlocks)
-                    .outputConstraint(ragConfig.getOutputConstraint())
+                    .outputConstraint(ragProperties.getOutputConstraint())
                     .build();
 
             stats.put("totalTimeMs", System.currentTimeMillis() - startTime);
@@ -133,19 +132,7 @@ public class RagService {
         }
     }
 
-    public RagDebugResponse preview(RagRequest request) {
-        return preview(request.getQuestion(), normalizeTopK(request.getTopK()), request.getNovel(), request.getVersion());
-    }
-
-    /**
-     * 提出问题并获取回答
-     *
-     * @param question 用户问题
-     * @param topK     检索数量
-     * @param novel    小说名称 (可选)
-     * @param version  版本 (可选)
-     * @return 结构化的回答
-     */
+    @Override
     public Answer ask(String question, int topK, String novel, String version) {
         long startTime = System.currentTimeMillis();
         StopWatch stopWatch = new StopWatch("RAG Request");
@@ -166,8 +153,7 @@ public class RagService {
         try {
             // 1. 检索 (Retrieval)
             stopWatch.start("1. Retrieval");
-            AppConfig.RagConfig ragConfig = appConfig.getRag();
-            int actualTopK = topK > 0 ? topK : ragConfig.getDefaultTopK();
+            int actualTopK = topK > 0 ? topK : ragProperties.getDefaultTopK();
             
             // Normalize novel ID: remove .txt extension to match ingestion convention
             String novelId = novel;
@@ -194,10 +180,10 @@ public class RagService {
 
             // 3. 构建 Prompt
             Prompt prompt = Prompt.builder()
-                    .systemInstruction(ragConfig.getSystemInstruction())
+                    .systemInstruction(ragProperties.getSystemInstruction())
                     .userQuestion(question)
                     .contextBlocks(contextBlocks)
-                    .outputConstraint(ragConfig.getOutputConstraint())
+                    .outputConstraint(ragProperties.getOutputConstraint())
                     .build();
 
             // 4. LLM 生成 (Generation)
@@ -266,9 +252,8 @@ public class RagService {
         if (topK > 0) {
             return topK;
         }
-        AppConfig.RagConfig ragConfig = appConfig.getRag();
-        if (ragConfig != null && ragConfig.getDefaultTopK() > 0) {
-            return ragConfig.getDefaultTopK();
+        if (ragProperties != null && ragProperties.getDefaultTopK() > 0) {
+            return ragProperties.getDefaultTopK();
         }
         return 3;
     }

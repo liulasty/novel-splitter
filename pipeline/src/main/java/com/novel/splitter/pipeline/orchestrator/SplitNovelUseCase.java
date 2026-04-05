@@ -1,6 +1,6 @@
-package com.novel.splitter.application.usecase.ingestion;
+package com.novel.splitter.pipeline.orchestrator;
 
-import com.novel.splitter.application.service.etl.NovelCacheService;
+import com.novel.splitter.pipeline.etl.NovelCacheService;
 import com.novel.splitter.core.SceneAssembler;
 import com.novel.splitter.domain.model.Chapter;
 import com.novel.splitter.domain.model.ChapterData;

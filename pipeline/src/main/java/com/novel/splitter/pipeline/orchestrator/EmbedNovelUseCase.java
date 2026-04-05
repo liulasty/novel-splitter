@@ -1,4 +1,4 @@
-package com.novel.splitter.application.usecase.ingestion;
+package com.novel.splitter.pipeline.orchestrator;
 
 import com.novel.splitter.domain.model.Scene;
 import com.novel.splitter.domain.strategy.ChunkingStrategy;

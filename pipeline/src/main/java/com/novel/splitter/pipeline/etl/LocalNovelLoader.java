@@ -1,4 +1,4 @@
-package com.novel.splitter.application.service.etl;
+package com.novel.splitter.pipeline.etl;
 
 import com.novel.splitter.domain.model.Chapter;
 import com.novel.splitter.domain.model.Novel;
