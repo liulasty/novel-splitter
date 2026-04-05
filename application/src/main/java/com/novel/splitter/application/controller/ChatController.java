@@ -1,6 +1,6 @@
 package com.novel.splitter.application.controller;
 
-import com.novel.splitter.application.service.rag.RagService;
+import com.novel.splitter.retrieval.api.RagFacade;
 import com.novel.splitter.domain.model.Answer;
 import com.novel.splitter.domain.model.dto.ChatRequest;
 import jakarta.validation.Valid;
@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.*;
 @Slf4j
 public class ChatController {
 
-    private final RagService ragService;
+    private final RagFacade ragService;
 
     /**
      * 发送聊天请求

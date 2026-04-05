@@ -1,6 +1,6 @@
 package com.novel.splitter.application.controller;
 
-import com.novel.splitter.application.service.rag.RagService;
+import com.novel.splitter.retrieval.api.RagFacade;
 import com.novel.splitter.domain.model.Answer;
 import com.novel.splitter.domain.model.dto.RagDebugResponse;
 import com.novel.splitter.domain.model.dto.RagRequest;
@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class RagController {
 
-    private final RagService ragService;
+    private final RagFacade ragService;
 
     /**
      * RAG 问答接口

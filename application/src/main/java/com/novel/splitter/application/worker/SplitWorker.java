@@ -4,8 +4,8 @@ import com.novel.splitter.application.config.RabbitConfig;
 import com.novel.splitter.domain.task.SplitTask;
 import com.novel.splitter.domain.task.SplitTaskMessage;
 import com.novel.splitter.domain.task.EmbedTaskMessage;
-import com.novel.splitter.application.service.etl.NovelCacheService;
-import com.novel.splitter.application.service.etl.NovelIngestionService;
+import com.novel.splitter.pipeline.etl.NovelCacheService;
+import com.novel.splitter.pipeline.orchestrator.SplitNovelUseCase;
 import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.domain.model.Novel;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +22,7 @@ import java.util.List;
 @Slf4j
 public class SplitWorker {
 
-    private final NovelIngestionService ingestionService;
+    private final SplitNovelUseCase splitNovelUseCase;
     private final TaskService taskService;
     private final NovelCacheService novelCacheService;
     private final RabbitTemplate rabbitTemplate;
@@ -44,7 +44,7 @@ public class SplitWorker {
 
             Novel novel = novelCacheService.load(taskId);
             
-            List<Long> sceneIds = ingestionService.splitPhase(taskId, novel, task.getMaxScenes(), task.getVersion(), (progress, info) -> {
+            List<Long> sceneIds = splitNovelUseCase.split(taskId, novel, task.getMaxScenes(), task.getVersion(), (progress, info) -> {
                 taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, progress, info);
             });
             

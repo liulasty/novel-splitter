@@ -3,7 +3,7 @@ package com.novel.splitter.application.worker;
 import com.novel.splitter.application.config.RabbitConfig;
 import com.novel.splitter.domain.task.SplitTask;
 import com.novel.splitter.domain.task.EmbedTaskMessage;
-import com.novel.splitter.application.service.etl.NovelIngestionService;
+import com.novel.splitter.pipeline.orchestrator.EmbedNovelUseCase;
 import com.novel.splitter.application.service.task.TaskService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class EmbedWorker {
 
-    private final NovelIngestionService ingestionService;
+    private final EmbedNovelUseCase embedNovelUseCase;
     private final TaskService taskService;
 
     @RabbitListener(queues = RabbitConfig.EMBED_TASK_QUEUE)
@@ -34,7 +34,7 @@ public class EmbedWorker {
                 return;
             }
 
-            ingestionService.embedPhaseBatch(message.getSceneIds());
+            embedNovelUseCase.embedBatch(message.getSceneIds());
 
             // 更新进度
             int completed = task.getCompletedScenes().addAndGet(message.getSceneIds().size());

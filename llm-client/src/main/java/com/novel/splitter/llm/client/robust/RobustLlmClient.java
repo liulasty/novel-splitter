@@ -1,4 +1,4 @@
-package com.novel.splitter.application.service.rag;
+package com.novel.splitter.llm.client.robust;
 
 import com.novel.splitter.domain.model.Answer;
 import com.novel.splitter.domain.model.Prompt;
