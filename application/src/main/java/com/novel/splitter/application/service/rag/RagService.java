@@ -4,13 +4,16 @@ import com.novel.splitter.application.config.AppConfig;
 import com.novel.splitter.assembler.api.ContextAssembler;
 import com.novel.splitter.assembler.config.AssemblerConfig;
 import com.novel.splitter.domain.model.Answer;
+import com.novel.splitter.domain.model.AnswerType;
 import com.novel.splitter.domain.model.ContextBlock;
 import com.novel.splitter.domain.model.Prompt;
 import com.novel.splitter.domain.model.Scene;
 import com.novel.splitter.domain.model.dto.RagDebugResponse;
 import com.novel.splitter.domain.model.dto.RagRequest;
 import com.novel.splitter.domain.model.dto.RetrievalQuery;
+import com.novel.splitter.retrieval.api.AnswerPolicyClassifier;
 import com.novel.splitter.retrieval.api.RetrievalService;
+import com.novel.splitter.retrieval.impl.RetrievalQueryBuilder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -38,6 +41,8 @@ public class RagService {
     private final ContextAssembler contextAssembler;
     private final AppConfig appConfig;
     private final AssemblerConfig assemblerConfig;
+    private final AnswerPolicyClassifier policyClassifier;
+    private final RetrievalQueryBuilder queryBuilder;
 
     /**
      * 提出问题并获取回答 (兼容旧接口)
@@ -64,6 +69,15 @@ public class RagService {
         StopWatch stopWatch = new StopWatch("RAG Debug");
         Map<String, Object> stats = new HashMap<>();
 
+        // 0. 前置意图拦截
+        AnswerType answerType = policyClassifier.classify(question);
+        if (answerType == AnswerType.UNSUPPORTED) {
+            log.info("Preview blocked by policy classifier: {}", question);
+            return RagDebugResponse.builder()
+                    .stats(Map.of("error", "问题不受支持：作为一个小说阅读助手，我只能回答与小说内容相关的问题。"))
+                    .build();
+        }
+
         try {
             // 1. 检索 (Retrieval)
             stopWatch.start("1. Retrieval");
@@ -76,12 +90,13 @@ public class RagService {
                 novelId = novel.replace(".txt", "");
             }
 
-            RetrievalQuery query = RetrievalQuery.builder()
-                    .question(question)
-                    .topK(actualTopK)
-                    .novel(novelId)
-                    .version(version)
-                    .build();
+            // 使用 QueryBuilder 增强查询
+            int currentChapter = -1; // 暂无当前阅读章节信息
+            RetrievalQuery query = queryBuilder.build(question, currentChapter);
+            query.setTopK(actualTopK);
+            query.setNovel(novelId);
+            query.setVersion(version);
+
             List<Scene> scenes = retrievalService.retrieve(query);
             stopWatch.stop();
             stats.put("retrievalTimeMs", stopWatch.getLastTaskTimeMillis());
@@ -137,6 +152,17 @@ public class RagService {
         
         log.info("Processing RAG request: query='{}', topK={}, novel={}, version={}", question, topK, novel, version);
 
+        // 0. 前置意图拦截
+        AnswerType answerType = policyClassifier.classify(question);
+        if (answerType == AnswerType.UNSUPPORTED) {
+            log.info("Question blocked by policy classifier: {}", question);
+            return Answer.builder()
+                    .answer("作为一个小说阅读助手，我只能回答与小说内容相关的问题哦。")
+                    .citations(Collections.emptyList())
+                    .confidence(1.0)
+                    .build();
+        }
+
         try {
             // 1. 检索 (Retrieval)
             stopWatch.start("1. Retrieval");
@@ -149,12 +175,13 @@ public class RagService {
                 novelId = novel.replace(".txt", "");
             }
 
-            RetrievalQuery query = RetrievalQuery.builder()
-                    .question(question)
-                    .topK(actualTopK)
-                    .novel(novelId)
-                    .version(version)
-                    .build();
+            // 使用 QueryBuilder 增强查询
+            int currentChapter = -1; // 暂无当前阅读章节信息
+            RetrievalQuery query = queryBuilder.build(question, currentChapter);
+            query.setTopK(actualTopK);
+            query.setNovel(novelId);
+            query.setVersion(version);
+
             List<Scene> scenes = retrievalService.retrieve(query);
             stopWatch.stop();
             log.info("Retrieved {} scenes", scenes.size());
