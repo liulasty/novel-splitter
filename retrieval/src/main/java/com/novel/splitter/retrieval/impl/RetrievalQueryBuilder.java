@@ -13,51 +13,53 @@ import org.springframework.stereotype.Component;
 @Component
 public class RetrievalQueryBuilder {
 
+    private static final String LAST_CHAPTER = "上一章";
+    private static final String CURRENT_CHAPTER = "这一章";
+    private static final String DIALOGUE_INTENT = "他说了什么";
+
     /**
-     * 构建查询对象
-     *
-     * @param question       用户自然语言问题
-     * @param currentChapter 当前阅读的章节号
-     * @return 结构化的 RetrievalQuery
+     * 构建查询对象（增强健壮性 + 语义清晰）
      */
     public RetrievalQuery build(String question, int currentChapter) {
-        if (question == null) {
-            throw new IllegalArgumentException("Question cannot be null");
+        if (question == null || question.isBlank()) {
+            throw new IllegalArgumentException("Question cannot be null or blank");
         }
 
         RetrievalQuery.RetrievalQueryBuilder builder = RetrievalQuery.builder()
-                .question(question);
+                .question(question.trim());
 
-        // 1. 解析章节范围 (Chapter Range)
         parseChapterRange(builder, question, currentChapter);
-
-        // 2. 解析角色/功能 (Role)
         parseRole(builder, question);
 
         return builder.build();
     }
 
-    private void parseChapterRange(RetrievalQuery.RetrievalQueryBuilder builder, String question, int currentChapter) {
-        if (question.contains("上一章")) {
-            // “上一章” → chapterFrom = current - 1
-            // 注意：如果当前是第1章，上一章可能是0或者无，这里简单处理为 current - 1
-            int target = Math.max(0, currentChapter - 1);
+    private void parseChapterRange(RetrievalQuery.RetrievalQueryBuilder builder,
+                                   String question,
+                                   int currentChapter) {
+        if (currentChapter <= 0) {
+            builder.chapterFrom(null);
+            builder.chapterTo(null);
+            return;
+        }
+
+        if (question.contains(LAST_CHAPTER)) {
+            int target = Math.max(1, currentChapter - 1);
             builder.chapterFrom(target);
-            builder.chapterTo(target); // 通常指“那一章”，所以是点查
-        } else if (question.contains("这一章")) {
-            // “这一章” → chapterFrom = chapterTo = current
+            builder.chapterTo(target);
+        }
+        else if (question.contains(CURRENT_CHAPTER)) {
             builder.chapterFrom(currentChapter);
             builder.chapterTo(currentChapter);
-        } else {
-            // 无法确定范围时，必须显式设置为 null
+        }
+        else {
             builder.chapterFrom(null);
             builder.chapterTo(null);
         }
     }
 
     private void parseRole(RetrievalQuery.RetrievalQueryBuilder builder, String question) {
-        if (question.contains("他说了什么")) {
-            // “他说了什么” → role = dialogue
+        if (question.contains(DIALOGUE_INTENT)) {
             builder.role("dialogue");
         } else {
             builder.role(null);
