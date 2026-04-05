@@ -1,0 +1,1818 @@
+diff --git a/application/src/main/java/com/novel/splitter/application/common/AuthInterceptor.java b/application/src/main/java/com/novel/splitter/application/common/AuthInterceptor.java
+index 97fb05c..5ea9b84 100644
+--- a/application/src/main/java/com/novel/splitter/application/common/AuthInterceptor.java
++++ b/application/src/main/java/com/novel/splitter/application/common/AuthInterceptor.java
+@@ -35,9 +35,10 @@ public class AuthInterceptor implements HandlerInterceptor {
+             return true;
+         }
+ 
+-        // 如果未配置 Token，则默认放行（或者根据安全需求默认拦截，这里根据题意简单鉴权）
++        // 如果未配置 Token，拒绝访问，防止未配置导致的鉴权绕过（Fail-Closed）
+         if (!StringUtils.hasText(authToken)) {
+-            return true;
++            log.error("系统未配置鉴权 Token (api.auth.token)，拒绝所有 API 访问。请检查 application.yml 或环境变量配置。");
++            return rejectRequest(request, response, "系统配置错误：未配置鉴权 Token");
+         }
+ 
+         String authHeader = request.getHeader("Authorization");
+@@ -48,18 +49,22 @@ public class AuthInterceptor implements HandlerInterceptor {
+             }
+         }
+ 
++        return rejectRequest(request, response, "未授权访问：无效的 Token");
++    }
++
++    private boolean rejectRequest(HttpServletRequest request, HttpServletResponse response, String message) throws Exception {
+         log.warn("API 访问鉴权失败，来源 IP: {}, 请求路径: {}", request.getRemoteAddr(), request.getRequestURI());
+ 
+         // 返回 401 统一响应结构
+         response.setStatus(HttpStatus.UNAUTHORIZED.value());
+         response.setContentType("application/json;charset=UTF-8");
+-        ApiResponse<Void> apiResponse = ApiResponse.error(HttpStatus.UNAUTHORIZED.value(), "未授权访问：无效的 Token");
+-        
++        ApiResponse<Void> apiResponse = ApiResponse.error(HttpStatus.UNAUTHORIZED.value(), message);
++
+         try (PrintWriter writer = response.getWriter()) {
+             writer.write(objectMapper.writeValueAsString(apiResponse));
+             writer.flush();
+         }
+-        
++
+         return false;
+     }
+ }
+diff --git a/docs/plan/engineering-analysis-report.md b/docs/plan/engineering-analysis-report.md
+new file mode 100644
+index 0000000..87088a2
+--- /dev/null
++++ b/docs/plan/engineering-analysis-report.md
+@@ -0,0 +1,117 @@
++这是一份基于提供的 Spring Boot + React 项目（代码库实际为 React，非你提示中提到的 Vue）生成的系统级工程分析报告。分析结论全部基于仓库中的实际代码结构、依赖配置以及文件内容推导。
++
++## 1. 项目整体架构分析
++- **架构模式**：采用 **前后端分离** + **模块化单体架构 (Modular Monolith)**。系统在单个 Spring Boot 进程中运行，但通过 RabbitMQ（如 `LoadWorker`, `SplitWorker` 等）实现了离线耗时任务的异步解耦。
++- **分层设计**：后端使用了极具 **DDD（领域驱动设计）** 和 Clean Architecture 风格的分层。包含 `domain`、`repository`、`application`、`infrastructure` 等 12 个 Maven 子模块。`Controller -> Service -> Repository` 分层非常清晰。
++- **模块边界是否合理**：合理且清晰。例如 `TaskRepository` 作为防腐层，将 `JpaSplitTaskEntity` (持久化对象) 转换为 `SplitTask` (领域对象)，隔离了基础设施与核心业务逻辑。
++- **是否存在“伪分层”或“上帝类”**：`NovelIngestionService` 存在轻微的“上帝类”倾向。它揉杂了本地文件加载、切分器实例化（`SceneAssembler`）、任务状态维护以及 RabbitMQ 消息发送的编排工作，职责略重。
++
++## 2. Spring Boot 后端分析
++- **技术栈识别**：Spring Boot 3.2.1, Java 21, PostgreSQL (JPA/Hibernate), RabbitMQ, ChromaDB, 混合大模型 SDK（集成 DeepSeek / Coze / Ollama / Gemini）。
++- **依赖合理性**：依赖管理非常规范（使用父 `pom.xml` 的 `<dependencyManagement>` 统一管理版本），且没有发现明显的过时依赖。使用了 `picocli` 支持脚本执行，设计精巧。
++- **配置结构**：`application.yml` 规范严谨，充分利用了环境变量占位符（如 `${DB_HOST:localhost}`），具备极好的容器化部署（Docker/K8s）适配能力。
++- **事务管理、异常处理**：
++  - 异常处理很完善，通过 `@RestControllerAdvice` (`GlobalExceptionHandler`) 捕获并封装为统一的 `ApiResponse.error()`。
++  - 事务管理基本达标，在 `TaskService` 等层使用了 `@Transactional`，但在跨数据源（PostgreSQL 与 ChromaDB 向量库）的操作上，缺乏分布式事务一致性保障。
++- **是否存在典型反模式**：
++  - **无 Mapper 直出逻辑**：Repository 封装良好。
++  - **弱鉴权反模式**：安全拦截器存在严重的实现缺陷（详见安全性分析）。
++
++## 3. 前端分析（纠正：实际为 React 项目）
++> **缺失信息/纠正**：需求中要求分析 Vue，但分析 `novel-splitter-web/package.json` 发现，这是一个基于 **React 19 + Vite + TypeScript** 的项目。以下基于实际代码分析。
++- **技术栈**：React 19, Vite, Zustand 5 (状态管理), React Router 7, TailwindCSS 4, React Query 5, Axios。
++- **状态管理**：使用了 `Zustand` (`useAppStore.ts`) 作为轻量全局状态，但代码库中实际更多依赖了 `React Query` 处理服务端数据缓存。
++- **路由设计**：使用 `react-router-dom` 实现了 `createBrowserRouter`，结构清晰。但**缺失路由守卫**，没有对 `/system` 或 `/chroma-admin` 等敏感页面做强制前端拦截。
++- **API 调用封装是否规范**：**不规范，存在严重缺陷**。`client.ts` 很好地封装了拦截器并注入了 `localStorage` 的 Token，但 `ragApi.ts` 中却独立 `axios.create({ baseURL: '/api/v1' })`，导致 RAG 请求丢失了 Token 注入逻辑和全局错误捕获机制。
++- **组件拆分是否合理**：**存在严重“巨型组件”反模式**。`src/pages/` 下的文件过大，如 `ChatPage.tsx` (16KB)、`SystemPage.tsx` (14KB)，UI 渲染、状态绑定和 API 调用严重耦合，缺乏合理的 Hooks 和功能组件拆分。
++
++## 4. 前后端交互设计
++- **API 设计风格**：标准 RESTful 风格，如 `POST /api/v1/rag`（提问）和 `GET /api/tasks/{taskId}`（任务查询）。
++- **DTO / VO 是否规范**：非常规范。后端通过 `RagRequest` 等 DTO 接收数据，配合 `@Valid` 校验；响应被全局封装在 `ApiResponse<T>` 中。前端的 `types/api.ts` 与之严格对应。
++- **错误码体系是否统一**：统一了 JSON 结构，但**缺乏业务错误码枚举**。强依赖 HTTP 状态码（如 400、401、500）与字符串 `message`，不利于前端做精细化多语言或错误跳转处理。
++- **鉴权方式**：极简静态 Token 鉴权。Header 携带 `Authorization: Bearer <Token>`，与 `application.yml` 中的静态配置比对，并非 JWT 或 Session。
++
++## 5. 数据流 & 关键链路分析（重点）
++**完整调用链推导：RAG 对话链路**
++1. **前端页面**：`ChatPage.tsx` 获取用户输入，调用 `ragApi.debug()` 或对应方法。
++2. **API**：发起 HTTP POST 请求到后端 `/api/v1/rag`。
++3. **Controller**：`RagController.ask()` 接收请求，通过 `@Valid` 校验参数。
++4. **Service**：`RagService.ask()` 协调全流程：
++   - 拦截：`AnswerPolicyClassifier.classify` 前置拦截非小说意图问题。
++   - 查询组装：`RetrievalQueryBuilder` 构造结构化检索条件。
++   - 向量检索：调用 `RetrievalService` 查 ChromaDB。
++   - 上下文组装：`ContextAssembler` 将匹配的 Scene 组装为 Prompt。
++   - LLM调用：`RobustLlmClient` 请求配置的大模型。
++5. **返回**：将大模型生成的 `Answer` 同步返回给前端渲染。
++
++- **耦合点**：检索（Chroma）、数据库（Postgres）与大模型推理逻辑强耦合在一个同步方法中。
++- **潜在性能瓶颈（致命）**：`RagService` 中的检索与 LLM 调用是**纯同步阻塞调用**。由于 LLM（特别是本地 Ollama）生成时间通常长达几秒到几十秒，这将瞬间耗尽 Tomcat 线程池。
++- **可优化点**：必须将该接口重构为流式响应（Server-Sent Events, SSE），目前代码库中虽然有 `TaskSseService` 证明系统有 SSE 能力，但 RAG 链路尚未使用。
++
++## 6. 性能与扩展性分析
++- **是否支持高并发**：**不支持**。除了 RAG 接口的同步阻塞外，配置中 `Ollama` 占用了 `num_threads: 16`，单机显存和 CPU 会被单个请求跑满，无法处理并发。
++- **是否存在明显瓶颈**：
++  - **阻塞调用**：与外部 LLM / Chroma 数据库的网络 I/O 是最大的阻塞点。
++  - **大事务风险**：虽然切分入库使用了 RabbitMQ 解耦，但 `LoadWorker` 加载大体积 txt 文件时可能导致 OOM。
++- **水平扩展能力**：异步入库系统（基于 RabbitMQ 的 Worker 群）具备极好的水平伸缩（Scale-out）能力，可通过增加消费者节点提升小说入库速度。
++
++## 7. 安全性分析
++- **SQL 注入**：安全。全部使用 Spring Data JPA/Hibernate，自动参数化查询，无拼接 SQL 风险。
++- **鉴权是否存在绕过风险（严重漏洞）**：
++  查看 `AuthInterceptor.java` 源码发现典型的 **Fail-Open（失效即开放）** 漏洞：
++  ```java
++  if (!StringUtils.hasText(authToken)) {
++      return true; // 严重：如果配置漏写，直接全站裸奔！
++  }
++  ```
++  如果生产环境的 `${API_AUTH_TOKEN}` 环境变量未注入，整个 API 将对公网完全开放。
++- **敏感信息泄露**：`application.yml` 中集中存放了各类大模型（Coze/DeepSeek/Gemini）的 API Key 配置，存在代码库泄露导致的资损风险（建议强制依赖云端 Secret Manager）。
++
++## 8. 工程质量评估
++- **代码规范**：后端极为优秀，接口清晰，应用了防腐层和设计模式；前端规范较差，页面逻辑臃肿。
++- **可维护性**：后端 Maven 模块化降低了耦合，可维护性极高。前端需要重构。
++- **可测试性**：后端使用 Lombok `@RequiredArgsConstructor` 实现依赖注入，非常易于编写 Mock 单元测试。前端因 UI 和请求强耦合，难以单测。
++- **CI/CD 友好性**：非常友好。根目录下配备了完备的 `Dockerfile` 和各类 `docker-compose` 文件，随时可接入 Jenkins / GitHub Actions。
++
++---
++
++## 9. 问题清单（按严重程度排序）
++
++**[严重] AuthInterceptor 存在 Fail-Open 鉴权绕过漏洞**
++- **影响**：生产环境若遗漏环境变量配置，后台所有接口（包含 Chroma Admin 和小说入库）将完全对外暴露。
++- **原因**：拦截器中判断 `!StringUtils.hasText(authToken)` 时直接返回了 `true`。
++- **修改建议**：修改为白名单机制，如果 `authToken` 为空，应直接抛出系统配置异常或返回 401 拦截。
++
++**[严重] 前端 `ragApi.ts` 未注入 Axios 拦截器**
++- **影响**：RAG 问答请求无法带上鉴权 Token，一旦后端修复了鉴权逻辑，聊天功能将永久 401 报错。
++- **原因**：`ragApi.ts` 自行 `axios.create()` 且未引入 `client.ts` 中的全局拦截器。
++- **修改建议**：将 `ragApi.ts` 中的请求改为直接从 `import { apiClient } from './client'` 引入并调用。
++
++**[高] RAG 问答链路为同步阻塞请求**
++- **影响**：极低的并发上限（QPS可能 < 5），且前端需要长时间 loading 等待（易触发网关超时）。
++- **原因**：`RagService.ask()` 等待 LLM 生成全部文本后才返回 `Answer` 对象。
++- **修改建议**：重构 `/api/v1/rag`，使用 Spring WebFlux 的 `SseEmitter` 或 `Flux<String>` 实现大模型的流式字级吐出（Streaming）。
++
++**[中] 前端存在巨型组件反模式**
++- **影响**：代码难以维护，二次开发极易引发回归 Bug。
++- **原因**：`ChatPage.tsx` 等页面将状态管理、网络请求、DOM 渲染混写在一起（代码 > 15KB）。
++- **修改建议**：抽取自定义 Hook（如 `useChatLogic.ts`）剥离业务状态，将 UI 拆分为 `MessageList`, `ChatInput` 等纯渲染组件。
++
++---
++
++## 10. 优化路线图（可执行改造计划）
++
++**阶段 1（1~3天）：高危修复与稳定性补丁**
++- [后端] 修复 `AuthInterceptor.java` 拦截逻辑，改为默认拒绝（Fail-Closed）。
++- [前端] 修复 `ragApi.ts`，统一使用 `client.ts` 进行请求，确保 Token 正常传递和错误统一拦截。
++- [前端] 增加 React Router 鉴权守卫，防止未输入 Token 的用户进入敏感后台页面。
++
++**阶段 2（1~2周）：核心体验与架构重构**
++- [后端] 引入 Spring WebFlux 或利用现有的 SSE 基础设施，将 `RagController` 的问答接口改造为流式输出。
++- [前端] 配合后端的 SSE 改造 `ChatPage.tsx`，实现类似 ChatGPT 的打字机渲染效果，并在此过程中重构、拆分该巨型组件。
++- [后端] 在 `application.yml` 引入更严谨的业务错误码体系（Enum），替代纯文本 message，方便前端处理异常逻辑。
++
++**阶段 3（架构升级）：安全与分布式演进**
++- [安全] 引入标准的 JWT 体系或 Spring Security，替代现有的静态 Token 鉴权，实现多用户隔离。
++- [数据] 针对 `NovelIngestionService` 中的入库流程，引入分布式事务最终一致性方案（如基于 RabbitMQ 的重试/死信队列和本地消息表），解决 DB 和 ChromaDB 的状态可能不一致问题。
++- [运维] 将 LLM Key 抽离至 Vault 等密钥管理系统，禁止通过默认 `application.yml` 硬编码兜底。
+\ No newline at end of file
+diff --git a/novel-splitter-web/src/api/ragApi.ts b/novel-splitter-web/src/api/ragApi.ts
+index 94f9d41..747f8e4 100644
+--- a/novel-splitter-web/src/api/ragApi.ts
++++ b/novel-splitter-web/src/api/ragApi.ts
+@@ -1,13 +1,9 @@
+-import axios from 'axios';
++import { apiClient } from './client';
+ import type { ChatRequest, RagDebugResponse } from '@/types/api';
+ 
+-const apiClient = axios.create({
+-  baseURL: '/api/v1',
+-});
+-
+ export const ragApi = {
+   debug: async (request: ChatRequest): Promise<RagDebugResponse> => {
+-    const response = await apiClient.post<RagDebugResponse>('/rag/debug', request);
++    const response = await apiClient.post<RagDebugResponse>('/v1/rag/debug', request);
+     return response.data;
+   },
+ };
+diff --git a/novel-splitter-web/src/pages/Chat/components/ChatInputArea.tsx b/novel-splitter-web/src/pages/Chat/components/ChatInputArea.tsx
+new file mode 100644
+index 0000000..776a170
+--- /dev/null
++++ b/novel-splitter-web/src/pages/Chat/components/ChatInputArea.tsx
+@@ -0,0 +1,36 @@
++import { Send, Loader2 } from "lucide-react";
++
++interface ChatInputAreaProps {
++    inputValue: string;
++    isPending: boolean;
++    disabled: boolean;
++    placeholder: string;
++    actions: {
++        setInputValue: (val: string) => void;
++        handleSend: () => void;
++        handleKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
++    };
++}
++
++export function ChatInputArea({ inputValue, isPending, disabled, placeholder, actions }: ChatInputAreaProps) {
++    return (
++        <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/50 flex gap-2 items-center">
++            <input
++                type="text"
++                placeholder={placeholder}
++                value={inputValue}
++                onChange={(e) => actions.setInputValue(e.target.value)}
++                onKeyDown={actions.handleKeyDown}
++                disabled={disabled}
++                className="flex-1 h-10 rounded-full border border-gray-200 bg-white px-4 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-400 disabled:opacity-50"
++            />
++            <button
++                onClick={actions.handleSend}
++                disabled={disabled || !inputValue.trim()}
++                className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-blue-500 hover:from-violet-600 hover:to-blue-600 text-white flex items-center justify-center transition-all disabled:opacity-40 disabled:pointer-events-none shadow-sm"
++            >
++                {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
++            </button>
++        </div>
++    );
++}
+\ No newline at end of file
+diff --git a/novel-splitter-web/src/pages/Chat/components/ChatSidebar.tsx b/novel-splitter-web/src/pages/Chat/components/ChatSidebar.tsx
+new file mode 100644
+index 0000000..376ce9b
+--- /dev/null
++++ b/novel-splitter-web/src/pages/Chat/components/ChatSidebar.tsx
+@@ -0,0 +1,76 @@
++interface ChatSidebarProps {
++    state: {
++        novels: string[] | undefined;
++        versions: string[] | undefined;
++        selectedNovel: string;
++        selectedVersion: string;
++        topK: number;
++    };
++    actions: {
++        setSelectedNovel: (val: string) => void;
++        setSelectedVersion: (val: string) => void;
++        setTopK: (val: number) => void;
++    };
++}
++
++export function ChatSidebar({ state, actions }: ChatSidebarProps) {
++    return (
++        <div className="flex flex-col gap-3">
++            <div className="rounded-2xl border border-gray-100 overflow-hidden shadow-sm bg-white">
++                {/* Card gradient header */}
++                <div className="px-4 py-3 bg-gradient-to-br from-violet-50 to-blue-50 border-b border-gray-100">
++                    <h3 className="text-sm font-semibold text-violet-800">会话设置</h3>
++                    <p className="text-xs text-violet-500 mt-0.5">选择小说版本与检索参数</p>
++                </div>
++                <div className="p-4 space-y-4">
++                    {/* Novel select */}
++                    <div className="space-y-1.5">
++                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">选择小说</label>
++                        <select
++                            className="w-full h-9 rounded-lg border border-gray-200 bg-gray-50 px-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-violet-400"
++                            value={state.selectedNovel}
++                            onChange={(e) => actions.setSelectedNovel(e.target.value)}
++                        >
++                            <option value="" disabled>-- 请选择 --</option>
++                            {Array.isArray(state.novels) && state.novels.map(n => <option key={n} value={n}>{n}</option>)}
++                        </select>
++                    </div>
++
++                    {/* Version select */}
++                    <div className="space-y-1.5">
++                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">版本号</label>
++                        <select
++                            className="w-full h-9 rounded-lg border border-gray-200 bg-gray-50 px-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-400 disabled:opacity-50"
++                            value={state.selectedVersion}
++                            onChange={(e) => actions.setSelectedVersion(e.target.value)}
++                            disabled={!state.selectedNovel || !state.versions?.length}
++                        >
++                            <option value="" disabled>-- 请选择 --</option>
++                            {Array.isArray(state.versions) && state.versions.map(v => <option key={v} value={v}>{v}</option>)}
++                        </select>
++                    </div>
++
++                    {/* TopK */}
++                    <div className="space-y-1.5">
++                        <div className="flex items-center justify-between">
++                            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">引用数量 TopK</label>
++                            <span className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-500 to-blue-500 text-white text-xs flex items-center justify-center font-semibold">
++                                {state.topK}
++                            </span>
++                        </div>
++                        <input
++                            type="range" min={1} max={10} value={state.topK}
++                            onChange={(e) => actions.setTopK(Number(e.target.value))}
++                            className="w-full accent-violet-500"
++                        />
++                    </div>
++                </div>
++                {/* Status bar */}
++                <div className="px-4 py-2 bg-teal-50 border-t border-teal-100 flex items-center gap-1.5">
++                    <span className="w-2 h-2 rounded-full bg-teal-500 animate-pulse" />
++                    <span className="text-xs text-teal-700">ChromaDB 已连接</span>
++                </div>
++            </div>
++        </div>
++    );
++}
+\ No newline at end of file
+diff --git a/novel-splitter-web/src/pages/Chat/components/CitationItem.tsx b/novel-splitter-web/src/pages/Chat/components/CitationItem.tsx
+new file mode 100644
+index 0000000..9ccc9d6
+--- /dev/null
++++ b/novel-splitter-web/src/pages/Chat/components/CitationItem.tsx
+@@ -0,0 +1,39 @@
++import { useState } from 'react';
++import { ChevronDown, ChevronUp } from "lucide-react";
++import { cn } from "@/lib/utils";
++import type { Citation } from "@/types/api";
++
++export function CitationItem({ citation, index }: { citation: Citation; index: number }) {
++    const [expanded, setExpanded] = useState(false);
++    const colors = [
++        { bg: 'bg-purple-50', border: 'border-purple-300', text: 'text-purple-800', score: 'text-purple-400' },
++        { bg: 'bg-teal-50',   border: 'border-teal-300',   text: 'text-teal-800',   score: 'text-teal-400'   },
++        { bg: 'bg-blue-50',   border: 'border-blue-300',   text: 'text-blue-800',   score: 'text-blue-400'   },
++    ];
++    const c = colors[index % colors.length];
++
++    return (
++        <div
++            className={cn(
++                "p-3 rounded-lg text-xs border-l-2 cursor-pointer transition-all",
++                c.bg, c.border, c.text
++            )}
++            onClick={() => setExpanded(!expanded)}
++        >
++            <div className="flex justify-between items-center mb-1">
++                <span className="font-semibold flex items-center gap-1">
++                    片段 #{index + 1}
++                    {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
++                </span>
++                {citation.score && (
++                    <span className={cn("font-mono text-[10px]", c.score)}>
++                        {citation.score.toFixed(4)}
++                    </span>
++                )}
++            </div>
++            <p className={cn("italic leading-relaxed whitespace-pre-wrap", expanded ? "" : "line-clamp-2")}>
++                {citation.content || "(无内容)"}
++            </p>
++        </div>
++    );
++}
+\ No newline at end of file
+diff --git a/novel-splitter-web/src/pages/Chat/components/MessageList.tsx b/novel-splitter-web/src/pages/Chat/components/MessageList.tsx
+new file mode 100644
+index 0000000..69bd9bc
+--- /dev/null
++++ b/novel-splitter-web/src/pages/Chat/components/MessageList.tsx
+@@ -0,0 +1,68 @@
++import { Bot, User, BookOpen, Loader2 } from "lucide-react";
++import { cn } from "@/lib/utils";
++import { CitationItem } from "./CitationItem";
++import type { Message } from "../hooks/useChatLogic";
++
++interface MessageListProps {
++    messages: Message[];
++    isPending: boolean;
++    bottomRef: React.RefObject<HTMLDivElement | null>;
++}
++
++export function MessageList({ messages, isPending, bottomRef }: MessageListProps) {
++    return (
++        <div className="flex-1 overflow-y-auto p-5 space-y-5">
++            {messages.map((msg) => (
++                <div key={msg.id} className={cn("flex gap-3", msg.role === 'user' ? "flex-row-reverse" : "flex-row")}>
++                    {/* Avatar */}
++                    <div className={cn(
++                        "w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-white",
++                        msg.role === 'user'
++                            ? "bg-gradient-to-br from-blue-500 to-teal-500"
++                            : "bg-gradient-to-br from-violet-500 to-purple-600"
++                    )}>
++                        {msg.role === 'user' ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
++                    </div>
++
++                    {/* Bubble */}
++                    <div className={cn(
++                        "max-w-[78%] px-4 py-3 rounded-2xl text-sm leading-relaxed shadow-sm",
++                        msg.role === 'user'
++                            ? "bg-gradient-to-br from-blue-500 to-violet-500 text-white rounded-tr-sm"
++                            : "bg-gray-50 border border-gray-100 text-gray-800 rounded-tl-sm"
++                    )}>
++                        <p className="whitespace-pre-wrap">{msg.content}</p>
++
++                        {/* Citations */}
++                        {msg.citations && msg.citations.length > 0 && (
++                            <div className="mt-3 pt-3 border-t border-gray-200/60">
++                                <p className="text-xs font-semibold mb-2 flex items-center gap-1 text-gray-500">
++                                    <BookOpen className="w-3 h-3" /> 参考片段
++                                </p>
++                                <div className="space-y-2">
++                                    {msg.citations.map((cit, idx) => (
++                                        <CitationItem key={idx} citation={cit} index={idx} />
++                                    ))}
++                                </div>
++                            </div>
++                        )}
++                    </div>
++                </div>
++            ))}
++
++            {/* Thinking indicator */}
++            {isPending && (
++                <div className="flex gap-3">
++                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
++                        <Bot className="w-4 h-4 text-white" />
++                    </div>
++                    <div className="px-4 py-3 rounded-2xl rounded-tl-sm bg-gray-50 border border-gray-100 flex items-center gap-2">
++                        <Loader2 className="w-3.5 h-3.5 animate-spin text-violet-500" />
++                        <span className="text-xs text-gray-500">正在思考...</span>
++                    </div>
++                </div>
++            )}
++            <div ref={bottomRef} />
++        </div>
++    );
++}
+\ No newline at end of file
+diff --git a/novel-splitter-web/src/pages/Chat/hooks/useChatLogic.ts b/novel-splitter-web/src/pages/Chat/hooks/useChatLogic.ts
+new file mode 100644
+index 0000000..c39b58c
+--- /dev/null
++++ b/novel-splitter-web/src/pages/Chat/hooks/useChatLogic.ts
+@@ -0,0 +1,87 @@
++import { useState, useRef, useEffect } from 'react';
++import { useQuery, useMutation } from '@tanstack/react-query';
++import { novelApi } from "@/api/novelApi";
++import { knowledgeApi } from "@/api/knowledgeApi";
++import { chatApi } from "@/api/chatApi";
++import type { Citation } from "@/types/api";
++
++export interface Message {
++    id: string;
++    role: 'user' | 'assistant';
++    content: string;
++    citations?: Citation[];
++}
++
++export function useChatLogic() {
++    const [selectedNovel, setSelectedNovel] = useState<string>("");
++    const [selectedVersion, setSelectedVersion] = useState<string>("");
++    const [topK, setTopK] = useState<number>(3);
++    const [inputValue, setInputValue] = useState("");
++    const [messages, setMessages] = useState<Message[]>([{
++        id: 'welcome',
++        role: 'assistant',
++        content: '你好！我是 Novel Splitter 助手。请先在左侧选择一本小说，我将根据原文内容为你精准回答问题。',
++    }]);
++
++    const messagesEndRef = useRef<HTMLDivElement>(null);
++
++    const { data: novels } = useQuery({ queryKey: ['novels'], queryFn: novelApi.getNovels });
++    const { data: versions } = useQuery({
++        queryKey: ['versions', selectedNovel],
++        queryFn: () => knowledgeApi.getVersions(selectedNovel),
++        enabled: !!selectedNovel,
++    });
++
++    useEffect(() => {
++        if (novels?.length && !selectedNovel) setSelectedNovel(novels[0]);
++    }, [novels, selectedNovel]);
++
++    useEffect(() => {
++        if (versions?.length) setSelectedVersion(versions[versions.length - 1]);
++        else setSelectedVersion("");
++    }, [versions]);
++
++    useEffect(() => {
++        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
++    }, [messages]);
++
++    const chatMutation = useMutation({
++        mutationFn: chatApi.sendMessage,
++        onSuccess: (data) => {
++            setMessages(prev => [...prev, {
++                id: Date.now().toString(),
++                role: 'assistant',
++                content: data.answer,
++                citations: data.citations,
++            }]);
++        },
++        onError: (error) => {
++            setMessages(prev => [...prev, {
++                id: Date.now().toString(),
++                role: 'assistant',
++                content: `请求出错：${error}`,
++            }]);
++        },
++    });
++
++    const handleSend = () => {
++        if (!inputValue.trim() || !selectedNovel || !selectedVersion) return;
++        setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', content: inputValue }]);
++        const q = inputValue;
++        setInputValue("");
++        chatMutation.mutate({ question: q, novel: selectedNovel, version: selectedVersion, topK });
++    };
++
++    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
++        if (e.key === 'Enter' && !e.shiftKey) { 
++            e.preventDefault(); 
++            handleSend(); 
++        }
++    };
++
++    return {
++        state: { selectedNovel, selectedVersion, topK, inputValue, messages, novels, versions, isPending: chatMutation.isPending },
++        refs: { messagesEndRef },
++        actions: { setSelectedNovel, setSelectedVersion, setTopK, setInputValue, handleSend, handleKeyDown }
++    };
++}
+\ No newline at end of file
+diff --git a/novel-splitter-web/src/pages/ChatPage.tsx b/novel-splitter-web/src/pages/ChatPage.tsx
+index a5c60d3..e722a3c 100644
+--- a/novel-splitter-web/src/pages/ChatPage.tsx
++++ b/novel-splitter-web/src/pages/ChatPage.tsx
+@@ -1,117 +1,11 @@
+-import { useState, useRef, useEffect } from 'react';
+-import { useQuery, useMutation } from '@tanstack/react-query';
+-import { Loader2, Send, Bot, User, BookOpen, ChevronDown, ChevronUp, Sparkles, Database } from "lucide-react";
+-import { novelApi } from "@/api/novelApi";
+-import { knowledgeApi } from "@/api/knowledgeApi";
+-import { chatApi } from "@/api/chatApi";
+-import { cn } from "@/lib/utils";
+-import type { Citation } from "@/types/api";
+-
+-function CitationItem({ citation, index }: { citation: Citation; index: number }) {
+-    const [expanded, setExpanded] = useState(false);
+-    const colors = [
+-        { bg: 'bg-purple-50', border: 'border-purple-300', text: 'text-purple-800', score: 'text-purple-400' },
+-        { bg: 'bg-teal-50',   border: 'border-teal-300',   text: 'text-teal-800',   score: 'text-teal-400'   },
+-        { bg: 'bg-blue-50',   border: 'border-blue-300',   text: 'text-blue-800',   score: 'text-blue-400'   },
+-    ];
+-    const c = colors[index % colors.length];
+-
+-    return (
+-        <div
+-            className={cn(
+-                "p-3 rounded-lg text-xs border-l-2 cursor-pointer transition-all",
+-                c.bg, c.border, c.text
+-            )}
+-            onClick={() => setExpanded(!expanded)}
+-        >
+-            <div className="flex justify-between items-center mb-1">
+-        <span className="font-semibold flex items-center gap-1">
+-          片段 #{index + 1}
+-            {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+-        </span>
+-                {citation.score && (
+-                    <span className={cn("font-mono text-[10px]", c.score)}>
+-            {citation.score.toFixed(4)}
+-          </span>
+-                )}
+-            </div>
+-            <p className={cn("italic leading-relaxed whitespace-pre-wrap", expanded ? "" : "line-clamp-2")}>
+-                {citation.content || "(无内容)"}
+-            </p>
+-        </div>
+-    );
+-}
+-
+-interface Message {
+-    id: string;
+-    role: 'user' | 'assistant';
+-    content: string;
+-    citations?: Citation[];
+-}
++import { Bot, Sparkles, Database } from "lucide-react";
++import { useChatLogic } from "./Chat/hooks/useChatLogic";
++import { ChatSidebar } from "./Chat/components/ChatSidebar";
++import { MessageList } from "./Chat/components/MessageList";
++import { ChatInputArea } from "./Chat/components/ChatInputArea";
+ 
+ export default function ChatPage() {
+-    const [selectedNovel, setSelectedNovel]   = useState<string>("");
+-    const [selectedVersion, setSelectedVersion] = useState<string>("");
+-    const [topK, setTopK]       = useState<number>(3);
+-    const [inputValue, setInputValue] = useState("");
+-    const [messages, setMessages] = useState<Message[]>([{
+-        id: 'welcome',
+-        role: 'assistant',
+-        content: '你好！我是 Novel Splitter 助手。请先在左侧选择一本小说，我将根据原文内容为你精准回答问题。',
+-    }]);
+-
+-    const messagesEndRef = useRef<HTMLDivElement>(null);
+-
+-    const { data: novels } = useQuery({ queryKey: ['novels'], queryFn: novelApi.getNovels });
+-    const { data: versions } = useQuery({
+-        queryKey: ['versions', selectedNovel],
+-        queryFn: () => knowledgeApi.getVersions(selectedNovel),
+-        enabled: !!selectedNovel,
+-    });
+-
+-    useEffect(() => {
+-        if (novels?.length && !selectedNovel) setSelectedNovel(novels[0]);
+-    }, [novels]);
+-
+-    useEffect(() => {
+-        if (versions?.length) setSelectedVersion(versions[versions.length - 1]);
+-        else setSelectedVersion("");
+-    }, [versions]);
+-
+-    useEffect(() => {
+-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+-    }, [messages]);
+-
+-    const chatMutation = useMutation({
+-        mutationFn: chatApi.sendMessage,
+-        onSuccess: (data) => {
+-            setMessages(prev => [...prev, {
+-                id: Date.now().toString(),
+-                role: 'assistant',
+-                content: data.answer,
+-                citations: data.citations,
+-            }]);
+-        },
+-        onError: (error) => {
+-            setMessages(prev => [...prev, {
+-                id: Date.now().toString(),
+-                role: 'assistant',
+-                content: `请求出错：${error}`,
+-            }]);
+-        },
+-    });
+-
+-    const handleSend = () => {
+-        if (!inputValue.trim() || !selectedNovel || !selectedVersion) return;
+-        setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', content: inputValue }]);
+-        const q = inputValue;
+-        setInputValue("");
+-        chatMutation.mutate({ question: q, novel: selectedNovel, version: selectedVersion, topK });
+-    };
+-
+-    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+-        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+-    };
++    const { state, refs, actions } = useChatLogic();
+ 
+     return (
+         <div className="flex flex-col gap-4 h-full">
+@@ -121,75 +15,19 @@ export default function ChatPage() {
+                     RAG 智能问答
+                 </h1>
+                 <p className="text-sm text-gray-500 mt-1">
+-          <span className="inline-flex items-center gap-1 bg-violet-100 text-violet-700 text-xs font-medium px-2 py-0.5 rounded-full mr-1">
+-            <Database className="w-3 h-3" /> 向量检索
+-          </span>
++                    <span className="inline-flex items-center gap-1 bg-violet-100 text-violet-700 text-xs font-medium px-2 py-0.5 rounded-full mr-1">
++                        <Database className="w-3 h-3" /> 向量检索
++                    </span>
+                     <span className="inline-flex items-center gap-1 bg-teal-100 text-teal-700 text-xs font-medium px-2 py-0.5 rounded-full mr-1">
+-            <Sparkles className="w-3 h-3" /> ChromaDB
+-          </span>
++                        <Sparkles className="w-3 h-3" /> ChromaDB
++                    </span>
+                     基于知识库向量检索，结合大模型生成精准回答
+                 </p>
+             </div>
+ 
+             <div className="grid gap-4 md:grid-cols-[280px_1fr] flex-1 min-h-0">
+                 {/* Sidebar */}
+-                <div className="flex flex-col gap-3">
+-                    <div className="rounded-2xl border border-gray-100 overflow-hidden shadow-sm bg-white">
+-                        {/* Card gradient header */}
+-                        <div className="px-4 py-3 bg-gradient-to-br from-violet-50 to-blue-50 border-b border-gray-100">
+-                            <h3 className="text-sm font-semibold text-violet-800">会话设置</h3>
+-                            <p className="text-xs text-violet-500 mt-0.5">选择小说版本与检索参数</p>
+-                        </div>
+-                        <div className="p-4 space-y-4">
+-                            {/* Novel select */}
+-                            <div className="space-y-1.5">
+-                                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">选择小说</label>
+-                                <select
+-                                    className="w-full h-9 rounded-lg border border-gray-200 bg-gray-50 px-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-violet-400"
+-                                    value={selectedNovel}
+-                                    onChange={(e) => setSelectedNovel(e.target.value)}
+-                                >
+-                                    <option value="" disabled>-- 请选择 --</option>
+-                                    {Array.isArray(novels) && novels.map(n => <option key={n} value={n}>{n}</option>)}
+-                                </select>
+-                            </div>
+-
+-                            {/* Version select */}
+-                            <div className="space-y-1.5">
+-                                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">版本号</label>
+-                                <select
+-                                    className="w-full h-9 rounded-lg border border-gray-200 bg-gray-50 px-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-400 disabled:opacity-50"
+-                                    value={selectedVersion}
+-                                    onChange={(e) => setSelectedVersion(e.target.value)}
+-                                    disabled={!selectedNovel || !versions?.length}
+-                                >
+-                                    <option value="" disabled>-- 请选择 --</option>
+-                                    {Array.isArray(versions) && versions.map(v => <option key={v} value={v}>{v}</option>)}
+-                                </select>
+-                            </div>
+-
+-                            {/* TopK */}
+-                            <div className="space-y-1.5">
+-                                <div className="flex items-center justify-between">
+-                                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">引用数量 TopK</label>
+-                                    <span className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-500 to-blue-500 text-white text-xs flex items-center justify-center font-semibold">
+-                    {topK}
+-                  </span>
+-                                </div>
+-                                <input
+-                                    type="range" min={1} max={10} value={topK}
+-                                    onChange={(e) => setTopK(Number(e.target.value))}
+-                                    className="w-full accent-violet-500"
+-                                />
+-                            </div>
+-                        </div>
+-                        {/* Status bar */}
+-                        <div className="px-4 py-2 bg-teal-50 border-t border-teal-100 flex items-center gap-1.5">
+-                            <span className="w-2 h-2 rounded-full bg-teal-500 animate-pulse" />
+-                            <span className="text-xs text-teal-700">ChromaDB 已连接</span>
+-                        </div>
+-                    </div>
+-                </div>
++                <ChatSidebar state={state} actions={actions} />
+ 
+                 {/* Chat panel */}
+                 <div className="flex flex-col rounded-2xl border border-gray-100 shadow-sm bg-white overflow-hidden">
+@@ -201,89 +39,28 @@ export default function ChatPage() {
+                             </div>
+                             <span className="font-semibold text-gray-800 text-sm">Novel Splitter 助手</span>
+                         </div>
+-                        {selectedNovel && selectedVersion && (
++                        {state.selectedNovel && state.selectedVersion && (
+                             <span className="text-xs bg-teal-100 text-teal-700 font-medium px-2.5 py-0.5 rounded-full">
+-                {selectedNovel} · {selectedVersion}
+-              </span>
++                                {state.selectedNovel} · {state.selectedVersion}
++                            </span>
+                         )}
+                     </div>
+ 
+                     {/* Messages */}
+-                    <div className="flex-1 overflow-y-auto p-5 space-y-5">
+-                        {messages.map((msg) => (
+-                            <div key={msg.id} className={cn("flex gap-3", msg.role === 'user' ? "flex-row-reverse" : "flex-row")}>
+-                                {/* Avatar */}
+-                                <div className={cn(
+-                                    "w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-white",
+-                                    msg.role === 'user'
+-                                        ? "bg-gradient-to-br from-blue-500 to-teal-500"
+-                                        : "bg-gradient-to-br from-violet-500 to-purple-600"
+-                                )}>
+-                                    {msg.role === 'user' ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
+-                                </div>
+-
+-                                {/* Bubble */}
+-                                <div className={cn(
+-                                    "max-w-[78%] px-4 py-3 rounded-2xl text-sm leading-relaxed shadow-sm",
+-                                    msg.role === 'user'
+-                                        ? "bg-gradient-to-br from-blue-500 to-violet-500 text-white rounded-tr-sm"
+-                                        : "bg-gray-50 border border-gray-100 text-gray-800 rounded-tl-sm"
+-                                )}>
+-                                    <p className="whitespace-pre-wrap">{msg.content}</p>
+-
+-                                    {/* Citations */}
+-                                    {msg.citations && msg.citations.length > 0 && (
+-                                        <div className="mt-3 pt-3 border-t border-gray-200/60">
+-                                            <p className="text-xs font-semibold mb-2 flex items-center gap-1 text-gray-500">
+-                                                <BookOpen className="w-3 h-3" /> 参考片段
+-                                            </p>
+-                                            <div className="space-y-2">
+-                                                {msg.citations.map((cit, idx) => (
+-                                                    <CitationItem key={idx} citation={cit} index={idx} />
+-                                                ))}
+-                                            </div>
+-                                        </div>
+-                                    )}
+-                                </div>
+-                            </div>
+-                        ))}
+-
+-                        {/* Thinking indicator */}
+-                        {chatMutation.isPending && (
+-                            <div className="flex gap-3">
+-                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+-                                    <Bot className="w-4 h-4 text-white" />
+-                                </div>
+-                                <div className="px-4 py-3 rounded-2xl rounded-tl-sm bg-gray-50 border border-gray-100 flex items-center gap-2">
+-                                    <Loader2 className="w-3.5 h-3.5 animate-spin text-violet-500" />
+-                                    <span className="text-xs text-gray-500">正在思考...</span>
+-                                </div>
+-                            </div>
+-                        )}
+-                        <div ref={messagesEndRef} />
+-                    </div>
++                    <MessageList 
++                        messages={state.messages} 
++                        isPending={state.isPending} 
++                        bottomRef={refs.messagesEndRef} 
++                    />
+ 
+                     {/* Input area */}
+-                    <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/50 flex gap-2 items-center">
+-                        <input
+-                            type="text"
+-                            placeholder={!selectedNovel ? "请先选择小说..." : "输入你的问题，按 Enter 发送..."}
+-                            value={inputValue}
+-                            onChange={(e) => setInputValue(e.target.value)}
+-                            onKeyDown={handleKeyDown}
+-                            disabled={!selectedNovel || chatMutation.isPending}
+-                            className="flex-1 h-10 rounded-full border border-gray-200 bg-white px-4 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-400 disabled:opacity-50"
+-                        />
+-                        <button
+-                            onClick={handleSend}
+-                            disabled={!selectedNovel || !inputValue.trim() || chatMutation.isPending}
+-                            className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-blue-500 hover:from-violet-600 hover:to-blue-600 text-white flex items-center justify-center transition-all disabled:opacity-40 disabled:pointer-events-none shadow-sm"
+-                        >
+-                            {chatMutation.isPending
+-                                ? <Loader2 className="w-4 h-4 animate-spin" />
+-                                : <Send className="w-4 h-4" />}
+-                        </button>
+-                    </div>
++                    <ChatInputArea 
++                        inputValue={state.inputValue}
++                        isPending={state.isPending}
++                        disabled={!state.selectedNovel || state.isPending}
++                        placeholder={!state.selectedNovel ? "请先选择小说..." : "输入你的问题，按 Enter 发送..."}
++                        actions={actions}
++                    />
+                 </div>
+             </div>
+         </div>
+diff --git a/novel-splitter-web/src/pages/Ingest/components/TaskQueueBoard.tsx b/novel-splitter-web/src/pages/Ingest/components/TaskQueueBoard.tsx
+new file mode 100644
+index 0000000..8a050a0
+--- /dev/null
++++ b/novel-splitter-web/src/pages/Ingest/components/TaskQueueBoard.tsx
+@@ -0,0 +1,60 @@
++import { Clock, Loader2, CheckCircle, AlertCircle } from "lucide-react";
++import { TaskItem } from "@/components/TaskItem";
++import { TaskDetailDrawer } from "@/components/TaskDetailDrawer";
++import type { SplitTask } from "@/api/taskApi";
++
++const STATUS_CONFIG = {
++    PENDING:    { label: 'PENDING',    pill: 'bg-gray-100 text-gray-600',    bar: 'bg-gray-400',  Icon: Clock },
++    PROCESSING: { label: 'PROCESSING', pill: 'bg-blue-100 text-blue-700',    bar: 'bg-gradient-to-r from-violet-500 to-blue-500', Icon: Loader2 },
++    SUCCESS:    { label: 'SUCCESS',    pill: 'bg-green-100 text-green-700',   bar: 'bg-gradient-to-r from-teal-500 to-green-500',  Icon: CheckCircle },
++    FAILED:     { label: 'FAILED',     pill: 'bg-red-100 text-red-700',       bar: 'bg-red-500',   Icon: AlertCircle },
++} as const;
++
++interface TaskQueueBoardProps {
++    tasks: SplitTask[];
++    selectedTaskId: string | null;
++    actions: {
++        deleteTask: (id: string) => void;
++        setSelectedTaskId: (id: string | null) => void;
++    };
++}
++
++export function TaskQueueBoard({ tasks, selectedTaskId, actions }: TaskQueueBoardProps) {
++    return (
++        <>
++            <div className="rounded-2xl border border-gray-100 shadow-sm bg-white overflow-hidden">
++                <div className="px-5 py-3.5 bg-gradient-to-r from-violet-50 to-blue-50 border-b border-gray-100 flex items-center justify-between">
++                    <h3 className="text-sm font-semibold text-violet-800">入库任务队列</h3>
++                    {tasks.length > 0 && (
++                        <span className="text-xs bg-violet-100 text-violet-700 font-medium px-2.5 py-0.5 rounded-full">
++                            {tasks.length} 项任务
++                        </span>
++                    )}
++                </div>
++
++                <div className="p-4 space-y-3">
++                    {tasks.length === 0 ? (
++                        <p className="text-sm text-gray-400 text-center py-6">暂无切分任务</p>
++                    ) : tasks.map((task) => {
++                        const cfg = STATUS_CONFIG[task.status as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.PENDING;
++                        return (
++                            <TaskItem 
++                                key={task.taskId} 
++                                task={task} 
++                                onDelete={actions.deleteTask} 
++                                onViewLogs={actions.setSelectedTaskId}
++                                Icon={cfg.Icon} 
++                            />
++                        );
++                    })}
++                </div>
++            </div>
++
++            {/* Task Detail Drawer */}
++            <TaskDetailDrawer 
++                taskId={selectedTaskId} 
++                onClose={() => actions.setSelectedTaskId(null)} 
++            />
++        </>
++    );
++}
+\ No newline at end of file
+diff --git a/novel-splitter-web/src/pages/Ingest/components/UploadPanel.tsx b/novel-splitter-web/src/pages/Ingest/components/UploadPanel.tsx
+new file mode 100644
+index 0000000..c850fc8
+--- /dev/null
++++ b/novel-splitter-web/src/pages/Ingest/components/UploadPanel.tsx
+@@ -0,0 +1,109 @@
++import { UploadCloud, FileText, Loader2, CheckCircle, AlertCircle } from "lucide-react";
++import { cn } from "@/lib/utils";
++
++interface UploadPanelProps {
++    state: {
++        selectedFile: File | null;
++        version: string;
++        maxScenes: number;
++        ingestStatus: string;
++        isError: boolean;
++        isUploading: boolean;
++        isIngesting: boolean;
++    };
++    actions: {
++        handleFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
++        handleUpload: () => void;
++        handleIngest: () => void;
++        setVersion: (version: string) => void;
++        setMaxScenes: (scenes: number) => void;
++    };
++}
++
++export function UploadPanel({ state, actions }: UploadPanelProps) {
++    const { selectedFile, version, maxScenes, ingestStatus, isError, isUploading, isIngesting } = state;
++
++    return (
++        <div className="rounded-2xl border-2 border-dashed border-amber-200 bg-gradient-to-br from-amber-50/60 via-white to-violet-50/40 p-6">
++            {/* Drop zone */}
++            <label
++                htmlFor="file-upload"
++                className="flex flex-col items-center justify-center border-2 border-dashed border-amber-300/70 rounded-xl bg-amber-50/50 hover:bg-amber-50 transition-colors cursor-pointer py-8 px-4 text-center mb-5"
++            >
++                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 flex items-center justify-center mb-3">
++                    <UploadCloud className="w-6 h-6 text-white" />
++                </div>
++                <p className="text-sm font-medium text-gray-700">拖拽文件到此，或点击选择</p>
++                {selectedFile ? (
++                    <span className="mt-2 text-xs bg-amber-100 text-amber-800 px-3 py-1 rounded-full font-medium">
++                        {selectedFile.name}
++                    </span>
++                ) : (
++                    <p className="mt-1 text-xs text-gray-400">支持 .txt 格式，最大 50MB</p>
++                )}
++                <input 
++                    id="file-upload" 
++                    type="file" 
++                    accept=".txt" 
++                    className="hidden" 
++                    onChange={actions.handleFileChange} 
++                />
++            </label>
++
++            {/* Config */}
++            <div className="grid grid-cols-2 gap-4 mb-5">
++                <div className="space-y-1.5">
++                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">版本号 Version</label>
++                    <input
++                        type="text" 
++                        value={version} 
++                        onChange={(e) => actions.setVersion(e.target.value)}
++                        placeholder="v1"
++                        className="w-full h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-400"
++                    />
++                </div>
++                <div className="space-y-1.5">
++                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">最大场景数（0 = 全部）</label>
++                    <input
++                        type="number" 
++                        value={maxScenes} 
++                        onChange={(e) => actions.setMaxScenes(Number(e.target.value))}
++                        className="w-full h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-400"
++                    />
++                </div>
++            </div>
++
++            {/* Actions */}
++            <div className="flex gap-3 justify-center">
++                <button
++                    onClick={actions.handleUpload}
++                    disabled={!selectedFile || isUploading}
++                    className="inline-flex items-center gap-2 px-5 py-2 rounded-full text-sm font-medium border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:shadow transition-all disabled:opacity-40 disabled:pointer-events-none"
++                >
++                    {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UploadCloud className="w-4 h-4" />}
++                    上传文件
++                </button>
++
++                <button
++                    onClick={actions.handleIngest}
++                    disabled={!selectedFile || isIngesting}
++                    className="inline-flex items-center gap-2 px-5 py-2 rounded-full text-sm font-medium text-white bg-gradient-to-r from-violet-500 to-blue-500 hover:from-violet-600 hover:to-blue-600 hover:shadow-lg transition-all disabled:opacity-40 disabled:pointer-events-none"
++                >
++                    {isIngesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
++                    发送到任务队列
++                </button>
++            </div>
++
++            {/* Status */}
++            {ingestStatus && (
++                <div className={cn(
++                    "mt-4 flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium",
++                    isError ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"
++                )}>
++                    {isError ? <AlertCircle className="w-4 h-4 flex-shrink-0" /> : <CheckCircle className="w-4 h-4 flex-shrink-0" />}
++                    {ingestStatus}
++                </div>
++            )}
++        </div>
++    );
++}
+\ No newline at end of file
+diff --git a/novel-splitter-web/src/pages/Ingest/hooks/useIngestTask.ts b/novel-splitter-web/src/pages/Ingest/hooks/useIngestTask.ts
+new file mode 100644
+index 0000000..7ebf292
+--- /dev/null
++++ b/novel-splitter-web/src/pages/Ingest/hooks/useIngestTask.ts
+@@ -0,0 +1,122 @@
++import { useState } from 'react';
++import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
++import { toast } from 'sonner';
++import { novelApi } from "@/api/novelApi";
++import { taskApi } from "@/api/taskApi";
++
++export function useIngestTask() {
++    const queryClient = useQueryClient();
++    
++    // UI State
++    const [selectedFile, setSelectedFile] = useState<File | null>(null);
++    const [uploadedFileName, setUploadedFileName] = useState<string>("");
++    const [version, setVersion] = useState("v1");
++    const [maxScenes, setMaxScenes] = useState(0);
++    const [ingestStatus, setIngestStatus] = useState<string>("");
++    const [isError, setIsError] = useState(false);
++    const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
++
++    // Queries
++    const { data: tasks = [] } = useQuery({
++        queryKey: ['tasks'],
++        queryFn: taskApi.getAllTasks,
++        refetchInterval: (query) => {
++            const list = query.state.data;
++            if (!list || list.length === 0) return 10000;
++            const hasActive = list.some((t: any) => t.status === 'PENDING' || t.status === 'PROCESSING');
++            return hasActive ? 2000 : 10000;
++        },
++    });
++
++    // Mutations
++    const uploadMutation = useMutation({
++        mutationFn: novelApi.uploadNovel,
++        onSuccess: (data) => {
++            const msg = `上传成功：${data.message}`;
++            setIngestStatus(msg); 
++            setIsError(false);
++            toast.success(msg);
++            if (data.fileName) setUploadedFileName(data.fileName);
++            queryClient.invalidateQueries({ queryKey: ['novels'] });
++        },
++        onError: (error: any) => {
++            const msg = `上传失败：${error.response?.data?.error || error.message}`;
++            setIngestStatus(msg); 
++            setIsError(true);
++            toast.error(msg);
++        },
++    });
++
++    const ingestMutation = useMutation({
++        mutationFn: novelApi.ingestNovel,
++        onSuccess: (data) => {
++            const msg = `入库成功：${data.message}`;
++            setIngestStatus(msg); 
++            setIsError(false);
++            toast.success(msg);
++        },
++        onError: (error: any) => {
++            const msg = `入库失败：${error.response?.data?.error || error.message}`;
++            setIngestStatus(msg); 
++            setIsError(true);
++            toast.error(msg);
++        },
++    });
++
++    const deleteTaskMutation = useMutation({
++        mutationFn: taskApi.deleteTask,
++        onSuccess: () => {
++            queryClient.invalidateQueries({ queryKey: ['tasks'] });
++            toast.success("任务已删除");
++        },
++    });
++
++    // Handlers
++    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
++        if (e.target.files?.[0]) {
++            setSelectedFile(e.target.files[0]);
++            setUploadedFileName("");
++            setIngestStatus("");
++            setIsError(false);
++        }
++    };
++
++    const handleUpload = () => {
++        if (selectedFile) {
++            uploadMutation.mutate(selectedFile);
++        }
++    };
++
++    const handleIngest = () => {
++        if (!uploadedFileName) {
++            setIngestStatus(selectedFile ? "请先点击「上传文件」完成上传" : "请先选择并上传文件");
++            setIsError(true);
++            return;
++        }
++        ingestMutation.mutate({ fileName: uploadedFileName, version, maxScenes });
++    };
++
++    return {
++        state: {
++            selectedFile,
++            uploadedFileName,
++            version,
++            maxScenes,
++            ingestStatus,
++            isError,
++            tasks,
++            selectedTaskId,
++            isUploading: uploadMutation.isPending,
++            isIngesting: ingestMutation.isPending,
++        },
++        actions: {
++            setVersion,
++            setMaxScenes,
++            setSelectedTaskId,
++            handleFileChange,
++            handleUpload,
++            handleIngest,
++            deleteTask: (id: string) => deleteTaskMutation.mutate(id),
++        }
++    };
++}
+diff --git a/novel-splitter-web/src/pages/IngestPage.tsx b/novel-splitter-web/src/pages/IngestPage.tsx
+index 4d088f2..a8f0a23 100644
+--- a/novel-splitter-web/src/pages/IngestPage.tsx
++++ b/novel-splitter-web/src/pages/IngestPage.tsx
+@@ -1,99 +1,10 @@
+-import { useState } from 'react';
+-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+-import {
+-    UploadCloud, FileText, Loader2, CheckCircle,
+-    AlertCircle, Clock, Zap, Database, GitBranch
+-} from "lucide-react";
+-import { novelApi } from "@/api/novelApi";
+-import { taskApi } from "@/api/taskApi";
+-import { cn } from "@/lib/utils";
+-import { toast } from 'sonner';
+-import { TaskItem } from "@/components/TaskItem";
+-import { TaskDetailDrawer } from "@/components/TaskDetailDrawer";
+-
+-const STATUS_CONFIG = {
+-    PENDING:    { label: 'PENDING',    pill: 'bg-gray-100 text-gray-600',    bar: 'bg-gray-400',  Icon: Clock },
+-    PROCESSING: { label: 'PROCESSING', pill: 'bg-blue-100 text-blue-700',    bar: 'bg-gradient-to-r from-violet-500 to-blue-500', Icon: Loader2 },
+-    SUCCESS:    { label: 'SUCCESS',    pill: 'bg-green-100 text-green-700',   bar: 'bg-gradient-to-r from-teal-500 to-green-500',  Icon: CheckCircle },
+-    FAILED:     { label: 'FAILED',     pill: 'bg-red-100 text-red-700',       bar: 'bg-red-500',   Icon: AlertCircle },
+-} as const;
++import { Zap, Database, GitBranch } from "lucide-react";
++import { useIngestTask } from "./Ingest/hooks/useIngestTask";
++import { UploadPanel } from "./Ingest/components/UploadPanel";
++import { TaskQueueBoard } from "./Ingest/components/TaskQueueBoard";
+ 
+ export default function IngestPage() {
+-    const queryClient = useQueryClient();
+-    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+-    const [uploadedFileName, setUploadedFileName] = useState<string>("");
+-    const [version, setVersion] = useState("v1");
+-    const [maxScenes, setMaxScenes] = useState(0);
+-    const [ingestStatus, setIngestStatus] = useState<string>("");
+-    const [isError, setIsError] = useState(false);
+-    const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+-
+-    const { data: tasks = [] } = useQuery({
+-        queryKey: ['tasks'],
+-        queryFn: taskApi.getAllTasks,
+-        refetchInterval: (query) => {
+-            const list = query.state.data;
+-            if (!list || list.length === 0) return 10000;
+-            const hasActive = list.some((t: any) => t.status === 'PENDING' || t.status === 'PROCESSING');
+-            return hasActive ? 2000 : 10000;
+-        },
+-    });
+-
+-    const uploadMutation = useMutation({
+-        mutationFn: novelApi.uploadNovel,
+-        onSuccess: (data) => {
+-            const msg = `上传成功：${data.message}`;
+-            setIngestStatus(msg); setIsError(false);
+-            toast.success(msg);
+-            if (data.fileName) setUploadedFileName(data.fileName);
+-            queryClient.invalidateQueries({ queryKey: ['novels'] });
+-        },
+-        onError: (error: any) => {
+-            const msg = `上传失败：${error.response?.data?.error || error.message}`;
+-            setIngestStatus(msg); setIsError(true);
+-            toast.error(msg);
+-        },
+-    });
+-
+-    const ingestMutation = useMutation({
+-        mutationFn: novelApi.ingestNovel,
+-        onSuccess: (data) => {
+-            const msg = `入库成功：${data.message}`;
+-            setIngestStatus(msg); setIsError(false);
+-            toast.success(msg);
+-        },
+-        onError: (error: any) => {
+-            const msg = `入库失败：${error.response?.data?.error || error.message}`;
+-            setIngestStatus(msg); setIsError(true);
+-            toast.error(msg);
+-        },
+-    });
+-
+-    const deleteTaskMutation = useMutation({
+-        mutationFn: taskApi.deleteTask,
+-        onSuccess: () => {
+-            queryClient.invalidateQueries({ queryKey: ['tasks'] });
+-            toast.success("任务已删除");
+-        },
+-    });
+-
+-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+-        if (e.target.files?.[0]) {
+-            setSelectedFile(e.target.files[0]);
+-            setUploadedFileName("");
+-            setIngestStatus("");
+-            setIsError(false);
+-        }
+-    };
+-
+-    const handleIngest = () => {
+-        if (!uploadedFileName) {
+-            setIngestStatus(selectedFile ? "请先点击「上传文件」完成上传" : "请先选择并上传文件");
+-            setIsError(true);
+-            return;
+-        }
+-        ingestMutation.mutate({ fileName: uploadedFileName, version, maxScenes });
+-    };
++    const { state, actions } = useIngestTask();
+ 
+     return (
+         <div className="flex flex-col gap-5 max-w-4xl mx-auto">
+@@ -103,125 +14,27 @@ export default function IngestPage() {
+                     入库处理
+                 </h1>
+                 <p className="text-sm text-gray-500 mt-1.5 leading-relaxed">
+-          <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 text-xs font-medium px-2 py-0.5 rounded-full mr-1">
+-            <Zap className="w-3 h-3" /> RabbitMQ
+-          </span>
++                    <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 text-xs font-medium px-2 py-0.5 rounded-full mr-1">
++                        <Zap className="w-3 h-3" /> RabbitMQ
++                    </span>
+                     <span className="inline-flex items-center gap-1 bg-violet-100 text-violet-700 text-xs font-medium px-2 py-0.5 rounded-full mr-1">
+-            <GitBranch className="w-3 h-3" /> 异步队列
+-          </span>
++                        <GitBranch className="w-3 h-3" /> 异步队列
++                    </span>
+                     <span className="inline-flex items-center gap-1 bg-teal-100 text-teal-700 text-xs font-medium px-2 py-0.5 rounded-full mr-1">
+-            <Database className="w-3 h-3" /> ChromaDB
+-          </span>
++                        <Database className="w-3 h-3" /> ChromaDB
++                    </span>
+                     上传小说并配置切分参数，由 Worker 异步写入向量知识库
+                 </p>
+             </div>
+ 
+-            {/* Upload card */}
+-            <div className="rounded-2xl border-2 border-dashed border-amber-200 bg-gradient-to-br from-amber-50/60 via-white to-violet-50/40 p-6">
+-                {/* Drop zone */}
+-                <label
+-                    htmlFor="file-upload"
+-                    className="flex flex-col items-center justify-center border-2 border-dashed border-amber-300/70 rounded-xl bg-amber-50/50 hover:bg-amber-50 transition-colors cursor-pointer py-8 px-4 text-center mb-5"
+-                >
+-                    <div className="w-14 h-14 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 flex items-center justify-center mb-3">
+-                        <UploadCloud className="w-6 h-6 text-white" />
+-                    </div>
+-                    <p className="text-sm font-medium text-gray-700">拖拽文件到此，或点击选择</p>
+-                    {selectedFile ? (
+-                        <span className="mt-2 text-xs bg-amber-100 text-amber-800 px-3 py-1 rounded-full font-medium">
+-              {selectedFile.name}
+-            </span>
+-                    ) : (
+-                        <p className="mt-1 text-xs text-gray-400">支持 .txt 格式，最大 50MB</p>
+-                    )}
+-                    <input id="file-upload" type="file" accept=".txt" className="hidden" onChange={handleFileChange} />
+-                </label>
+-
+-                {/* Config */}
+-                <div className="grid grid-cols-2 gap-4 mb-5">
+-                    <div className="space-y-1.5">
+-                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">版本号 Version</label>
+-                        <input
+-                            type="text" value={version} onChange={(e) => setVersion(e.target.value)}
+-                            placeholder="v1"
+-                            className="w-full h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-400"
+-                        />
+-                    </div>
+-                    <div className="space-y-1.5">
+-                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">最大场景数（0 = 全部）</label>
+-                        <input
+-                            type="number" value={maxScenes} onChange={(e) => setMaxScenes(Number(e.target.value))}
+-                            className="w-full h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-400"
+-                        />
+-                    </div>
+-                </div>
+-
+-                {/* Actions */}
+-                <div className="flex gap-3 justify-center">
+-                    <button
+-                        onClick={() => selectedFile && uploadMutation.mutate(selectedFile)}
+-                        disabled={!selectedFile || uploadMutation.isPending}
+-                        className="inline-flex items-center gap-2 px-5 py-2 rounded-full text-sm font-medium border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:shadow transition-all disabled:opacity-40 disabled:pointer-events-none"
+-                    >
+-                        {uploadMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <UploadCloud className="w-4 h-4" />}
+-                        上传文件
+-                    </button>
+-
+-                    <button
+-                        onClick={handleIngest}
+-                        disabled={!selectedFile || ingestMutation.isPending}
+-                        className="inline-flex items-center gap-2 px-5 py-2 rounded-full text-sm font-medium text-white bg-gradient-to-r from-violet-500 to-blue-500 hover:from-violet-600 hover:to-blue-600 hover:shadow-lg transition-all disabled:opacity-40 disabled:pointer-events-none"
+-                    >
+-                        {ingestMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+-                        发送到任务队列
+-                    </button>
+-                </div>
+-
+-                {/* Status */}
+-                {ingestStatus && (
+-                    <div className={cn(
+-                        "mt-4 flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium",
+-                        isError ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"
+-                    )}>
+-                        {isError ? <AlertCircle className="w-4 h-4 flex-shrink-0" /> : <CheckCircle className="w-4 h-4 flex-shrink-0" />}
+-                        {ingestStatus}
+-                    </div>
+-                )}
+-            </div>
+-
+-            {/* Task list */}
+-            <div className="rounded-2xl border border-gray-100 shadow-sm bg-white overflow-hidden">
+-                <div className="px-5 py-3.5 bg-gradient-to-r from-violet-50 to-blue-50 border-b border-gray-100 flex items-center justify-between">
+-                    <h3 className="text-sm font-semibold text-violet-800">入库任务队列</h3>
+-                    {tasks.length > 0 && (
+-                        <span className="text-xs bg-violet-100 text-violet-700 font-medium px-2.5 py-0.5 rounded-full">
+-              {tasks.length} 项任务
+-            </span>
+-                    )}
+-                </div>
+-
+-                <div className="p-4 space-y-3">
+-                    {tasks.length === 0 ? (
+-                        <p className="text-sm text-gray-400 text-center py-6">暂无切分任务</p>
+-                    ) : tasks.map((task) => {
+-                        const cfg = STATUS_CONFIG[task.status as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.PENDING;
+-                        return (
+-                            <TaskItem 
+-                                key={task.taskId} 
+-                                task={task} 
+-                                onDelete={(id) => deleteTaskMutation.mutate(id)} 
+-                                onViewLogs={(id) => setSelectedTaskId(id)}
+-                                Icon={cfg.Icon} 
+-                            />
+-                        );
+-                    })}
+-                </div>
+-            </div>
++            {/* Upload & Config Panel */}
++            <UploadPanel state={state} actions={actions} />
+ 
+-            {/* Task Detail Drawer */}
+-            <TaskDetailDrawer 
+-                taskId={selectedTaskId} 
+-                onClose={() => setSelectedTaskId(null)} 
++            {/* Task Queue Board */}
++            <TaskQueueBoard 
++                tasks={state.tasks} 
++                selectedTaskId={state.selectedTaskId} 
++                actions={actions} 
+             />
+         </div>
+     );
+diff --git a/novel-splitter-web/src/pages/Knowledge/components/NovelVersionsCard.tsx b/novel-splitter-web/src/pages/Knowledge/components/NovelVersionsCard.tsx
+new file mode 100644
+index 0000000..bcffc9b
+--- /dev/null
++++ b/novel-splitter-web/src/pages/Knowledge/components/NovelVersionsCard.tsx
+@@ -0,0 +1,145 @@
++import { useState } from 'react';
++import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
++import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
++import { Loader2, Book, Trash2, AlertCircle } from "lucide-react";
++import { knowledgeApi } from "@/api/knowledgeApi";
++import { toast } from 'sonner';
++import { VersionTag } from "./VersionTag";
++
++export function NovelVersionsCard({ novel }: { novel: string }) {
++    const queryClient = useQueryClient();
++    const [deleteConfirming, setDeleteConfirming] = useState(false);
++
++    const { data: versions, isLoading, isError } = useQuery({
++        queryKey: ['versions', novel],
++        queryFn: () => knowledgeApi.getVersions(novel),
++    });
++
++    const deleteNovelMutation = useMutation({
++        mutationFn: () => knowledgeApi.deleteKnowledgeBase(novel),
++        onSuccess: () => {
++            toast.success(`知识库 "${novel}" 已删除`);
++            queryClient.invalidateQueries({ queryKey: ['novels'] });
++        },
++        onError: (error) => {
++            toast.error(`删除知识库失败: ${error}`);
++            setDeleteConfirming(false);
++        },
++    });
++
++    const deleteVersionMutation = useMutation({
++        mutationFn: (version: string) => knowledgeApi.deleteVersion(novel, version),
++        onSuccess: (_, version) => {
++            toast.success(`版本 "${version}" 已删除`);
++            queryClient.invalidateQueries({ queryKey: ['versions', novel] });
++        },
++        onError: (error) => {
++            toast.error(`删除版本失败: ${error}`);
++        },
++    });
++
++    const versionCount = versions?.length ?? 0;
++
++    return (
++        <Card className="relative overflow-hidden border border-slate-200 bg-white hover:border-slate-300 hover:shadow-md transition-all duration-200 group">
++            {/* Top accent bar */}
++            <div className="h-0.5 w-full bg-gradient-to-r from-indigo-400 via-blue-400 to-cyan-400 opacity-60 group-hover:opacity-100 transition-opacity" />
++
++            <CardHeader className="pb-3 pt-4 px-5">
++                <div className="flex items-start justify-between gap-2">
++                    <div className="flex items-center gap-2.5 min-w-0">
++                        <div className="p-1.5 rounded-lg bg-indigo-50 shrink-0">
++                            <Book className="w-4 h-4 text-indigo-500" />
++                        </div>
++                        <CardTitle
++                            className="text-base font-semibold text-slate-800 truncate leading-snug"
++                            title={novel}
++                        >
++                            {novel}
++                        </CardTitle>
++                    </div>
++
++                    {/* Delete button — only show when not confirming */}
++                    {!deleteConfirming && (
++                        <button
++                            onClick={() => setDeleteConfirming(true)}
++                            disabled={deleteNovelMutation.isPending}
++                            className="shrink-0 p-1.5 rounded-md text-slate-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all duration-150"
++                            title="删除知识库"
++                        >
++                            <Trash2 className="w-4 h-4" />
++                        </button>
++                    )}
++                </div>
++
++                <CardDescription className="mt-1.5 ml-[2.375rem] text-xs text-slate-400">
++                    {isLoading ? (
++                        <span className="inline-flex items-center gap-1">
++                            <Loader2 className="w-3 h-3 animate-spin" /> 加载中…
++                        </span>
++                    ) : (
++                        <span>{versionCount} 个向量版本</span>
++                    )}
++                </CardDescription>
++            </CardHeader>
++
++            <CardContent className="px-5 pb-5 pt-0">
++                {/* Inline delete confirmation */}
++                {deleteConfirming && (
++                    <div className="mb-3 p-3 rounded-lg bg-red-50 border border-red-200 animate-in fade-in slide-in-from-top-1 duration-200">
++                        <p className="text-sm font-medium text-red-700 mb-0.5">确认删除此知识库？</p>
++                        <p className="text-xs text-red-500 mb-3">
++                            将删除所有源文件、切分版本和向量数据，操作不可恢复。
++                        </p>
++                        <div className="flex gap-2">
++                            <button
++                                onClick={() => deleteNovelMutation.mutate()}
++                                disabled={deleteNovelMutation.isPending}
++                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-red-500 text-white text-xs font-semibold hover:bg-red-600 disabled:opacity-60 transition-colors"
++                            >
++                                {deleteNovelMutation.isPending ? (
++                                    <Loader2 className="w-3 h-3 animate-spin" />
++                                ) : (
++                                    <Trash2 className="w-3 h-3" />
++                                )}
++                                确认删除
++                            </button>
++                            <button
++                                onClick={() => setDeleteConfirming(false)}
++                                disabled={deleteNovelMutation.isPending}
++                                className="px-3 py-1.5 rounded-md bg-white text-slate-600 text-xs font-medium border border-slate-200 hover:bg-slate-50 transition-colors"
++                            >
++                                取消
++                            </button>
++                        </div>
++                    </div>
++                )}
++
++                {/* Version list */}
++                {isLoading ? (
++                    <div className="flex justify-center py-3">
++                        <Loader2 className="w-4 h-4 animate-spin text-slate-300" />
++                    </div>
++                ) : isError ? (
++                    <div className="flex items-center gap-2 text-xs text-red-500 bg-red-50 border border-red-100 px-3 py-2 rounded-lg">
++                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
++                        获取版本列表失败
++                    </div>
++                ) : versions && versions.length > 0 ? (
++                    <div className="flex flex-wrap gap-1.5">
++                        {versions.map((v) => (
++                            <VersionTag
++                                key={v}
++                                version={v}
++                                onDelete={() => deleteVersionMutation.mutate(v)}
++                                isPending={deleteVersionMutation.isPending}
++                            />
++                        ))}
++                    </div>
++                ) : (
++                    <p className="text-xs text-slate-400 italic">暂无版本数据</p>
++                )}
++            </CardContent>
++        </Card>
++    );
++}
+\ No newline at end of file
+diff --git a/novel-splitter-web/src/pages/Knowledge/components/VersionTag.tsx b/novel-splitter-web/src/pages/Knowledge/components/VersionTag.tsx
+new file mode 100644
+index 0000000..17ea01b
+--- /dev/null
++++ b/novel-splitter-web/src/pages/Knowledge/components/VersionTag.tsx
+@@ -0,0 +1,49 @@
++import { useState } from 'react';
++import { GitBranch, X, Loader2 } from "lucide-react";
++
++export function VersionTag({
++    version,
++    onDelete,
++    isPending,
++}: {
++    version: string;
++    onDelete: () => void;
++    isPending: boolean;
++}) {
++    const [confirming, setConfirming] = useState(false);
++
++    if (confirming) {
++        return (
++            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600 border border-red-200 animate-in fade-in duration-150">
++                <span className="mr-0.5">删除此版本？</span>
++                <button
++                    onClick={() => { onDelete(); setConfirming(false); }}
++                    disabled={isPending}
++                    className="px-1.5 py-0.5 rounded bg-red-500 text-white hover:bg-red-600 transition-colors text-[10px] font-semibold"
++                >
++                    {isPending ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : '确认'}
++                </button>
++                <button
++                    onClick={() => setConfirming(false)}
++                    className="p-0.5 rounded hover:bg-red-100 transition-colors text-red-400 hover:text-red-600"
++                >
++                    <X className="w-3 h-3" />
++                </button>
++            </span>
++        );
++    }
++
++    return (
++        <span className="group/tag inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100 hover:border-indigo-300 hover:bg-indigo-100 transition-all duration-150 cursor-default select-none">
++            <GitBranch className="w-3 h-3 shrink-0 text-indigo-400" />
++            <span>{version}</span>
++            <button
++                onClick={() => setConfirming(true)}
++                className="ml-0.5 p-0.5 rounded-full text-indigo-300 hover:text-red-500 hover:bg-white opacity-0 group-hover/tag:opacity-100 transition-all duration-150"
++                title="删除版本"
++            >
++                <X className="w-3 h-3" />
++            </button>
++        </span>
++    );
++}
+\ No newline at end of file
+diff --git a/novel-splitter-web/src/pages/KnowledgePage.tsx b/novel-splitter-web/src/pages/KnowledgePage.tsx
+index 362cbc4..3eb3e1b 100644
+--- a/novel-splitter-web/src/pages/KnowledgePage.tsx
++++ b/novel-splitter-web/src/pages/KnowledgePage.tsx
+@@ -1,199 +1,8 @@
+-import { useState } from 'react';
+-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+-import { Loader2, Book, GitBranch, AlertCircle, Trash2, X, Database, ChevronRight } from "lucide-react";
++import { useQuery } from '@tanstack/react-query';
++import { Loader2, Book, AlertCircle, Database, ChevronRight } from "lucide-react";
+ import { novelApi } from "@/api/novelApi";
+-import { knowledgeApi } from "@/api/knowledgeApi";
+-import { toast } from 'sonner';
++import { NovelVersionsCard } from "./Knowledge/components/NovelVersionsCard";
+ 
+-// ---- Sub-component: Version Tag ----
+-function VersionTag({
+-                      version,
+-                      onDelete,
+-                      isPending,
+-                    }: {
+-  version: string;
+-  onDelete: () => void;
+-  isPending: boolean;
+-}) {
+-  const [confirming, setConfirming] = useState(false);
+-
+-  if (confirming) {
+-    return (
+-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600 border border-red-200 animate-in fade-in duration-150">
+-        <span className="mr-0.5">删除此版本？</span>
+-        <button
+-            onClick={() => { onDelete(); setConfirming(false); }}
+-            disabled={isPending}
+-            className="px-1.5 py-0.5 rounded bg-red-500 text-white hover:bg-red-600 transition-colors text-[10px] font-semibold"
+-        >
+-          {isPending ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : '确认'}
+-        </button>
+-        <button
+-            onClick={() => setConfirming(false)}
+-            className="p-0.5 rounded hover:bg-red-100 transition-colors text-red-400 hover:text-red-600"
+-        >
+-          <X className="w-3 h-3" />
+-        </button>
+-      </span>
+-    );
+-  }
+-
+-  return (
+-      <span className="group/tag inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100 hover:border-indigo-300 hover:bg-indigo-100 transition-all duration-150 cursor-default select-none">
+-      <GitBranch className="w-3 h-3 shrink-0 text-indigo-400" />
+-      <span>{version}</span>
+-      <button
+-          onClick={() => setConfirming(true)}
+-          className="ml-0.5 p-0.5 rounded-full text-indigo-300 hover:text-red-500 hover:bg-white opacity-0 group-hover/tag:opacity-100 transition-all duration-150"
+-          title="删除版本"
+-      >
+-        <X className="w-3 h-3" />
+-      </button>
+-    </span>
+-  );
+-}
+-
+-// ---- Sub-component: Novel Card ----
+-function NovelVersionsCard({ novel }: { novel: string }) {
+-  const queryClient = useQueryClient();
+-  const [deleteConfirming, setDeleteConfirming] = useState(false);
+-
+-  const { data: versions, isLoading, isError } = useQuery({
+-    queryKey: ['versions', novel],
+-    queryFn: () => knowledgeApi.getVersions(novel),
+-  });
+-
+-  const deleteNovelMutation = useMutation({
+-    mutationFn: () => knowledgeApi.deleteKnowledgeBase(novel),
+-    onSuccess: () => {
+-      toast.success(`知识库 "${novel}" 已删除`);
+-      queryClient.invalidateQueries({ queryKey: ['novels'] });
+-    },
+-    onError: (error) => {
+-      toast.error(`删除知识库失败: ${error}`);
+-      setDeleteConfirming(false);
+-    },
+-  });
+-
+-  const deleteVersionMutation = useMutation({
+-    mutationFn: (version: string) => knowledgeApi.deleteVersion(novel, version),
+-    onSuccess: (_, version) => {
+-      toast.success(`版本 "${version}" 已删除`);
+-      queryClient.invalidateQueries({ queryKey: ['versions', novel] });
+-    },
+-    onError: (error) => {
+-      toast.error(`删除版本失败: ${error}`);
+-    },
+-  });
+-
+-  const versionCount = versions?.length ?? 0;
+-
+-  return (
+-      <Card className="relative overflow-hidden border border-slate-200 bg-white hover:border-slate-300 hover:shadow-md transition-all duration-200 group">
+-        {/* Top accent bar */}
+-        <div className="h-0.5 w-full bg-gradient-to-r from-indigo-400 via-blue-400 to-cyan-400 opacity-60 group-hover:opacity-100 transition-opacity" />
+-
+-        <CardHeader className="pb-3 pt-4 px-5">
+-          <div className="flex items-start justify-between gap-2">
+-            <div className="flex items-center gap-2.5 min-w-0">
+-              <div className="p-1.5 rounded-lg bg-indigo-50 shrink-0">
+-                <Book className="w-4 h-4 text-indigo-500" />
+-              </div>
+-              <CardTitle
+-                  className="text-base font-semibold text-slate-800 truncate leading-snug"
+-                  title={novel}
+-              >
+-                {novel}
+-              </CardTitle>
+-            </div>
+-
+-            {/* Delete button — only show when not confirming */}
+-            {!deleteConfirming && (
+-                <button
+-                    onClick={() => setDeleteConfirming(true)}
+-                    disabled={deleteNovelMutation.isPending}
+-                    className="shrink-0 p-1.5 rounded-md text-slate-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all duration-150"
+-                    title="删除知识库"
+-                >
+-                  <Trash2 className="w-4 h-4" />
+-                </button>
+-            )}
+-          </div>
+-
+-          <CardDescription className="mt-1.5 ml-[2.375rem] text-xs text-slate-400">
+-            {isLoading ? (
+-                <span className="inline-flex items-center gap-1">
+-              <Loader2 className="w-3 h-3 animate-spin" /> 加载中…
+-            </span>
+-            ) : (
+-                <span>{versionCount} 个向量版本</span>
+-            )}
+-          </CardDescription>
+-        </CardHeader>
+-
+-        <CardContent className="px-5 pb-5 pt-0">
+-          {/* Inline delete confirmation */}
+-          {deleteConfirming && (
+-              <div className="mb-3 p-3 rounded-lg bg-red-50 border border-red-200 animate-in fade-in slide-in-from-top-1 duration-200">
+-                <p className="text-sm font-medium text-red-700 mb-0.5">确认删除此知识库？</p>
+-                <p className="text-xs text-red-500 mb-3">
+-                  将删除所有源文件、切分版本和向量数据，操作不可恢复。
+-                </p>
+-                <div className="flex gap-2">
+-                  <button
+-                      onClick={() => deleteNovelMutation.mutate()}
+-                      disabled={deleteNovelMutation.isPending}
+-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-red-500 text-white text-xs font-semibold hover:bg-red-600 disabled:opacity-60 transition-colors"
+-                  >
+-                    {deleteNovelMutation.isPending ? (
+-                        <Loader2 className="w-3 h-3 animate-spin" />
+-                    ) : (
+-                        <Trash2 className="w-3 h-3" />
+-                    )}
+-                    确认删除
+-                  </button>
+-                  <button
+-                      onClick={() => setDeleteConfirming(false)}
+-                      disabled={deleteNovelMutation.isPending}
+-                      className="px-3 py-1.5 rounded-md bg-white text-slate-600 text-xs font-medium border border-slate-200 hover:bg-slate-50 transition-colors"
+-                  >
+-                    取消
+-                  </button>
+-                </div>
+-              </div>
+-          )}
+-
+-          {/* Version list */}
+-          {isLoading ? (
+-              <div className="flex justify-center py-3">
+-                <Loader2 className="w-4 h-4 animate-spin text-slate-300" />
+-              </div>
+-          ) : isError ? (
+-              <div className="flex items-center gap-2 text-xs text-red-500 bg-red-50 border border-red-100 px-3 py-2 rounded-lg">
+-                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+-                获取版本列表失败
+-              </div>
+-          ) : versions && versions.length > 0 ? (
+-              <div className="flex flex-wrap gap-1.5">
+-                {versions.map((v) => (
+-                    <VersionTag
+-                        key={v}
+-                        version={v}
+-                        onDelete={() => deleteVersionMutation.mutate(v)}
+-                        isPending={deleteVersionMutation.isPending}
+-                    />
+-                ))}
+-              </div>
+-          ) : (
+-              <p className="text-xs text-slate-400 italic">暂无版本数据</p>
+-          )}
+-        </CardContent>
+-      </Card>
+-  );
+-}
+-
+-// ---- Page ----
+ export default function KnowledgePage() {
+   const { data: novels, isLoading, isError } = useQuery({
+     queryKey: ['novels'],
