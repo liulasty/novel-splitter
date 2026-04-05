@@ -1,16 +1,18 @@
 package com.novel.splitter.application.service;
 
-import com.novel.splitter.application.service.etl.NovelIngestionService;
+import com.novel.splitter.application.config.RabbitConfig;
 import com.novel.splitter.application.service.novel.NovelFacadeServiceImpl;
 import com.novel.splitter.application.service.novel.NovelStorageService;
 import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.domain.model.dto.IngestRequest;
+import com.novel.splitter.domain.task.SplitTaskMessage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 import java.nio.file.Path;
 import java.util.Map;
@@ -30,7 +32,7 @@ class NovelFacadeServiceTest {
     private TaskService taskService;
 
     @Mock
-    private NovelIngestionService novelIngestionService;
+    private RabbitTemplate rabbitTemplate;
 
     @InjectMocks
     private NovelFacadeServiceImpl novelFacadeService;
@@ -48,12 +50,19 @@ class NovelFacadeServiceTest {
         ArgumentCaptor<String> novelIdCaptor = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<Integer> maxScenesCaptor = ArgumentCaptor.forClass(Integer.class);
         ArgumentCaptor<String> versionCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<SplitTaskMessage> messageCaptor = ArgumentCaptor.forClass(SplitTaskMessage.class);
 
         verify(taskService).createTask(taskIdCaptor.capture(), novelIdCaptor.capture(), org.mockito.Mockito.eq("demo.txt"),
                 maxScenesCaptor.capture(), versionCaptor.capture());
-        verify(novelIngestionService).ingestAsync(org.mockito.Mockito.eq(taskIdCaptor.getValue()), org.mockito.Mockito.eq(novelIdCaptor.getValue()),
-                org.mockito.Mockito.eq(Path.of("D:/novels/demo.txt").toAbsolutePath().toString()),
-                org.mockito.Mockito.eq(Integer.MAX_VALUE), org.mockito.Mockito.eq("v1"));
+        
+        verify(rabbitTemplate).convertAndSend(org.mockito.Mockito.eq(RabbitConfig.EXCHANGE_NAME), org.mockito.Mockito.eq("load"), messageCaptor.capture());
+
+        SplitTaskMessage message = messageCaptor.getValue();
+        assertEquals(taskIdCaptor.getValue(), message.getTaskId());
+        assertEquals(novelIdCaptor.getValue(), message.getNovelId());
+        assertEquals(Path.of("D:/novels/demo.txt").toAbsolutePath().toString(), message.getFilePath());
+        assertEquals(Integer.MAX_VALUE, message.getMaxScenes());
+        assertEquals("v1", message.getVersion());
 
         assertTrue(result.containsKey("taskId"));
         assertEquals("入库任务已提交到队列", result.get("message"));

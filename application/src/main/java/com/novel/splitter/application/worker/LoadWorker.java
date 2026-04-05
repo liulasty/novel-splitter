@@ -5,7 +5,7 @@ import com.novel.splitter.application.config.RabbitConfig;
 import com.novel.splitter.domain.task.SplitTask;
 import com.novel.splitter.domain.task.SplitTaskMessage;
 import com.novel.splitter.application.service.etl.NovelCacheService;
-import com.novel.splitter.application.service.etl.NovelIngestionService;
+import com.novel.splitter.application.usecase.ingestion.LoadNovelUseCase;
 import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.domain.model.Novel;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +22,7 @@ import java.nio.file.Paths;
 @Slf4j
 public class LoadWorker {
 
-    private final NovelIngestionService ingestionService;
+    private final LoadNovelUseCase loadNovelUseCase;
     private final TaskService taskService;
     private final NovelCacheService novelCacheService;
     private final RabbitTemplate rabbitTemplate;
@@ -45,7 +45,7 @@ public class LoadWorker {
             String rootPath = appConfig.getStorage().getRootPath();
             Path novelPath = Paths.get(rootPath, task.getFileName());
             
-            Novel novel = ingestionService.loadPhase(taskId, novelPath, (progress, info) -> {
+            Novel novel = loadNovelUseCase.load(taskId, novelPath, (progress, info) -> {
                 taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, progress, info);
             });
 

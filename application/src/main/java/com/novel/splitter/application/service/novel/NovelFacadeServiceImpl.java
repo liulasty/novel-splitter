@@ -1,10 +1,12 @@
 package com.novel.splitter.application.service.novel;
 
-import com.novel.splitter.application.service.etl.NovelIngestionService;
+import com.novel.splitter.application.config.RabbitConfig;
 import com.novel.splitter.application.service.task.TaskService;
+import com.novel.splitter.domain.task.SplitTaskMessage;
 import com.novel.splitter.domain.model.dto.IngestRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -23,7 +25,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
 
     private final NovelStorageService novelStorageService;
     private final TaskService taskService;
-    private final NovelIngestionService novelIngestionService;
+    private final RabbitTemplate rabbitTemplate;
 
     @Override
     public List<String> listNovels() throws IOException {
@@ -47,7 +49,10 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         String version = normalizeVersion(request.getVersion());
 
         taskService.createTask(taskId, novelId, request.getFileName(), maxScenes, version);
-        novelIngestionService.ingestAsync(taskId, novelId, novelPath.toAbsolutePath().toString(), maxScenes, version);
+        
+        SplitTaskMessage message = new SplitTaskMessage(taskId, novelId, novelPath.toAbsolutePath().toString(), maxScenes, version);
+        rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "load", message);
+        log.info("Sent taskId {} to load queue", taskId);
 
         log.info("入库任务已发送到队列, taskId: {}", taskId);
         return Map.of("message", "入库任务已提交到队列", "taskId", taskId);
