@@ -34,7 +34,7 @@
 
 ### 1. 表现与接入层 (Presentation & Entry)
 *   **`application` (应用入口)**
-    *   **职责**：Spring Boot 核心启动入口，整合所有模块。提供基于 RESTful API 的控制器（如 `NovelController`、`ChatController`、`VectorManagementController`）。整合 RabbitMQ 实现了基于消息队列的异步任务调度，包含 `LoadWorker`、`SplitWorker` 和 `EmbedWorker` 三阶段异步流水线，彻底解决大文件处理时的阻塞和内存溢出问题。同时提供 `SplitCommandRunner` 供极客用户在命令行模式下运行。
+    *   **职责**：Spring Boot 核心启动入口，整合所有模块。提供基于 RESTful API 的控制器（如 `NovelController`、`ChatController`、`VectorManagementController`）。整合 RabbitMQ 实现了基于消息队列的异步任务调度，包含 `LoadWorker`、`SplitWorker` 和 `EmbedWorker` 三阶段异步流水线，彻底解决大文件处理时的阻塞和内存溢出问题。
 *   **`novel-splitter-web` (现代前端 UI)**
     *   **职责**：提供全套的图形化操作界面，降低系统使用门槛。
     *   **现状**：基于 React 19, TypeScript, Zustand, TanStack Query 和 Tailwind CSS 4 构建。包含小说导入 (Ingest)、知识库管理 (Knowledge)、RAG 对话测试 (Chat) 和系统向量库监控 (System) 四大核心页面。

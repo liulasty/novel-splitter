@@ -1,4 +1,4 @@
-package com.novel.splitter.application.service;
+package com.novel.splitter.application.service.download;
 
 import com.novel.splitter.application.config.AppConfig;
 import com.novel.splitter.downloader.api.NovelDownloader;

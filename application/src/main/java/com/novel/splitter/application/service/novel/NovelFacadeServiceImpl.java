@@ -1,8 +1,10 @@
 package com.novel.splitter.application.service.novel;
 
 import com.novel.splitter.application.config.RabbitConfig;
+import com.novel.splitter.application.service.download.DownloadService;
 import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.domain.task.SplitTaskMessage;
+import com.novel.splitter.domain.model.dto.DownloadAndIngestRequest;
 import com.novel.splitter.domain.model.dto.IngestRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,6 +14,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -26,6 +29,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
     private final NovelStorageService novelStorageService;
     private final TaskService taskService;
     private final RabbitTemplate rabbitTemplate;
+    private final DownloadService downloadService;
 
     @Override
     public List<String> listNovels() throws IOException {
@@ -56,6 +60,23 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
 
         log.info("入库任务已发送到队列, taskId: {}", taskId);
         return Map.of("message", "入库任务已提交到队列", "taskId", taskId);
+    }
+
+    @Override
+    public Map<String, String> downloadAndIngest(DownloadAndIngestRequest request) throws IOException {
+        log.info("接收到下载并入库请求: url={}, name={}", request.getUrl(), request.getName());
+        
+        // 1. 同步下载，得到落盘文件名
+        String savedFileName = downloadService.downloadNovel(request.getUrl(), request.getName());
+        String fileName = Paths.get(savedFileName).getFileName().toString();
+        
+        // 2. 复用已有 ingest 入口，异步进入 Worker 链路
+        IngestRequest ingestRequest = new IngestRequest();
+        ingestRequest.setFileName(fileName);
+        ingestRequest.setVersion(request.getVersion());
+        ingestRequest.setMaxScenes(request.getMaxScenes());
+        
+        return ingest(ingestRequest);
     }
 
     private String normalizeNovelId(String fileName) {

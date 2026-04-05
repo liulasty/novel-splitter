@@ -1,6 +1,7 @@
 package com.novel.splitter.application.controller;
 
 import com.novel.splitter.application.service.novel.NovelFacadeService;
+import com.novel.splitter.domain.model.dto.DownloadAndIngestRequest;
 import com.novel.splitter.domain.model.dto.IngestRequest;
 import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
@@ -60,5 +61,17 @@ public class NovelController {
     @PostMapping("/ingest")
     public Map<String, String> ingest(@Valid @RequestBody IngestRequest request) throws IOException {
         return novelFacadeService.ingest(request);
+    }
+
+    /**
+     * 下载并启动小说入库处理
+     *
+     * @param request 下载并入库请求参数
+     * @return 启动入库任务的响应信息
+     */
+    @Operation(summary = "小说下载并入库处理", description = "同步下载小说文件后异步启动入库流程")
+    @PostMapping("/download-and-ingest")
+    public Map<String, String> downloadAndIngest(@Valid @RequestBody DownloadAndIngestRequest request) throws IOException {
+        return novelFacadeService.downloadAndIngest(request);
     }
 }

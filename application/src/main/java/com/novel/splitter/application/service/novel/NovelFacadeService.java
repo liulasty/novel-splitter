@@ -1,5 +1,6 @@
 package com.novel.splitter.application.service.novel;
 
+import com.novel.splitter.domain.model.dto.DownloadAndIngestRequest;
 import com.novel.splitter.domain.model.dto.IngestRequest;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -14,4 +15,6 @@ public interface NovelFacadeService {
     Map<String, String> uploadNovel(MultipartFile file) throws IOException;
 
     Map<String, String> ingest(IngestRequest request) throws IOException;
+
+    Map<String, String> downloadAndIngest(DownloadAndIngestRequest request) throws IOException;
 }
