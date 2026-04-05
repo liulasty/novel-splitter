@@ -55,6 +55,12 @@ public class NovelIngestionService {
     @org.springframework.beans.factory.annotation.Value("${splitter.ingestion.batch-size:10}")
     private int batchSize; 
 
+    @org.springframework.beans.factory.annotation.Value("${splitter.ingestion.chunk-size:150}")
+    private int chunkSize;
+
+    @org.springframework.beans.factory.annotation.Value("${splitter.ingestion.chunk-overlap:30}")
+    private int chunkOverlap;
+
     public void ingestAsync(String taskId, String novelId, String novelPathStr, int maxScenes, String version) {
         SplitTaskMessage message = new SplitTaskMessage(taskId, novelId, novelPathStr, maxScenes, version);
         rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "load", message);
@@ -196,12 +202,14 @@ public class NovelIngestionService {
         List<Scene> scenes = sceneRepository.findByIds(sceneIds);
         if (scenes == null || scenes.isEmpty()) return;
 
+        com.novel.splitter.domain.strategy.ChunkingStrategy chunkingStrategy = new com.novel.splitter.domain.strategy.OverlapChunkingStrategy(chunkSize, chunkOverlap);
+
         try {
             List<String> texts = new ArrayList<>();
             List<Scene> validChildScenes = new ArrayList<>();
             for (Scene scene : scenes) {
                 if (scene.getText() != null && !scene.getText().trim().isEmpty()) {
-                    List<Scene> children = createChildChunks(scene);
+                    List<Scene> children = chunkingStrategy.split(scene);
                     for (Scene child : children) {
                         texts.add(child.getText());
                         validChildScenes.add(child);
@@ -229,6 +237,8 @@ public class NovelIngestionService {
         int totalBatches = (int) Math.ceil((double) total / batchSize);
         int batchIndex = 0;
 
+        com.novel.splitter.domain.strategy.ChunkingStrategy chunkingStrategy = new com.novel.splitter.domain.strategy.OverlapChunkingStrategy(chunkSize, chunkOverlap);
+
         for (int i = 0; i < total; i += batchSize) {
             int end = Math.min(i + batchSize, total);
             List<Scene> batchScenes = scenes.subList(i, end);
@@ -239,7 +249,7 @@ public class NovelIngestionService {
                 List<Scene> validChildScenes = new ArrayList<>();
                 for (Scene scene : batchScenes) {
                     if (scene.getText() != null && !scene.getText().trim().isEmpty()) {
-                        List<Scene> children = createChildChunks(scene);
+                        List<Scene> children = chunkingStrategy.split(scene);
                         for (Scene child : children) {
                             texts.add(child.getText());
                             validChildScenes.add(child);
@@ -282,53 +292,4 @@ public class NovelIngestionService {
         }
     }
     
-    private List<Scene> createChildChunks(Scene parent) {
-        List<Scene> children = new ArrayList<>();
-        String text = parent.getText();
-        
-        // 按照 150 字左右切分子块，重叠 30 字，提升向量召回精度
-        int chunkSize = 150;
-        int overlap = 30;
-        
-        if (text.length() <= chunkSize) {
-            children.add(createChildScene(parent, text, 0));
-            return children;
-        }
-        
-        int index = 0;
-        int childIdx = 0;
-        while (index < text.length()) {
-            int end = Math.min(index + chunkSize, text.length());
-            String chunkText = text.substring(index, end);
-            children.add(createChildScene(parent, chunkText, childIdx++));
-            
-            if (end == text.length()) {
-                break;
-            }
-            index = end - overlap;
-        }
-        return children;
-    }
-
-    private Scene createChildScene(Scene parent, String text, int childIndex) {
-        Scene child = new Scene();
-        child.setId(java.util.UUID.randomUUID().toString());
-        child.setText(text);
-        child.setChapterIndex(parent.getChapterIndex());
-        child.setChapterTitle(parent.getChapterTitle());
-        child.setStartParagraphIndex(parent.getStartParagraphIndex());
-        child.setEndParagraphIndex(parent.getEndParagraphIndex());
-        
-        SceneMetadata parentMeta = parent.getMetadata();
-        SceneMetadata childMeta = new SceneMetadata();
-        if (parentMeta != null) {
-            childMeta.setNovel(parentMeta.getNovel());
-            childMeta.setVersion(parentMeta.getVersion());
-        }
-        childMeta.setParentSceneId(parent.getId());
-        childMeta.setChunkType("child_chunk");
-        child.setMetadata(childMeta);
-        
-        return child;
-    }
 }
