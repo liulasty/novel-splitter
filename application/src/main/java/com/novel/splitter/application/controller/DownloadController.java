@@ -1,14 +1,20 @@
 package com.novel.splitter.application.controller;
 
 import com.novel.splitter.application.service.download.DownloadService;
+import com.novel.splitter.application.service.novel.NovelFacadeService;
+import com.novel.splitter.domain.model.dto.DownloadAndIngestRequest;
 import com.novel.splitter.domain.model.dto.DownloadRequest;
 import com.novel.splitter.domain.model.dto.DownloadResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.io.IOException;
+import java.util.Map;
 
 /**
  * 小说下载控制器
@@ -20,9 +26,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class DownloadController {
 
     private final DownloadService downloadService;
+    private final NovelFacadeService novelFacadeService;
 
-    public DownloadController(DownloadService downloadService) {
+    public DownloadController(DownloadService downloadService, NovelFacadeService novelFacadeService) {
         this.downloadService = downloadService;
+        this.novelFacadeService = novelFacadeService;
     }
 
     /**
@@ -37,5 +45,17 @@ public class DownloadController {
         // 同步执行（注意：下载耗时较长，生产环境应异步）
         String savedPath = downloadService.downloadNovel(request.getUrl(), request.getName());
         return new DownloadResponse("Success", savedPath);
+    }
+
+    /**
+     * 下载并启动小说入库处理
+     *
+     * @param request 下载并入库请求参数
+     * @return 启动入库任务的响应信息
+     */
+    @Operation(summary = "小说下载并入库处理", description = "同步下载小说文件后异步启动入库流程")
+    @PostMapping("/ingest")
+    public Map<String, String> downloadAndIngest(@Valid @RequestBody DownloadAndIngestRequest request) throws IOException {
+        return novelFacadeService.downloadAndIngest(request);
     }
 }
