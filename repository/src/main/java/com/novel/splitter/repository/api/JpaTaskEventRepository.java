@@ -9,4 +9,5 @@ import java.util.List;
 @Repository
 public interface JpaTaskEventRepository extends JpaRepository<JpaTaskEventEntity, Long> {
     List<JpaTaskEventEntity> findByTaskIdOrderByCreatedAtAsc(String taskId);
+    List<JpaTaskEventEntity> findByTaskIdAndCreatedAtGreaterThanOrderByCreatedAtAsc(String taskId, long sinceTimestamp);
 }

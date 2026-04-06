@@ -303,7 +303,7 @@ function DiagnosticsTab() {
           <div className="flex items-center justify-between">
             <div>
               <p className="font-medium text-gray-900">重建 Chroma Collection</p>
-              <p className="text-sm text-gray-500">销毁当前 Collection -> 重建并注入 hnsw:space=cosine -> 清空本地映射表。</p>
+              <p className="text-sm text-gray-500">销毁当前 Collection -{'>'} 重建并注入 hnsw:space=cosine -{'>'} 清空本地映射表。</p>
             </div>
             <button
               onClick={() => setShowRebuildModal(true)}

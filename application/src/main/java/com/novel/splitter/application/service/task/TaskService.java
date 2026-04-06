@@ -75,7 +75,10 @@ public class TaskService {
     }
 
     @Transactional(readOnly = true)
-    public List<TaskProgressEvent> getTaskEvents(String taskId) {
+    public List<TaskProgressEvent> getTaskEvents(String taskId, Long sinceTimestamp) {
+        if (sinceTimestamp != null && sinceTimestamp > 0) {
+            return taskEventRepository.findByTaskIdSince(taskId, sinceTimestamp);
+        }
         return taskEventRepository.findByTaskId(taskId);
     }
 
