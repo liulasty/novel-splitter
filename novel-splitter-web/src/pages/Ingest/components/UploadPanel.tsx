@@ -7,31 +7,38 @@ interface UploadPanelProps {
     state: {
         activeTab: 'upload' | 'download';
         selectedFile: File | null;
+        novelName: string;
         downloadUrl: string;
-        downloadName: string;
         version: string;
-        maxScenes: number;
+        strategy: string;
+        maxTokens: number;
+        overlapTokens: number;
+        currentNovelId: string;
         ingestStatus: string;
         isError: boolean;
         isUploading: boolean;
-        isIngesting: boolean;
+        isSplitting: boolean;
+        isEmbedding: boolean;
         isDownloading: boolean;
     };
     actions: {
         setActiveTab: (tab: 'upload' | 'download') => void;
         handleFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
         setDownloadUrl: (url: string) => void;
-        setDownloadName: (name: string) => void;
+        setNovelName: (name: string) => void;
         handleUpload: () => void;
-        handleIngest: () => void;
+        handleSplit: () => void;
+        handleEmbed: () => void;
         handleDownloadAndIngest: () => void;
         setVersion: (version: string) => void;
-        setMaxScenes: (scenes: number) => void;
+        setStrategy: (strategy: string) => void;
+        setMaxTokens: (tokens: number) => void;
+        setOverlapTokens: (tokens: number) => void;
     };
 }
 
 export function UploadPanel({ state, actions }: UploadPanelProps) {
-    const { activeTab, selectedFile, downloadUrl, downloadName, version, maxScenes, ingestStatus, isError, isUploading, isIngesting, isDownloading } = state;
+    const { activeTab, selectedFile, novelName, downloadUrl, version, strategy, maxTokens, overlapTokens, currentNovelId, ingestStatus, isError, isUploading, isSplitting, isEmbedding, isDownloading } = state;
     const [previewOpen, setPreviewOpen] = useState(false);
 
     return (
@@ -109,10 +116,20 @@ export function UploadPanel({ state, actions }: UploadPanelProps) {
             )}
 
             {/* Config */}
-            <div className="flex items-end gap-4 mb-5">
-                <div className="grid grid-cols-2 gap-4 flex-1">
+            <div className="flex flex-col gap-4 mb-5">
+                <div className="grid grid-cols-4 gap-4">
                     <div className="space-y-1.5">
-                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">版本号 Version</label>
+                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">小说名称</label>
+                        <input
+                            type="text" 
+                            value={novelName} 
+                            onChange={(e) => actions.setNovelName(e.target.value)}
+                            placeholder="例如：九阳帝尊"
+                            className="w-full h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                        />
+                    </div>
+                    <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">版本标识</label>
                         <input
                             type="text" 
                             value={version} 
@@ -122,25 +139,42 @@ export function UploadPanel({ state, actions }: UploadPanelProps) {
                         />
                     </div>
                     <div className="space-y-1.5">
-                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">最大场景数（0 = 全部）</label>
+                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">切分策略</label>
+                        <select
+                            value={strategy}
+                            onChange={(e) => actions.setStrategy(e.target.value)}
+                            className="w-full h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                        >
+                            <option value="semantic">语义场景切分（推荐）</option>
+                            <option value="fixed">固定长度切分</option>
+                            <option value="chapter">章节切分</option>
+                        </select>
+                    </div>
+                </div>
+                <div className="grid grid-cols-4 gap-4">
+                    <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">最大 Token / 块</label>
                         <input
                             type="number" 
-                            value={maxScenes} 
-                            onChange={(e) => actions.setMaxScenes(Number(e.target.value))}
+                            value={maxTokens} 
+                            onChange={(e) => actions.setMaxTokens(Number(e.target.value))}
+                            className="w-full h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                        />
+                    </div>
+                    <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">重叠 Token</label>
+                        <input
+                            type="number" 
+                            value={overlapTokens} 
+                            onChange={(e) => actions.setOverlapTokens(Number(e.target.value))}
                             className="w-full h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-400"
                         />
                     </div>
                 </div>
-                <button
-                    onClick={() => setPreviewOpen(true)}
-                    className="flex items-center gap-1.5 h-9 px-4 py-2 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg hover:bg-indigo-100 transition-colors"
-                >
-                    <Eye className="w-4 h-4" /> 效果预览
-                </button>
             </div>
 
             {/* Actions */}
-            <div className="flex gap-3 justify-center">
+            <div className="flex gap-3 justify-center items-center flex-wrap">
                 {activeTab === 'upload' ? (
                     <>
                         <button
@@ -149,16 +183,33 @@ export function UploadPanel({ state, actions }: UploadPanelProps) {
                             className="inline-flex items-center gap-2 px-5 py-2 rounded-full text-sm font-medium border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:shadow transition-all disabled:opacity-40 disabled:pointer-events-none"
                         >
                             {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UploadCloud className="w-4 h-4" />}
-                            上传文件
+                            1. 上传文件
                         </button>
 
                         <button
-                            onClick={actions.handleIngest}
-                            disabled={!selectedFile || isIngesting}
+                            onClick={actions.handleSplit}
+                            disabled={!currentNovelId || isSplitting}
                             className="inline-flex items-center gap-2 px-5 py-2 rounded-full text-sm font-medium text-white bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 hover:shadow-lg transition-all disabled:opacity-40 disabled:pointer-events-none"
                         >
-                            {isIngesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
-                            发送到任务队列
+                            {isSplitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+                            2. 开始切分
+                        </button>
+
+                        <button
+                            onClick={() => setPreviewOpen(true)}
+                            disabled={!currentNovelId}
+                            className="inline-flex items-center gap-2 h-9 px-4 py-2 rounded-full text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+                        >
+                            <Eye className="w-4 h-4" /> 预览效果
+                        </button>
+
+                        <button
+                            onClick={actions.handleEmbed}
+                            disabled={!currentNovelId || isEmbedding}
+                            className="inline-flex items-center gap-2 px-5 py-2 rounded-full text-sm font-medium text-white bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 hover:shadow-lg transition-all disabled:opacity-40 disabled:pointer-events-none"
+                        >
+                            {isEmbedding ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                            3. 确认向量化
                         </button>
                     </>
                 ) : (
@@ -185,7 +236,7 @@ export function UploadPanel({ state, actions }: UploadPanelProps) {
             )}
 
             {/* Split Preview Modal */}
-            <SplitPreviewModal isOpen={previewOpen} onClose={() => setPreviewOpen(false)} />
+            <SplitPreviewModal isOpen={previewOpen} onClose={() => setPreviewOpen(false)} novelId={currentNovelId} />
         </div>
     );
 }

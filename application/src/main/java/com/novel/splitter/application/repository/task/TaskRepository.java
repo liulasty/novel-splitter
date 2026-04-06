@@ -40,6 +40,7 @@ public class TaskRepository {
     private JpaSplitTaskEntity toEntity(SplitTask task) {
         return JpaSplitTaskEntity.builder()
                 .taskId(task.getTaskId())
+                .taskType(task.getTaskType())
                 .novelId(task.getNovelId())
                 .fileName(task.getFileName())
                 .maxScenes(task.getMaxScenes())
@@ -57,6 +58,7 @@ public class TaskRepository {
     private SplitTask toDomain(JpaSplitTaskEntity entity) {
         SplitTask task = new SplitTask();
         task.setTaskId(entity.getTaskId());
+        task.setTaskType(entity.getTaskType());
         task.setNovelId(entity.getNovelId());
         task.setFileName(entity.getFileName());
         task.setMaxScenes(entity.getMaxScenes());

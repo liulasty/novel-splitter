@@ -13,9 +13,7 @@ import { Copy, Filter, ArrowDownAZ, ArrowUpZA } from 'lucide-react';
 const TABS = [
   { id: 'retrieval', label: '检索结果 (Retrieval)' },
   { id: 'context', label: '上下文组装 (Context)' },
-  { id: 'prompt', label: '最终提示词 (Prompt)' },
-  { id: 'chroma', label: 'ChromaDB诊断 (ChromaDB)' },
-  { id: 'stats', label: '执行统计 (Stats)' },
+  { id: 'prompt', label: '最终提示词 (Prompt)' }
 ];
 
 interface VersionSampleRecord {
@@ -369,87 +367,62 @@ export default function RagDebugPage() {
           </div>
         );
 
-      case 'chroma':
-        return (
-          <div className="space-y-6">
-            <div className="mb-4 sticky top-0 bg-white z-10 py-2 border-b">
-              <h2 className="text-xl font-bold">ChromaDB 诊断信息 (Diagnostics)</h2>
-            </div>
-            
-            {!chromaCollection ? (
-              <div className="text-center py-10 text-gray-400">无 ChromaDB 诊断数据</div>
-            ) : (
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                <CollapseCard title={<span className="font-bold text-sm">集合级状态 (Collection Stats)</span>}>
-                  <div className="space-y-3">
-                    <div className="flex justify-between text-sm border-b pb-2">
-                      <span className="text-gray-500">集合名称:</span>
-                      <span className="font-mono bg-gray-100 px-2 rounded">{chromaCollection.name}</span>
-                    </div>
-                    <div className="flex justify-between text-sm border-b pb-2">
-                      <span className="text-gray-500">距离空间 (hnsw:space):</span>
-                      <span className={`font-mono font-bold ${chromaCollection.metadata?.['hnsw:space'] !== 'cosine' ? 'text-red-600' : 'text-green-600'}`}>
-                        {chromaCollection.metadata?.['hnsw:space'] || 'l2 (未设置/默认)'}
-                        {chromaCollection.metadata?.['hnsw:space'] !== 'cosine' && <span className="text-xs ml-1 text-red-500">(公式退化风险)</span>}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm border-b pb-2">
-                      <span className="text-gray-500">总向量数:</span>
-                      <span className="font-mono bg-blue-50 text-blue-700 px-2 rounded font-bold">{collectionCount !== null ? collectionCount : '获取中...'}</span>
-                    </div>
-                  </div>
-                </CollapseCard>
-
-                {selectedNovel && selectedVersion && (
-                  <CollapseCard title={<span className="font-bold text-sm">版本级验证 (Version Data)</span>}>
-                    <div className="space-y-3">
-                      <div className="flex justify-between text-sm border-b pb-2">
-                        <span className="text-gray-500">过滤条件:</span>
-                        <span className="font-mono text-xs truncate bg-gray-100 px-2 rounded">novel={selectedNovel}, version={selectedVersion}</span>
-                      </div>
-                      <div className="flex justify-between text-sm border-b pb-2">
-                        <span className="text-gray-500">是否有数据:</span>
-                        <span className={`font-mono font-bold ${versionRecordCount === 0 ? 'text-red-600' : 'text-green-600'}`}>
-                          {versionRecordCount === null ? '获取中...' : (versionRecordCount > 0 ? `存在数据 (✅ ${versionRecordCount}条)` : '无数据 (❌)')}
-                        </span>
-                      </div>
-                      {versionSampleRecord && (
-                        <div className="mt-2 text-xs">
-                          <span className="text-gray-500 block mb-2 font-bold">采样记录 (ID: {versionSampleRecord.id}):</span>
-                          <pre className="bg-gray-900 text-gray-100 p-3 rounded overflow-x-auto max-h-48 shadow-inner">
-                            {JSON.stringify(versionSampleRecord.metadata, null, 2)}
-                          </pre>
-                        </div>
-                      )}
-                    </div>
-                  </CollapseCard>
-                )}
-              </div>
-            )}
-          </div>
-        );
-
-      case 'stats':
-        return (
-          <div className="space-y-6">
-            <div className="mb-4 sticky top-0 bg-white z-10 py-2 border-b">
-              <h2 className="text-xl font-bold">执行统计 (Execution Stats)</h2>
-            </div>
-            
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-              {Object.entries(result.stats).map(([key, value]) => (
-                <div key={key} className="p-4 bg-white border border-gray-100 shadow-sm rounded-lg hover:shadow-md transition-shadow">
-                  <div className="text-xs text-gray-500 mb-1 uppercase tracking-wide font-semibold">{key}</div>
-                  <div className="text-xl font-mono text-blue-700">{String(value)}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-
       default:
         return null;
     }
+  };
+
+  const renderDiagnosticsAndStats = () => {
+    if (!result) return null;
+    return (
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-6">
+        {/* Stats Grid */}
+        <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+          <h3 className="text-sm font-bold text-gray-700 mb-3 uppercase tracking-wider">执行统计 (Execution Stats)</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {Object.entries(result.stats).map(([key, value]) => (
+              <div key={key} className="p-3 bg-gray-50 border border-gray-100 rounded-lg">
+                <div className="text-[10px] text-gray-500 uppercase tracking-wide font-semibold mb-1 truncate">{key}</div>
+                <div className="text-lg font-mono font-bold text-blue-700 truncate">{String(value)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ChromaDB Diagnostics */}
+        <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+          <h3 className="text-sm font-bold text-gray-700 mb-3 uppercase tracking-wider">ChromaDB 诊断 (Diagnostics)</h3>
+          {!chromaCollection ? (
+            <div className="text-center py-4 text-gray-400 text-sm">无诊断数据</div>
+          ) : (
+            <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+              <div className="flex justify-between border-b border-gray-100 pb-1">
+                <span className="text-gray-500">集合:</span>
+                <span className="font-mono bg-gray-100 px-1.5 rounded text-xs">{chromaCollection.name}</span>
+              </div>
+              <div className="flex justify-between border-b border-gray-100 pb-1">
+                <span className="text-gray-500">空间:</span>
+                <span className={`font-mono text-xs font-bold ${chromaCollection.metadata?.['hnsw:space'] !== 'cosine' ? 'text-red-600' : 'text-green-600'}`}>
+                  {chromaCollection.metadata?.['hnsw:space'] || 'l2'}
+                </span>
+              </div>
+              <div className="flex justify-between border-b border-gray-100 pb-1">
+                <span className="text-gray-500">总数:</span>
+                <span className="font-mono bg-blue-50 text-blue-700 px-1.5 rounded text-xs font-bold">
+                  {collectionCount !== null ? collectionCount : '...'}
+                </span>
+              </div>
+              <div className="flex justify-between border-b border-gray-100 pb-1">
+                <span className="text-gray-500">当前版本:</span>
+                <span className={`font-mono text-xs font-bold ${versionRecordCount === 0 ? 'text-red-600' : 'text-green-600'}`}>
+                  {versionRecordCount === null ? '...' : (versionRecordCount > 0 ? `✅ ${versionRecordCount}` : '❌')}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -546,13 +519,16 @@ export default function RagDebugPage() {
         </div>
 
         {/* 右侧: Tab 内容 (具有内部滚动条) */}
-        <div className="flex-1 flex flex-col overflow-hidden bg-white rounded-xl shadow-sm border border-gray-200 relative">
+        <div className="flex-1 flex flex-col overflow-hidden relative">
           {result ? (
-            <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-              {renderTabContent()}
+            <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-4">
+              {renderDiagnosticsAndStats()}
+              <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                {renderTabContent()}
+              </div>
             </div>
           ) : (
-            <div className="flex-1 flex items-center justify-center flex-col text-gray-400 p-6">
+            <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-200 flex items-center justify-center flex-col text-gray-400 p-6">
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
                 <Filter className="w-8 h-8 text-gray-300" />
               </div>

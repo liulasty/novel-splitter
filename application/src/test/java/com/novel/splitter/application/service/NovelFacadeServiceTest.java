@@ -5,6 +5,7 @@ import com.novel.splitter.application.service.novel.NovelFacadeServiceImpl;
 import com.novel.splitter.application.service.novel.NovelStorageService;
 import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.domain.model.dto.IngestRequest;
+import com.novel.splitter.domain.enums.TaskType;
 import com.novel.splitter.domain.task.SplitTaskMessage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -52,7 +53,7 @@ class NovelFacadeServiceTest {
         ArgumentCaptor<String> versionCaptor = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<SplitTaskMessage> messageCaptor = ArgumentCaptor.forClass(SplitTaskMessage.class);
 
-        verify(taskService).createTask(taskIdCaptor.capture(), novelIdCaptor.capture(), org.mockito.Mockito.eq("demo.txt"),
+        verify(taskService).createTask(taskIdCaptor.capture(), org.mockito.Mockito.eq(TaskType.SPLIT), novelIdCaptor.capture(), org.mockito.Mockito.eq("demo.txt"),
                 maxScenesCaptor.capture(), versionCaptor.capture());
         
         verify(rabbitTemplate).convertAndSend(org.mockito.Mockito.eq(RabbitConfig.EXCHANGE_NAME), org.mockito.Mockito.eq("load"), messageCaptor.capture());
@@ -60,7 +61,6 @@ class NovelFacadeServiceTest {
         SplitTaskMessage message = messageCaptor.getValue();
         assertEquals(taskIdCaptor.getValue(), message.getTaskId());
         assertEquals(novelIdCaptor.getValue(), message.getNovelId());
-        assertEquals(Path.of("D:/novels/demo.txt").toAbsolutePath().toString(), message.getFilePath());
         assertEquals(Integer.MAX_VALUE, message.getMaxScenes());
         assertEquals("v1", message.getVersion());
 

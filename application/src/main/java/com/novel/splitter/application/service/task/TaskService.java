@@ -1,5 +1,6 @@
 package com.novel.splitter.application.service.task;
 
+import com.novel.splitter.domain.enums.TaskType;
 import com.novel.splitter.domain.task.SplitTask;
 import com.novel.splitter.domain.task.TaskProgressEvent;
 import com.novel.splitter.application.repository.task.TaskRepository;
@@ -35,8 +36,8 @@ public class TaskService {
     }
 
     @Transactional
-    public SplitTask createTask(String taskId, String novelId, String fileName, int maxScenes, String version) {
-        SplitTask task = new SplitTask(taskId, novelId, fileName, maxScenes, version);
+    public SplitTask createTask(String taskId, TaskType taskType, String novelId, String fileName, int maxScenes, String version) {
+        SplitTask task = new SplitTask(taskId, taskType, novelId, fileName, maxScenes, version);
         return taskRepository.save(task);
     }
 
@@ -107,6 +108,7 @@ public class TaskService {
         return JobRecordDto.builder()
                 .id(entity.getTaskId())
                 .taskId(entity.getTaskId())
+                .taskType(entity.getTaskType())
                 .novelId(entity.getNovelId())
                 .fileName(entity.getFileName())
                 .maxScenes(entity.getMaxScenes())

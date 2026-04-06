@@ -10,10 +10,10 @@ import java.util.List;
 import java.util.stream.Stream;
 
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 @Repository
-public interface JpaSceneRepository extends JpaRepository<JpaSceneEntity, Long> {
+public interface JpaSceneRepository extends JpaRepository<JpaSceneEntity, Long>, JpaSpecificationExecutor<JpaSceneEntity> {
     
     @Query("SELECT s.id as id, s.chapterIndex as chapterIndex, 'SCENE' as type, s.wordCount as tokenCount, SUBSTRING(s.text, 1, 150) as textContent FROM JpaSceneEntity s")
     Page<com.novel.splitter.domain.model.dto.VectorPreviewRecordDto> findLightweightScenes(Pageable pageable);
@@ -24,6 +24,8 @@ public interface JpaSceneRepository extends JpaRepository<JpaSceneEntity, Long> 
     List<JpaSceneEntity> findBySceneIdIn(List<String> sceneIds);
 
     List<JpaSceneEntity> findByNovelNameAndVersion(String novelName, String version);
+
+    Page<JpaSceneEntity> findByNovelId(String novelId, Pageable pageable);
 
     Stream<JpaSceneEntity> streamAllByNovelNameAndVersion(String novelName, String version);
 

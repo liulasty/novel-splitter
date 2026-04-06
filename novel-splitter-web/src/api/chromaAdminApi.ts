@@ -119,4 +119,8 @@ export const chromaAdminApi = {
     const response = await apiClient.post<{ message: string }>('/admin/chroma/collections/rebuild');
     return response;
   },
+  deleteVersion: async (novel: string, version: string): Promise<{ message: string }> => {
+    const response = await apiClient.delete<{ message: string }>(`/admin/chroma/collections/versions?novel=${encodeURIComponent(novel)}&version=${encodeURIComponent(version)}`);
+    return response;
+  },
 };

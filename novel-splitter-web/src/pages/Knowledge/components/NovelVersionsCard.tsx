@@ -17,7 +17,7 @@ export function NovelVersionsCard({ novel, stats }: { novel: string, stats: Nove
     });
 
     const deleteNovelMutation = useMutation({
-        mutationFn: () => knowledgeApi.deleteKnowledgeBase(novel),
+        mutationFn: () => novelApi.deleteNovel(novel),
         onSuccess: () => {
             toast.success(`知识库 "${novel}" 已删除`);
             queryClient.invalidateQueries({ queryKey: ['novels'] });

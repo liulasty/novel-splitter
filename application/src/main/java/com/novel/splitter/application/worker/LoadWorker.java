@@ -7,6 +7,8 @@ import com.novel.splitter.domain.task.SplitTaskMessage;
 import com.novel.splitter.pipeline.etl.NovelCacheService;
 import com.novel.splitter.pipeline.orchestrator.LoadNovelUseCase;
 import com.novel.splitter.application.service.task.TaskService;
+import com.novel.splitter.application.service.novel.NovelService;
+import com.novel.splitter.domain.enums.NovelStatus;
 import com.novel.splitter.domain.model.Novel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +29,7 @@ public class LoadWorker {
     private final NovelCacheService novelCacheService;
     private final RabbitTemplate rabbitTemplate;
     private final AppConfig appConfig;
+    private final NovelService novelService;
 
     @RabbitListener(queues = RabbitConfig.LOAD_TASK_QUEUE)
     public void processLoadTask(SplitTaskMessage message) {
@@ -41,6 +44,9 @@ public class LoadWorker {
             }
 
             taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, 5, "开始读取文件...");
+            if (message.getNovelId() != null) {
+                novelService.updateNovelStatus(message.getNovelId(), NovelStatus.SPLITTING);
+            }
 
             String rootPath = appConfig.getStorage().getRootPath();
             Path novelPath = Paths.get(rootPath, task.getFileName());
@@ -58,6 +64,9 @@ public class LoadWorker {
         } catch (Exception e) {
             log.error("处理任务 {} 时发生异常", taskId, e);
             taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.FAILED, 0, "读取失败: " + e.getMessage());
+            if (message.getNovelId() != null) {
+                novelService.updateNovelStatus(message.getNovelId(), NovelStatus.FAILED);
+            }
         }
     }
 }

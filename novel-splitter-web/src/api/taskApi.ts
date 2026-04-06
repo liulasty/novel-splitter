@@ -11,6 +11,10 @@ export interface SplitTask {
   message: string;
   createdAt: number;
   updatedAt: number;
+  taskType?: 'SPLIT' | 'EMBED';
+  sceneCount?: number;
+  embeddedCount?: number;
+  logs?: string[];
 }
 
 export interface TaskProgressEvent {
