@@ -41,6 +41,9 @@ public class SceneMetadata {
     /** Chunk 类型 (e.g., "scene", "summary") */
     private String chunkType;
     
+    /** 序列号 (例如在切分后的片段序号) */
+    private Integer sequenceNum;
+    
     /** 角色/功能 (e.g., "narration", "dialogue") */
     private String role;
 

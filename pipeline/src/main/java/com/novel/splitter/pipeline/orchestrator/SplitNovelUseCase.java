@@ -6,6 +6,8 @@ import com.novel.splitter.domain.model.Chapter;
 import com.novel.splitter.domain.model.ChapterData;
 import com.novel.splitter.domain.model.Novel;
 import com.novel.splitter.domain.model.Scene;
+import com.novel.splitter.domain.strategy.ChunkingStrategy;
+import com.novel.splitter.domain.strategy.OverlapChunkingStrategy;
 import com.novel.splitter.infrastructure.progress.IngestProgress;
 import com.novel.splitter.repository.api.SceneRepository;
 import lombok.RequiredArgsConstructor;
@@ -27,11 +29,14 @@ public class SplitNovelUseCase {
     
     private final SceneAssembler sceneAssembler = new SceneAssembler();
 
-    @Value("${splitter.rule.min-length:200}")
+    @Value("${splitter.rule.min-length:50}")
     private int minLength;
 
-    @Value("${splitter.rule.max-length:3000}")
-    private int maxLength;
+    @Value("${splitter.ingestion.chunk-size:500}")
+    private int chunkSize;
+
+    @Value("${splitter.ingestion.chunk-overlap:100}")
+    private int chunkOverlap;
 
     private List<Scene> filterByLength(List<Scene> scenes) {
         List<Scene> valid = new ArrayList<>();
@@ -41,10 +46,6 @@ public class SplitNovelUseCase {
                 log.warn("Scene {} (chapter {}) too short: {} chars, skipping",
                         s.getId(), s.getChapterTitle(), len);
                 continue;
-            }
-            if (len > maxLength) {
-                log.warn("Scene {} (chapter {}) too long: {} chars, will be chunked downstream",
-                        s.getId(), s.getChapterTitle(), len);
             }
             valid.add(s);
         }
@@ -63,6 +64,8 @@ public class SplitNovelUseCase {
             progressCallback.accept(IngestProgress.CHAPTER_END, String.format("准备逐章切分，共 %d 章", totalChapters));
         }
 
+        ChunkingStrategy chunkingStrategy = new OverlapChunkingStrategy(chunkSize, chunkOverlap);
+
         for (int i = 0; i < totalChapters; i++) {
             Chapter chapter = chapters.get(i);
             
@@ -70,8 +73,15 @@ public class SplitNovelUseCase {
             ChapterData chapterData = novelCacheService.loadChapter(taskId, chapter.getIndex());
             
             List<Scene> chapterScenes = sceneAssembler.assembleChapter(chapter, chapterData.getParagraphs(), novel.getTitle());
-            scenes.addAll(chapterScenes);
-            scenesCount += chapterScenes.size();
+            
+            // Apply fine-grained chunking immediately before DB save
+            List<Scene> chunkedScenes = new ArrayList<>();
+            for (Scene s : chapterScenes) {
+                chunkedScenes.addAll(chunkingStrategy.split(s));
+            }
+            
+            scenes.addAll(chunkedScenes);
+            scenesCount += chunkedScenes.size();
             
             if (progressCallback != null && (i % 10 == 0 || i == totalChapters - 1)) {
                 int progress = IngestProgress.calc(IngestProgress.SCENE_START, IngestProgress.SCENE_END, i + 1, totalChapters);

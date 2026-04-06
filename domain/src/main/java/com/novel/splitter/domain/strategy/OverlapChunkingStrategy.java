@@ -44,16 +44,56 @@ public class OverlapChunkingStrategy implements ChunkingStrategy {
         int index = 0;
         int childIdx = 0;
         while (index < text.length()) {
-            int end = Math.min(index + chunkSize, text.length());
+            int maxEnd = Math.min(index + chunkSize, text.length());
+            int end = findBestSplitPoint(text, index, maxEnd);
+            
+            // If the chunk becomes too small due to lookback, just use maxEnd
+            if (end <= index) {
+                end = maxEnd;
+            }
+            
             String chunkText = text.substring(index, end);
             children.add(createChildScene(parent, chunkText, childIdx++));
 
             if (end == text.length()) {
                 break;
             }
+            // For overlap, also try to find a natural start if possible, but simple overlap is fine for now
             index = end - overlap;
         }
         return children;
+    }
+
+    private int findBestSplitPoint(String text, int start, int maxEnd) {
+        if (maxEnd >= text.length()) {
+            return text.length();
+        }
+        
+        // Try to find a good break point within the last 40% of the chunk
+        int lookbackLimit = Math.max(start + chunkSize / 2, maxEnd - (chunkSize * 4 / 10));
+        
+        // 1. Look for double newline
+        int doubleNewline = text.lastIndexOf("\n\n", maxEnd);
+        if (doubleNewline >= lookbackLimit) return doubleNewline + 2;
+        
+        // 2. Look for single newline
+        int singleNewline = text.lastIndexOf("\n", maxEnd);
+        if (singleNewline >= lookbackLimit) return singleNewline + 1;
+        
+        // 3. Look for major punctuation marks
+        for (int i = maxEnd - 1; i >= lookbackLimit; i--) {
+            char c = text.charAt(i);
+            if (c == '。' || c == '！' || c == '？' || c == '!' || c == '?') {
+                // include the closing quote if it's there
+                if (i + 1 < text.length() && (text.charAt(i + 1) == '”' || text.charAt(i + 1) == '"' || text.charAt(i + 1) == '’')) {
+                    return i + 2;
+                }
+                return i + 1;
+            }
+        }
+        
+        // Fallback to maxEnd
+        return maxEnd;
     }
 
     private Scene createChildScene(Scene parent, String text, int childIndex) {
@@ -75,6 +115,7 @@ public class OverlapChunkingStrategy implements ChunkingStrategy {
         }
         childMeta.setParentSceneId(parent.getId());
         childMeta.setChunkType("child_chunk");
+        childMeta.setSequenceNum(childIndex);
         child.setMetadata(childMeta);
 
         return child;
