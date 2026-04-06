@@ -21,6 +21,14 @@ public class JpaSceneEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "novel_id", foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
+    private JpaNovelEntity novel;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "chapter_id", foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
+    private JpaChapterEntity chapter;
+
     @Column(name = "scene_id", nullable = false)
     private String sceneId; // String ID from Scene
 
