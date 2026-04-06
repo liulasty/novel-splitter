@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Novel Splitter · RAG Console</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Syne:wght@400;500;600;700;800&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0a0a0f;
+  --bg2: #111118;
+  --bg3: #1a1a24;
+  --bg4: #222230;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.12);
+  --text: #e8e8f0;
+  --text2: #9090a8;
+  --text3: #55556a;
+  --accent: #7c6aff;
+  --accent2: #5544dd;
+  --accent-glow: rgba(124,106,255,0.15);
+  --green: #2ecc8a;
+  --green-bg: rgba(46,204,138,0.08);
+  --amber: #f0a030;
+  --amber-bg: rgba(240,160,48,0.08);
+  --red: #e05555;
+  --red-bg: rgba(224,85,85,0.08);
+  --blue: #5599ff;
+  --blue-bg: rgba(85,153,255,0.08);
+  --font-ui: 'Syne', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --r: 8px;
+  --r2: 12px;
+}
+
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font-ui); font-size: 14px; line-height: 1.6; overflow: hidden; }
+
+/* ── LAYOUT ── */
+.shell { display: grid; grid-template-columns: 220px 1fr; grid-template-rows: 52px 1fr; height: 100vh; }
+.topbar { grid-column: 1/-1; display: flex; align-items: center; gap: 12px; padding: 0 20px; border-bottom: 1px solid var(--border); background: var(--bg2); position: relative; z-index: 10; }
+.sidebar { background: var(--bg2); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 16px 0; overflow-y: auto; }
+.main { overflow-y: auto; background: var(--bg); }
+
+/* ── TOPBAR ── */
+.logo { font-weight: 800; font-size: 15px; letter-spacing: -0.5px; color: var(--text); display: flex; align-items: center; gap: 8px; }
+.logo-icon { width: 26px; height: 26px; background: var(--accent); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+.logo span { color: var(--accent); }
+.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+.status-label { font-family: var(--font-mono); font-size: 11px; color: var(--text2); }
+
+/* ── SIDEBAR ── */
+.nav-section { padding: 0 12px 8px; }
+.nav-label { font-family: var(--font-mono); font-size: 10px; color: var(--text3); letter-spacing: 0.1em; text-transform: uppercase; padding: 8px 8px 4px; }
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--r); cursor: pointer; color: var(--text2); font-size: 13px; font-weight: 500; transition: all 0.15s; position: relative; }
+.nav-item:hover { background: var(--bg3); color: var(--text); }
+.nav-item.active { background: var(--accent-glow); color: var(--accent); }
+.nav-item.active::before { content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 3px; height: 18px; background: var(--accent); border-radius: 0 2px 2px 0; }
+.nav-icon { width: 16px; height: 16px; opacity: 0.7; flex-shrink: 0; }
+.nav-item.active .nav-icon { opacity: 1; }
+.nav-badge { margin-left: auto; font-family: var(--font-mono); font-size: 10px; background: var(--bg4); color: var(--text3); padding: 1px 6px; border-radius: 10px; }
+.nav-divider { height: 1px; background: var(--border); margin: 8px 12px; }
+
+/* ── CONTENT ── */
+.page { display: none; padding: 28px 32px; min-height: 100%; }
+.page.active { display: block; }
+.page-header { margin-bottom: 28px; }
+.page-title { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 4px; }
+.page-sub { color: var(--text2); font-size: 13px; }
+
+/* ── CARDS ── */
+.card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--r2); overflow: hidden; margin-bottom: 16px; }
+.card-head { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.card-title { font-size: 13px; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 8px; }
+.card-body { padding: 18px; }
+
+/* ── GRID ── */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+.grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; }
+
+/* ── STAT CARDS ── */
+.stat { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--r2); padding: 16px 18px; }
+.stat-label { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text3); margin-bottom: 8px; }
+.stat-value { font-size: 26px; font-weight: 700; letter-spacing: -1px; color: var(--text); line-height: 1; }
+.stat-sub { font-family: var(--font-mono); font-size: 11px; color: var(--text2); margin-top: 6px; }
+.stat.green .stat-value { color: var(--green); }
+.stat.amber .stat-value { color: var(--amber); }
+.stat.accent .stat-value { color: var(--accent); }
+.stat.blue .stat-value { color: var(--blue); }
+
+/* ── FORMS ── */
+.field { margin-bottom: 14px; }
+.field label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); margin-bottom: 6px; letter-spacing: 0.02em; text-transform: uppercase; }
+.field input, .field select, .field textarea {
+  width: 100%; background: var(--bg3); border: 1px solid var(--border2); border-radius: var(--r);
+  color: var(--text); font-family: var(--font-mono); font-size: 13px; padding: 9px 12px;
+  outline: none; transition: border-color 0.15s;
+}
+.field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+.field select option { background: var(--bg3); }
+.field textarea { resize: vertical; min-height: 80px; }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.field-hint { font-size: 11px; color: var(--text3); margin-top: 4px; font-family: var(--font-mono); }
+
+/* ── BUTTONS ── */
+.btn { display: inline-flex; align-items: center; gap: 7px; padding: 8px 16px; border-radius: var(--r); font-family: var(--font-ui); font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent2); }
+.btn-ghost { background: transparent; color: var(--text2); border: 1px solid var(--border2); }
+.btn-ghost:hover { background: var(--bg3); color: var(--text); }
+.btn-danger { background: var(--red-bg); color: var(--red); border: 1px solid rgba(224,85,85,0.2); }
+.btn-danger:hover { background: rgba(224,85,85,0.15); }
+.btn-sm { padding: 5px 10px; font-size: 12px; }
+.btn-icon { padding: 7px; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── BADGES ── */
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; font-family: var(--font-mono); }
+.badge-green { background: var(--green-bg); color: var(--green); }
+.badge-amber { background: var(--amber-bg); color: var(--amber); }
+.badge-red { background: var(--red-bg); color: var(--red); }
+.badge-accent { background: var(--accent-glow); color: var(--accent); }
+.badge-gray { background: var(--bg4); color: var(--text2); }
+.badge-blue { background: var(--blue-bg); color: var(--blue); }
+
+/* ── TABLE ── */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text3); padding: 8px 14px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+td { padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 13px; vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--bg3); }
+.td-mono { font-family: var(--font-mono); font-size: 12px; }
+
+/* ── CODE BLOCK ── */
+.code-block { background: #0d0d14; border: 1px solid var(--border); border-radius: var(--r); padding: 14px 16px; font-family: var(--font-mono); font-size: 12px; line-height: 1.7; color: #c8c8e0; overflow-x: auto; white-space: pre-wrap; word-break: break-word; }
+.code-block .kw { color: #a78bfa; }
+.code-block .str { color: var(--green); }
+.code-block .num { color: var(--amber); }
+.code-block .cm { color: var(--text3); font-style: italic; }
+
+/* ── PIPELINE STEPS ── */
+.pipeline { display: flex; align-items: center; gap: 0; overflow-x: auto; padding: 4px 0 8px; }
+.pipe-step { flex-shrink: 0; background: var(--bg3); border: 1px solid var(--border2); border-radius: var(--r); padding: 10px 14px; min-width: 110px; text-align: center; position: relative; }
+.pipe-step.done { border-color: rgba(46,204,138,0.3); background: var(--green-bg); }
+.pipe-step.running { border-color: rgba(124,106,255,0.4); background: var(--accent-glow); }
+.pipe-step.error { border-color: rgba(224,85,85,0.3); background: var(--red-bg); }
+.pipe-step.pending { opacity: 0.5; }
+.pipe-name { font-size: 11px; font-weight: 600; margin-bottom: 2px; }
+.pipe-sub { font-family: var(--font-mono); font-size: 10px; color: var(--text3); }
+.pipe-arrow { flex-shrink: 0; width: 28px; text-align: center; color: var(--text3); font-size: 16px; }
+
+/* ── TABS ── */
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+.tab { padding: 8px 16px; font-size: 13px; font-weight: 500; color: var(--text2); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.15s; }
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* ── TOGGLE ── */
+.toggle-wrap { display: flex; align-items: center; gap: 10px; }
+.toggle { position: relative; width: 36px; height: 20px; cursor: pointer; }
+.toggle input { display: none; }
+.toggle-track { width: 100%; height: 100%; background: var(--bg4); border-radius: 10px; transition: background 0.2s; display: block; }
+.toggle input:checked + .toggle-track { background: var(--accent); }
+.toggle-thumb { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; background: #fff; border-radius: 50%; transition: transform 0.2s; pointer-events: none; }
+.toggle input:checked ~ .toggle-thumb { transform: translateX(16px); }
+.toggle-label { font-size: 13px; color: var(--text2); }
+
+/* ── RAG DEBUG SPECIFIC ── */
+.score-bar { height: 4px; background: var(--bg4); border-radius: 2px; margin-top: 6px; }
+.score-fill { height: 100%; border-radius: 2px; background: var(--accent); }
+.scene-card { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--r2); padding: 14px 16px; margin-bottom: 10px; transition: border-color 0.15s; }
+.scene-card:hover { border-color: var(--border2); }
+.scene-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; align-items: center; }
+.scene-text { font-size: 12px; color: var(--text2); line-height: 1.65; max-height: 80px; overflow: hidden; position: relative; }
+.scene-text::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 24px; background: linear-gradient(transparent, var(--bg3)); }
+
+/* ── PROMPT VIEWER ── */
+.prompt-section { margin-bottom: 16px; }
+.prompt-section-label { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text3); padding: 6px 10px; background: var(--bg4); border-radius: var(--r) var(--r) 0 0; border: 1px solid var(--border); border-bottom: none; display: flex; justify-content: space-between; align-items: center; }
+.prompt-section-body { border: 1px solid var(--border); border-radius: 0 0 var(--r) var(--r); background: #0d0d14; padding: 12px 14px; font-family: var(--font-mono); font-size: 12px; line-height: 1.7; color: #c8c8e0; white-space: pre-wrap; word-break: break-word; max-height: 200px; overflow-y: auto; }
+
+/* ── VECTOR TABLE ── */
+.vector-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 4px; }
+.vector-cell { background: var(--bg4); border-radius: 4px; padding: 4px 6px; font-family: var(--font-mono); font-size: 10px; text-align: center; color: var(--text2); }
+
+/* ── ALERTS ── */
+.alert { padding: 12px 16px; border-radius: var(--r); font-size: 13px; display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; }
+.alert-warn { background: var(--amber-bg); border: 1px solid rgba(240,160,48,0.2); color: var(--amber); }
+.alert-error { background: var(--red-bg); border: 1px solid rgba(224,85,85,0.2); color: var(--red); }
+.alert-info { background: var(--blue-bg); border: 1px solid rgba(85,153,255,0.2); color: var(--blue); }
+.alert-success { background: var(--green-bg); border: 1px solid rgba(46,204,138,0.2); color: var(--green); }
+
+/* ── CHROMA HEATMAP ── */
+.heatmap { display: grid; grid-template-columns: repeat(20, 1fr); gap: 2px; }
+.heatmap-cell { aspect-ratio: 1; border-radius: 2px; }
+
+/* ── SETTINGS ── */
+.setting-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid var(--border); }
+.setting-row:last-child { border-bottom: none; }
+.setting-info { flex: 1; margin-right: 20px; }
+.setting-name { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+.setting-desc { font-size: 12px; color: var(--text2); }
+.setting-control { flex-shrink: 0; }
+
+/* ── LOADING ── */
+.loading-dots span { animation: blink 1.2s infinite; display: inline-block; }
+.loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+.loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes blink { 0%,80%,100% { opacity: 0; } 40% { opacity: 1; } }
+
+/* ── PROGRESS ── */
+.progress { height: 6px; background: var(--bg4); border-radius: 3px; overflow: hidden; }
+.progress-fill { height: 100%; border-radius: 3px; background: var(--accent); transition: width 0.4s ease; }
+.progress-fill.green { background: var(--green); }
+.progress-fill.amber { background: var(--amber); }
+
+/* ── MISC ── */
+.sep { height: 1px; background: var(--border); margin: 20px 0; }
+.tag { display: inline-block; padding: 1px 7px; border-radius: 4px; font-family: var(--font-mono); font-size: 11px; background: var(--bg4); color: var(--text2); }
+.flex { display: flex; align-items: center; }
+.flex-gap { gap: 8px; }
+.ml-auto { margin-left: auto; }
+.text-mono { font-family: var(--font-mono); }
+.text-sm { font-size: 12px; }
+.text-xs { font-size: 11px; }
+.text-muted { color: var(--text2); }
+.text-green { color: var(--green); }
+.text-red { color: var(--red); }
+.text-amber { color: var(--amber); }
+.text-accent { color: var(--accent); }
+.mt-4 { margin-top: 16px; }
+.mb-4 { margin-bottom: 16px; }
+.scroll { max-height: 400px; overflow-y: auto; }
+.scroll::-webkit-scrollbar { width: 4px; }
+.scroll::-webkit-scrollbar-track { background: transparent; }
+.scroll::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 2px; }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <div class="logo">
+      <div class="logo-icon">§</div>
+      Novel<span>Splitter</span>
+    </div>
+    <div style="width:1px;height:20px;background:var(--border);margin:0 4px"></div>
+    <span style="font-family:var(--font-mono);font-size:11px;color:var(--text3)">RAG Console</span>
+    <div class="topbar-right">
+      <div class="status-dot"></div>
+      <span class="status-label">ChromaDB · 在线</span>
+      <div style="width:1px;height:20px;background:var(--border)"></div>
+      <span class="status-label" style="color:var(--text3)">v1.0.0-SNAPSHOT</span>
+    </div>
+  </header>
+
+  <!-- SIDEBAR -->
+  <nav class="sidebar">
+    <div class="nav-section">
+      <div class="nav-label">概览</div>
+      <div class="nav-item active" onclick="nav('dashboard')">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg>
+        仪表盘
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">入库流水线</div>
+      <div class="nav-item" onclick="nav('novels')">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 2h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"/><path d="M5 5h6M5 8h6M5 11h4"/></svg>
+        小说管理
+        <span class="nav-badge">12</span>
+      </div>
+      <div class="nav-item" onclick="nav('pipeline')">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 8h12M8 2l4 6-4 6"/></svg>
+        处理流水线
+      </div>
+      <div class="nav-item" onclick="nav('jobs')">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/></svg>
+        任务队列
+        <span class="nav-badge" style="background:var(--amber-bg);color:var(--amber)">3</span>
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">向量数据库</div>
+      <div class="nav-item" onclick="nav('chroma')">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><ellipse cx="8" cy="5" rx="6" ry="3"/><path d="M2 5v6c0 1.66 2.69 3 6 3s6-1.34 6-3V5"/><path d="M2 8c0 1.66 2.69 3 6 3s6-1.34 6-3"/></svg>
+        ChromaDB
+      </div>
+      <div class="nav-item" onclick="nav('embeddings')">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="4" cy="4" r="2"/><circle cx="12" cy="4" r="2"/><circle cx="4" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><path d="M6 4h4M4 6v4M12 6v4M6 12h4" stroke-opacity="0.4"/></svg>
+        向量浏览
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">RAG 问答</div>
+      <div class="nav-item" onclick="nav('chat')">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 10a2 2 0 0 1-2 2H5l-3 3V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v6z"/></svg>
+        问答界面
+      </div>
+      <div class="nav-item" onclick="nav('debug')">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 2l-4 4 4 4M10 2l4 4-4 4M9 1l-2 14"/></svg>
+        RAG 调试器
+      </div>
+    </div>
+
+    <div class="nav-divider"></div>
+
+    <div class="nav-section">
+      <div class="nav-item" onclick="nav('settings')">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41"/></svg>
+        系统配置
+      </div>
+    </div>
+  </nav>
+
+  <!-- ═══════════════════════════════════════════
+       MAIN CONTENT AREA
+  ════════════════════════════════════════════ -->
+  <main class="main">
+
+    <!-- ── DASHBOARD ── -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-header">
+        <div class="page-title">系统概览</div>
+        <div class="page-sub">实时监控 · 入库状态 · RAG 性能</div>
+      </div>
+
+      <div class="grid-4 mb-4">
+        <div class="stat accent"><div class="stat-label">入库小说</div><div class="stat-value">12</div><div class="stat-sub">+2 本周</div></div>
+        <div class="stat green"><div class="stat-label">向量总数</div><div class="stat-value">84.2k</div><div class="stat-sub">ChromaDB</div></div>
+        <div class="stat blue"><div class="stat-label">问答次数</div><div class="stat-value">1,247</div><div class="stat-sub">今日 38 次</div></div>
+        <div class="stat amber"><div class="stat-label">平均检索耗时</div><div class="stat-value">312ms</div><div class="stat-sub">↓ 18% vs 昨日</div></div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-head"><div class="card-title">近期入库任务</div><span class="badge badge-green">3 运行中</span></div>
+          <div class="card-body" style="padding:0">
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>小说</th><th>阶段</th><th>进度</th><th>状态</th></tr></thead>
+                <tbody>
+                  <tr>
+                    <td><div style="font-weight:600;font-size:12px">九阳帝尊</div><div class="text-xs text-muted text-mono">v3</div></td>
+                    <td><span class="badge badge-accent">向量化</span></td>
+                    <td><div style="min-width:80px"><div style="font-family:var(--font-mono);font-size:11px;color:var(--text2);margin-bottom:3px">68%</div><div class="progress"><div class="progress-fill" style="width:68%"></div></div></div></td>
+                    <td><div class="status-dot" style="display:inline-block"></div></td>
+                  </tr>
+                  <tr>
+                    <td><div style="font-weight:600;font-size:12px">凡人修仙传</div><div class="text-xs text-muted text-mono">v1</div></td>
+                    <td><span class="badge badge-blue">切分</span></td>
+                    <td><div style="min-width:80px"><div style="font-family:var(--font-mono);font-size:11px;color:var(--text2);margin-bottom:3px">23%</div><div class="progress"><div class="progress-fill blue" style="width:23%;background:var(--blue)"></div></div></div></td>
+                    <td><div class="status-dot" style="display:inline-block"></div></td>
+                  </tr>
+                  <tr>
+                    <td><div style="font-weight:600;font-size:12px">斗破苍穹</div><div class="text-xs text-muted text-mono">v2</div></td>
+                    <td><span class="badge badge-green">完成</span></td>
+                    <td><div style="min-width:80px"><div style="font-family:var(--font-mono);font-size:11px;color:var(--green);margin-bottom:3px">100%</div><div class="progress"><div class="progress-fill green" style="width:100%"></div></div></div></td>
+                    <td><span class="text-green text-mono text-xs">✓</span></td>
+                  </tr>
+                  <tr>
+                    <td><div style="font-weight:600;font-size:12px">遮天</div><div class="text-xs text-muted text-mono">v1</div></td>
+                    <td><span class="badge badge-red">失败</span></td>
+                    <td><div style="min-width:80px"><div style="font-family:var(--font-mono);font-size:11px;color:var(--red);margin-bottom:3px">41%</div><div class="progress"><div class="progress-fill" style="width:41%;background:var(--red)"></div></div></div></td>
+                    <td><span class="text-red text-mono text-xs">✕</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><div class="card-title">ChromaDB 健康状态</div></div>
+          <div class="card-body">
+            <div class="setting-row" style="padding:10px 0">
+              <div class="setting-info"><div class="setting-name text-sm">hnsw:space</div><div class="setting-desc">距离空间配置</div></div>
+              <span class="badge badge-green">cosine ✓</span>
+            </div>
+            <div class="setting-row" style="padding:10px 0">
+              <div class="setting-info"><div class="setting-name text-sm">Collection</div><div class="setting-desc">novel-splitter</div></div>
+              <span class="badge badge-green">在线</span>
+            </div>
+            <div class="setting-row" style="padding:10px 0">
+              <div class="setting-info"><div class="setting-name text-sm">总向量数</div><div class="setting-desc">所有版本合计</div></div>
+              <span class="text-mono text-sm text-accent">84,231</span>
+            </div>
+            <div class="setting-row" style="padding:10px 0">
+              <div class="setting-info"><div class="setting-name text-sm">Embedding 模型</div><div class="setting-desc">本地 ONNX</div></div>
+              <span class="badge badge-green">已加载</span>
+            </div>
+            <div class="setting-row" style="padding:10px 0;border:none">
+              <div class="setting-info"><div class="setting-name text-sm">LLM 后端</div><div class="setting-desc">Google Gemini 2.0</div></div>
+              <span class="badge badge-green">可达</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><div class="card-title">入库数据流向</div></div>
+        <div class="card-body">
+          <div class="pipeline">
+            <div class="pipe-step done"><div class="pipe-name text-green">下载</div><div class="pipe-sub">novelDownloader</div></div>
+            <div class="pipe-arrow">→</div>
+            <div class="pipe-step done"><div class="pipe-name text-green">切分</div><div class="pipe-sub">splitter</div></div>
+            <div class="pipe-arrow">→</div>
+            <div class="pipe-step done"><div class="pipe-name text-green">校验</div><div class="pipe-sub">validation</div></div>
+            <div class="pipe-arrow">→</div>
+            <div class="pipe-step running"><div class="pipe-name text-accent">向量化</div><div class="pipe-sub">embedding</div></div>
+            <div class="pipe-arrow">→</div>
+            <div class="pipe-step pending"><div class="pipe-name">入库</div><div class="pipe-sub">repository</div></div>
+          </div>
+          <div class="sep"></div>
+          <div class="pipeline">
+            <div class="pipe-step done"><div class="pipe-name text-green">问题输入</div><div class="pipe-sub">application</div></div>
+            <div class="pipe-arrow">→</div>
+            <div class="pipe-step done"><div class="pipe-name text-green">向量化</div><div class="pipe-sub">embedding</div></div>
+            <div class="pipe-arrow">→</div>
+            <div class="pipe-step done"><div class="pipe-name text-green">召回</div><div class="pipe-sub">retrieval</div></div>
+            <div class="pipe-arrow">→</div>
+            <div class="pipe-step done"><div class="pipe-name text-green">组装</div><div class="pipe-sub">context-assembler</div></div>
+            <div class="pipe-arrow">→</div>
+            <div class="pipe-step done"><div class="pipe-name text-green">生成</div><div class="pipe-sub">llm-client</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── PIPELINE PAGE ── -->
+    <div class="page" id="page-pipeline">
+      <div class="page-header">
+        <div class="page-title">处理流水线</div>
+        <div class="page-sub">触发新的入库任务，监控各阶段执行状态</div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-head"><div class="card-title">新建入库任务</div></div>
+          <div class="card-body">
+            <div class="field"><label>小说名称</label><input type="text" placeholder="例：九阳帝尊"></div>
+            <div class="field"><label>数据来源</label>
+              <select><option>本地文件上传</option><option>URL 下载</option><option>已有文件</option></select>
+            </div>
+            <div class="field"><label>版本标识</label><input type="text" placeholder="v1" style="width:120px"></div>
+            <div class="field"><label>切分策略</label>
+              <select><option>语义场景切分（推荐）</option><option>固定长度切分</option><option>章节切分</option></select>
+            </div>
+            <div class="field-row">
+              <div class="field"><label>最大 Token / 块</label><input type="number" value="512"></div>
+              <div class="field"><label>重叠 Token</label><input type="number" value="64"></div>
+            </div>
+            <div style="display:flex;gap:10px;margin-top:8px">
+              <button class="btn btn-primary">▶ 开始处理</button>
+              <button class="btn btn-ghost">预览切分效果</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><div class="card-title">实时进度</div><span class="badge badge-accent"><span class="loading-dots"><span>·</span><span>·</span><span>·</span></span> 处理中</span></div>
+          <div class="card-body">
+            <div style="margin-bottom:16px">
+              <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-size:12px;font-weight:600">九阳帝尊 v3</span><span class="text-mono text-xs text-accent">68%</span></div>
+              <div class="progress" style="height:8px"><div class="progress-fill" style="width:68%"></div></div>
+            </div>
+            <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:10px;max-height:200px;overflow-y:auto">
+              <div class="text-mono text-xs" style="color:var(--green)">✓ [10:32:01] 文件加载完成 · 1,842 章</div>
+              <div class="text-mono text-xs" style="color:var(--green)">✓ [10:32:03] 章节识别完成</div>
+              <div class="text-mono text-xs" style="color:var(--green)">✓ [10:32:18] 切分完成 · 8,421 个 Scene</div>
+              <div class="text-mono text-xs" style="color:var(--green)">✓ [10:32:19] 校验通过 · 0 个异常块</div>
+              <div class="text-mono text-xs" style="color:var(--accent)">⟳ [10:33:05] 向量化进行中 · 5,726/8,421</div>
+              <div class="text-mono text-xs text-muted">  · 预计剩余 ~4 分钟</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:14px">
+              <div style="background:var(--bg3);border-radius:var(--r);padding:10px;text-align:center"><div class="text-xs text-muted">Scene 总数</div><div class="text-mono" style="font-size:18px;font-weight:700;color:var(--text)">8,421</div></div>
+              <div style="background:var(--bg3);border-radius:var(--r);padding:10px;text-align:center"><div class="text-xs text-muted">已向量化</div><div class="text-mono" style="font-size:18px;font-weight:700;color:var(--accent)">5,726</div></div>
+              <div style="background:var(--bg3);border-radius:var(--r);padding:10px;text-align:center"><div class="text-xs text-muted">校验失败</div><div class="text-mono" style="font-size:18px;font-weight:700;color:var(--green)">0</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── CHROMA PAGE ── -->
+    <div class="page" id="page-chroma">
+      <div class="page-header">
+        <div class="page-title">ChromaDB 管理</div>
+        <div class="page-sub">集合状态 · 版本数据诊断 · 向量分布</div>
+      </div>
+
+      <div class="alert alert-warn">
+        <span>⚠</span>
+        <span>检测到 hnsw:space 未显式设置，当前使用默认值 <strong>l2</strong>。相似度公式 <code style="font-family:var(--font-mono)">1 - distance</code> 在 l2 空间下结果无意义，建议重建 Collection 并指定 <strong>cosine</strong>。</span>
+      </div>
+
+      <div class="grid-3 mb-4">
+        <div class="stat green"><div class="stat-label">总向量数</div><div class="stat-value">84,231</div><div class="stat-sub">novel-splitter</div></div>
+        <div class="stat"><div class="stat-label">Collection 数</div><div class="stat-value">1</div><div class="stat-sub">novel-splitter</div></div>
+        <div class="stat amber"><div class="stat-label">hnsw:space</div><div class="stat-value" style="font-size:18px">l2</div><div class="stat-sub" style="color:var(--amber)">⚠ 建议改为 cosine</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">版本级数据诊断</div>
+          <div style="display:flex;gap:8px">
+            <select style="background:var(--bg3);border:1px solid var(--border2);color:var(--text2);border-radius:var(--r);padding:5px 10px;font-family:var(--font-mono);font-size:12px"><option>九阳帝尊</option><option>斗破苍穹</option></select>
+            <select style="background:var(--bg3);border:1px solid var(--border2);color:var(--text2);border-radius:var(--r);padding:5px 10px;font-family:var(--font-mono);font-size:12px"><option>v1</option><option>v2</option><option>v3</option></select>
+            <button class="btn btn-ghost btn-sm">诊断</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="grid-2">
+            <div>
+              <div style="margin-bottom:12px">
+                <div class="flex flex-gap mb-4"><span class="text-sm" style="font-weight:600">版本向量数</span><span class="badge badge-green ml-auto">6,284 条</span></div>
+                <div class="flex flex-gap mb-4"><span class="text-sm" style="font-weight:600">数据完整性</span><span class="badge badge-green ml-auto">✓ 正常</span></div>
+                <div class="flex flex-gap mb-4"><span class="text-sm" style="font-weight:600">元数据字段</span><span class="badge badge-green ml-auto">novel · version · chapter</span></div>
+                <div class="flex flex-gap" style="margin-bottom:0"><span class="text-sm" style="font-weight:600">最新入库时间</span><span class="text-mono text-xs text-muted ml-auto">2026-04-06 13:52</span></div>
+              </div>
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em">采样记录元数据</div>
+              <div class="code-block" style="font-size:11px">{
+  <span class="kw">"id"</span>: <span class="str">"7dbe7345-6903-403a..."</span>,
+  <span class="kw">"novel"</span>: <span class="str">"九阳帝尊"</span>,
+  <span class="kw">"version"</span>: <span class="str">"v1"</span>,
+  <span class="kw">"chapter_index"</span>: <span class="num">4</span>,
+  <span class="kw">"chunk_type"</span>: <span class="str">"scene"</span>,
+  <span class="kw">"parent_scene_id"</span>: <span class="str">null</span>
+}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">集合操作</div>
+          <span class="badge badge-red">危险操作</span>
+        </div>
+        <div class="card-body">
+          <div class="grid-3">
+            <div style="background:var(--bg3);border-radius:var(--r);padding:14px">
+              <div style="font-weight:600;margin-bottom:4px">重建 Collection</div>
+              <div style="font-size:12px;color:var(--text2);margin-bottom:12px">删除并重建，可同时修正 hnsw:space 参数</div>
+              <button class="btn btn-danger btn-sm">重建 Collection</button>
+            </div>
+            <div style="background:var(--bg3);border-radius:var(--r);padding:14px">
+              <div style="font-weight:600;margin-bottom:4px">删除版本数据</div>
+              <div style="font-size:12px;color:var(--text2);margin-bottom:12px">按 novel + version 过滤删除特定版本向量</div>
+              <button class="btn btn-danger btn-sm">删除指定版本</button>
+            </div>
+            <div style="background:var(--bg3);border-radius:var(--r);padding:14px">
+              <div style="font-weight:600;margin-bottom:4px">导出元数据</div>
+              <div style="font-size:12px;color:var(--text2);margin-bottom:12px">导出所有向量的元数据字段为 JSON</div>
+              <button class="btn btn-ghost btn-sm">导出 JSON</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── CHAT PAGE ── -->
+    <div class="page" id="page-chat">
+      <div class="page-header">
+        <div class="page-title">RAG 问答</div>
+        <div class="page-sub">基于向量检索的小说内容问答</div>
+      </div>
+      <div style="display:grid;grid-template-columns:260px 1fr;gap:16px;height:calc(100vh - 160px)">
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div class="card" style="margin-bottom:0">
+            <div class="card-head"><div class="card-title" style="font-size:12px">检索配置</div></div>
+            <div class="card-body" style="padding:14px">
+              <div class="field" style="margin-bottom:10px"><label>小说</label>
+                <select><option>九阳帝尊</option><option>斗破苍穹</option><option>全部</option></select>
+              </div>
+              <div class="field" style="margin-bottom:10px"><label>版本</label>
+                <select><option>v1</option><option>v2</option></select>
+              </div>
+              <div class="field" style="margin-bottom:0"><label>Top K <span class="text-mono" style="color:var(--accent)">5</span></label>
+                <input type="range" min="1" max="20" value="5" style="width:100%;accent-color:var(--accent)">
+              </div>
+            </div>
+          </div>
+          <div class="card" style="margin-bottom:0;flex:1">
+            <div class="card-head"><div class="card-title" style="font-size:12px">历史会话</div></div>
+            <div class="card-body" style="padding:8px;overflow-y:auto">
+              <div style="padding:8px;border-radius:var(--r);cursor:pointer;background:var(--accent-glow);border:1px solid rgba(124,106,255,0.2);margin-bottom:6px">
+                <div style="font-size:12px;font-weight:600;margin-bottom:2px">楚晨的修炼境界</div>
+                <div class="text-xs text-muted">今天 10:32</div>
+              </div>
+              <div style="padding:8px;border-radius:var(--r);cursor:pointer;margin-bottom:6px" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">
+                <div style="font-size:12px;font-weight:600;margin-bottom:2px">黑衣少女是谁</div>
+                <div class="text-xs text-muted">今天 09:15</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);overflow:hidden">
+          <div style="flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:16px">
+            <div style="display:flex;justify-content:flex-end">
+              <div style="max-width:70%;background:var(--accent);color:white;border-radius:var(--r2) var(--r2) 4px var(--r2);padding:10px 14px;font-size:13px">楚晨是谁？</div>
+            </div>
+            <div style="display:flex;gap:10px;align-items:flex-start">
+              <div style="width:28px;height:28px;background:var(--bg4);border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px">§</div>
+              <div style="max-width:75%">
+                <div style="background:var(--bg3);border:1px solid var(--border);border-radius:4px var(--r2) var(--r2) var(--r2);padding:12px 14px;font-size:13px;line-height:1.7">楚晨是《九阳帝尊》的主角，一名转世为雏鹰的修士。他拥有前世记忆，天生具备超强的感知和体魄，在刚出生时就展现出异于寻常的坚韧——从数十丈高处坠落却毫发无伤。</div>
+                <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+                  <span class="badge badge-accent">来源: 第四章</span>
+                  <span class="badge badge-gray">置信度: 0.92</span>
+                  <span class="badge badge-gray" style="cursor:pointer" onclick="nav('debug')">查看调试 →</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style="padding:14px;border-top:1px solid var(--border);display:flex;gap:10px">
+            <input type="text" placeholder="向这本小说提问…" style="flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-family:var(--font-mono);font-size:13px;padding:10px 14px;outline:none">
+            <button class="btn btn-primary">发送</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── RAG DEBUG PAGE ── -->
+    <div class="page" id="page-debug">
+      <div class="page-header">
+        <div class="page-title">RAG 调试器</div>
+        <div class="page-sub">逐步追踪检索 → 组装 → Prompt 生成的完整链路</div>
+      </div>
+
+      <div class="grid-2 mb-4" style="align-items:start">
+        <div class="card" style="margin-bottom:0">
+          <div class="card-head"><div class="card-title">查询配置</div></div>
+          <div class="card-body">
+            <div class="field-row">
+              <div class="field"><label>小说</label><select><option>九阳帝尊</option><option>斗破苍穹</option></select></div>
+              <div class="field"><label>版本</label><select><option>v1</option><option>v2</option></select></div>
+            </div>
+            <div class="field"><label>问题</label><textarea placeholder="在此输入问题…" style="height:60px">楚晨</textarea></div>
+            <div class="field"><label>Top K &nbsp;<span class="text-mono text-accent">6</span></label><input type="range" min="1" max="20" value="6" style="accent-color:var(--accent)"></div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-primary" onclick="showDebugResult()">▶ 执行调试</button>
+              <button class="btn btn-ghost">清除结果</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:0" id="chroma-diag">
+          <div class="card-head"><div class="card-title">ChromaDB 诊断</div><span class="badge badge-green">自动执行</span></div>
+          <div class="card-body">
+            <div class="setting-row" style="padding:8px 0"><div class="setting-info"><div class="setting-name text-sm">hnsw:space</div></div><span class="badge badge-amber">l2 ⚠</span></div>
+            <div class="setting-row" style="padding:8px 0"><div class="setting-info"><div class="setting-name text-sm">总向量数</div></div><span class="text-mono text-sm text-accent">84,231</span></div>
+            <div class="setting-row" style="padding:8px 0"><div class="setting-info"><div class="setting-name text-sm">版本数据 (九阳帝尊/v1)</div></div><span class="badge badge-green">✓ 6,284 条</span></div>
+            <div class="setting-row" style="padding:8px 0;border:none"><div class="setting-info"><div class="setting-name text-sm">采样元数据字段</div></div><span class="text-mono text-xs text-muted">novel · version · chapter_index</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="debug-result" style="display:none">
+        <div class="grid-4 mb-4">
+          <div class="stat"><div class="stat-label">检索耗时</div><div class="stat-value accent">814ms</div></div>
+          <div class="stat"><div class="stat-label">召回场景数</div><div class="stat-value">4 / 6</div><div class="stat-sub text-amber">低于 topK</div></div>
+          <div class="stat"><div class="stat-label">最高相似度</div><div class="stat-value amber">0.198</div><div class="stat-sub text-red">极低 ⚠</div></div>
+          <div class="stat"><div class="stat-label">Token 用量</div><div class="stat-value">10,303</div></div>
+        </div>
+
+        <div class="alert alert-warn">
+          <span>⚠</span>
+          <span>最高相似度仅 0.198，远低于可信阈值（0.5）。可能原因：① hnsw:space 为 l2，公式退化；② 向量库数据与查询向量空间不对齐（重新入库后模型已变更）。</span>
+        </div>
+
+        <div class="tabs">
+          <div class="tab active" onclick="switchTab(event,'step1')">步骤 1 · 原始召回</div>
+          <div class="tab" onclick="switchTab(event,'step2')">步骤 2 · 上下文组装</div>
+          <div class="tab" onclick="switchTab(event,'step3')">步骤 3 · Prompt 载荷</div>
+        </div>
+
+        <!-- STEP 1 -->
+        <div id="step1" class="tab-content">
+          <div class="scroll">
+            <div class="scene-card">
+              <div class="scene-meta">
+                <span class="badge badge-amber">score: 0.198</span>
+                <span class="badge badge-gray">第四章</span>
+                <span class="badge badge-gray">scene</span>
+                <span class="badge badge-gray">§495–581</span>
+                <span class="badge badge-red ml-auto">低相关</span>
+              </div>
+              <div class="text-mono text-xs text-muted" style="margin-bottom:6px">7dbe7345-6903-403a-a1a2-304b3ea738e5</div>
+              <div class="scene-text">第四章 美女去哪儿<br>狂喜的楚晨兴奋的仰天长啸，稚嫩的鹰啼冲霄而起，在苍穹中久久不散。这一个发现实在是太惊喜了，让他忍不住挥动自己的小翅膀，手舞足蹈的大声狂叫。然而下一刻…</div>
+              <div class="score-bar"><div class="score-fill" style="width:19.8%"></div></div>
+            </div>
+            <div class="scene-card">
+              <div class="scene-meta">
+                <span class="badge badge-amber">score: 0.181</span>
+                <span class="badge badge-gray">第五章</span>
+                <span class="badge badge-gray">scene</span>
+                <span class="badge badge-gray">§670–754</span>
+              </div>
+              <div class="text-mono text-xs text-muted" style="margin-bottom:6px">53f3b444-9e36-4afb-95ff-81cbb4c101d1</div>
+              <div class="scene-text">第五章 修炼怪物<br>楚晨盘腿坐在鹰巢之中，他体内的气息开始缓缓流动，依照着那篇古老的功法，慢慢运转…</div>
+              <div class="score-bar"><div class="score-fill" style="width:18.1%"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 2 -->
+        <div id="step2" class="tab-content" style="display:none">
+          <div class="scroll">
+            <div style="background:var(--bg3);border:1px solid rgba(46,204,138,0.2);border-radius:var(--r2);padding:14px 16px;margin-bottom:10px">
+              <div class="scene-meta">
+                <span class="badge badge-green">chunkId: 7dbe7345</span>
+                <span class="badge badge-gray">tokens: 1,705</span>
+                <span class="badge badge-accent">score: 0.198</span>
+              </div>
+              <div style="font-size:12px;color:var(--text2);line-height:1.65;margin-top:8px;max-height:80px;overflow:hidden">第四章 美女去哪儿 · 楚晨落地遇蛇、被黑衣少女所救片段…</div>
+            </div>
+            <div style="background:var(--bg3);border:1px solid rgba(46,204,138,0.2);border-radius:var(--r2);padding:14px 16px;margin-bottom:10px">
+              <div class="scene-meta">
+                <span class="badge badge-green">chunkId: 53f3b444</span>
+                <span class="badge badge-gray">tokens: 984</span>
+                <span class="badge badge-accent">score: 0.181</span>
+              </div>
+              <div style="font-size:12px;color:var(--text2);line-height:1.65;margin-top:8px">第五章 修炼怪物 · 楚晨初次修炼，感受气息流动…</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 3 -->
+        <div id="step3" class="tab-content" style="display:none">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+            <div class="flex flex-gap">
+              <div class="badge badge-gray">预估 Token: <span class="text-accent">10,303</span></div>
+            </div>
+            <button class="btn btn-ghost btn-sm">复制完整 Prompt</button>
+          </div>
+          <div class="prompt-section">
+            <div class="prompt-section-label">System Instruction <span class="badge badge-gray" style="font-size:10px">~120 tokens</span></div>
+            <div class="prompt-section-body">你是一个专门分析小说内容的智能助手。
+任务：仅根据提供的上下文块回答用户的问题。
+如果上下文中没有答案，请明确说明无法从给定内容中找到答案，不要编造信息。</div>
+          </div>
+          <div class="prompt-section">
+            <div class="prompt-section-label">Context (4 blocks) <span class="badge badge-gray" style="font-size:10px">~9,800 tokens</span></div>
+            <div class="prompt-section-body">[Block 1 - 7dbe7345]
+第四章 美女去哪儿
+狂喜的楚晨兴奋的仰天长啸…（1705字）
+
+[Block 2 - 53f3b444]
+第五章 修炼怪物
+楚晨盘腿坐在鹰巢之中…（984字）</div>
+          </div>
+          <div class="prompt-section">
+            <div class="prompt-section-label">User Question</div>
+            <div class="prompt-section-body">楚晨</div>
+          </div>
+          <div class="prompt-section">
+            <div class="prompt-section-label">Output Constraint</div>
+            <div class="prompt-section-body">JSON 对象，包含字段：answer, citations (list of {chunkId, reason}), confidence。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SETTINGS PAGE ── -->
+    <div class="page" id="page-settings">
+      <div class="page-header">
+        <div class="page-title">系统配置</div>
+        <div class="page-sub">向量库参数、Embedding 模型、LLM 后端、切分策略</div>
+      </div>
+
+      <div class="tabs">
+        <div class="tab active" onclick="switchTab(event,'cfg-embed')">Embedding</div>
+        <div class="tab" onclick="switchTab(event,'cfg-llm')">LLM 后端</div>
+        <div class="tab" onclick="switchTab(event,'cfg-chroma')">ChromaDB</div>
+        <div class="tab" onclick="switchTab(event,'cfg-split')">切分策略</div>
+      </div>
+
+      <div id="cfg-embed" class="tab-content">
+        <div class="card">
+          <div class="card-head"><div class="card-title">Embedding 模型配置</div></div>
+          <div class="card-body">
+            <div class="setting-row">
+              <div class="setting-info"><div class="setting-name">模型运行方式</div><div class="setting-desc">本地 ONNX 或远程 API</div></div>
+              <div class="setting-control"><select style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:var(--r);padding:6px 10px;font-family:var(--font-mono);font-size:12px"><option>本地 ONNX</option><option>OpenAI API</option><option>自定义端点</option></select></div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info"><div class="setting-name">ONNX 模型路径</div><div class="setting-desc">本地模型文件位置</div></div>
+              <div class="setting-control"><input type="text" value="./models/bge-m3.onnx" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:var(--r);padding:6px 10px;font-family:var(--font-mono);font-size:12px;width:280px"></div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info"><div class="setting-name">向量维度</div><div class="setting-desc">与 ChromaDB collection 必须一致</div></div>
+              <div class="setting-control"><input type="number" value="1024" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:var(--r);padding:6px 10px;font-family:var(--font-mono);font-size:12px;width:100px"></div>
+            </div>
+            <div class="setting-row" style="border:none">
+              <div class="setting-info"><div class="setting-name">批量推理大小</div><div class="setting-desc">每次向量化的最大文本数量</div></div>
+              <div class="setting-control"><input type="number" value="32" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:var(--r);padding:6px 10px;font-family:var(--font-mono);font-size:12px;width:100px"></div>
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-primary">保存配置</button>
+      </div>
+
+      <div id="cfg-llm" class="tab-content" style="display:none">
+        <div class="card">
+          <div class="card-head"><div class="card-title">LLM 后端配置</div></div>
+          <div class="card-body">
+            <div class="setting-row">
+              <div class="setting-info"><div class="setting-name">当前后端</div><div class="setting-desc">支持 Gemini、DeepSeek、Coze、Ollama</div></div>
+              <div class="setting-control"><select style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:var(--r);padding:6px 10px;font-family:var(--font-mono);font-size:12px"><option>Google Gemini</option><option>DeepSeek</option><option>Coze</option><option>Ollama (本地)</option></select></div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info"><div class="setting-name">模型版本</div></div>
+              <div class="setting-control"><input type="text" value="gemini-2.0-flash-exp" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:var(--r);padding:6px 10px;font-family:var(--font-mono);font-size:12px;width:240px"></div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info"><div class="setting-name">API Key</div></div>
+              <div class="setting-control"><input type="password" value="••••••••••••••••••••" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:var(--r);padding:6px 10px;font-family:var(--font-mono);font-size:12px;width:240px"></div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info"><div class="setting-name">最大 Token 上限</div><div class="setting-desc">单次请求的上下文 Token 限制</div></div>
+              <div class="setting-control"><input type="number" value="32768" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:var(--r);padding:6px 10px;font-family:var(--font-mono);font-size:12px;width:120px"></div>
+            </div>
+            <div class="setting-row" style="border:none">
+              <div class="setting-info"><div class="setting-name">请求超时</div></div>
+              <div class="setting-control"><input type="number" value="300000" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:var(--r);padding:6px 10px;font-family:var(--font-mono);font-size:12px;width:120px"><span style="font-family:var(--font-mono);font-size:11px;color:var(--text3);margin-left:6px">ms</span></div>
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-primary">保存配置</button>
+      </div>
+
+      <div id="cfg-chroma" class="tab-content" style="display:none">
+        <div class="card">
+          <div class="card-head"><div class="card-title">ChromaDB 连接配置</div></div>
+          <div class="card-body">
+            <div class="setting-row">
+              <div class="setting-info"><div class="setting-name">服务地址</div></div>
+              <div class="setting-control"><input type="text" value="http://localhost:8081" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:var(--r);padding:6px 10px;font-family:var(--font-mono);font-size:12px;width:240px"></div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info"><div class="setting-name">Collection 名称</div></div>
+              <div class="setting-control"><input type="text" value="novel-splitter" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:var(--r);padding:6px 10px;font-family:var(--font-mono);font-size:12px;width:200px"></div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info"><div class="setting-name">距离空间 (hnsw:space)</div><div class="setting-desc" style="color:var(--amber)">⚠ 修改后需重建 Collection</div></div>
+              <div class="setting-control"><select style="background:var(--bg3);border:1px solid var(--amber);color:var(--amber);border-radius:var(--r);padding:6px 10px;font-family:var(--font-mono);font-size:12px"><option>l2 (当前)</option><option>cosine (推荐)</option><option>ip</option></select></div>
+            </div>
+            <div class="setting-row" style="border:none">
+              <div class="setting-info"><div class="setting-name">相似度阈值过滤</div><div class="setting-desc">前端展示结果的最低 score 门槛</div></div>
+              <div class="setting-control" style="display:flex;align-items:center;gap:10px"><input type="range" min="0" max="1" step="0.05" value="0.3" style="width:100px;accent-color:var(--accent)"><span class="text-mono text-sm text-accent">0.30</span></div>
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-primary">保存配置</button>
+      </div>
+
+      <div id="cfg-split" class="tab-content" style="display:none">
+        <div class="card">
+          <div class="card-head"><div class="card-title">切分策略默认参数</div></div>
+          <div class="card-body">
+            <div class="setting-row">
+              <div class="setting-info"><div class="setting-name">默认切分模式</div></div>
+              <div class="setting-control"><select style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:var(--r);padding:6px 10px;font-family:var(--font-mono);font-size:12px"><option>语义场景切分</option><option>固定长度</option><option>章节边界</option></select></div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info"><div class="setting-name">最大 Token / 块</div></div>
+              <div class="setting-control"><input type="number" value="512" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:var(--r);padding:6px 10px;font-family:var(--font-mono);font-size:12px;width:100px"></div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info"><div class="setting-name">重叠 Token</div><div class="setting-desc">相邻块间的重叠量，避免语义断裂</div></div>
+              <div class="setting-control"><input type="number" value="64" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:var(--r);padding:6px 10px;font-family:var(--font-mono);font-size:12px;width:100px"></div>
+            </div>
+            <div class="setting-row" style="border:none">
+              <div class="setting-info"><div class="setting-name">启用对话识别</div><div class="setting-desc">将连续对话段落合并为同一块</div></div>
+              <div class="setting-control">
+                <label class="toggle"><input type="checkbox" checked><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+              </div>
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-primary">保存配置</button>
+      </div>
+    </div>
+
+    <!-- ── NOVELS PAGE ── -->
+    <div class="page" id="page-novels">
+      <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between">
+        <div><div class="page-title">小说管理</div><div class="page-sub">管理已入库的小说及版本</div></div>
+        <button class="btn btn-primary">+ 新增小说</button>
+      </div>
+      <div class="card">
+        <div class="card-body" style="padding:0">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>小说名称</th><th>版本</th><th>Scene 数</th><th>向量数</th><th>入库时间</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td style="font-weight:600">九阳帝尊</td>
+                  <td><span class="badge badge-accent">v3</span> <span class="badge badge-gray">v2</span> <span class="badge badge-gray">v1</span></td>
+                  <td class="td-mono">8,421</td>
+                  <td class="td-mono">8,421</td>
+                  <td class="td-mono text-muted">2026-04-06</td>
+                  <td><span class="badge badge-green">完整</span></td>
+                  <td><button class="btn btn-ghost btn-sm">详情</button> <button class="btn btn-danger btn-sm">删除</button></td>
+                </tr>
+                <tr>
+                  <td style="font-weight:600">斗破苍穹</td>
+                  <td><span class="badge badge-accent">v2</span> <span class="badge badge-gray">v1</span></td>
+                  <td class="td-mono">12,043</td>
+                  <td class="td-mono">12,043</td>
+                  <td class="td-mono text-muted">2026-04-01</td>
+                  <td><span class="badge badge-green">完整</span></td>
+                  <td><button class="btn btn-ghost btn-sm">详情</button> <button class="btn btn-danger btn-sm">删除</button></td>
+                </tr>
+                <tr>
+                  <td style="font-weight:600">遮天</td>
+                  <td><span class="badge badge-amber">v1 处理中</span></td>
+                  <td class="td-mono text-muted">—</td>
+                  <td class="td-mono text-muted">—</td>
+                  <td class="td-mono text-muted">2026-04-06</td>
+                  <td><span class="badge badge-amber">入库中</span></td>
+                  <td><button class="btn btn-ghost btn-sm">查看进度</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── JOBS PAGE ── -->
+    <div class="page" id="page-jobs">
+      <div class="page-header"><div class="page-title">任务队列</div><div class="page-sub">RabbitMQ 异步任务监控</div></div>
+      <div class="grid-4 mb-4">
+        <div class="stat accent"><div class="stat-label">运行中</div><div class="stat-value">3</div></div>
+        <div class="stat amber"><div class="stat-label">等待中</div><div class="stat-value">2</div></div>
+        <div class="stat green"><div class="stat-label">今日完成</div><div class="stat-value">8</div></div>
+        <div class="stat"><div class="stat-label">今日失败</div><div class="stat-value" style="color:var(--red)">1</div></div>
+      </div>
+      <div class="card">
+        <div class="card-body" style="padding:0">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>任务 ID</th><th>类型</th><th>小说 / 版本</th><th>阶段</th><th>创建时间</th><th>状态</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td class="td-mono text-muted">job-8821</td>
+                  <td><span class="badge badge-accent">EMBED</span></td>
+                  <td>九阳帝尊 / v3</td>
+                  <td>向量化</td>
+                  <td class="td-mono text-muted">10:32:01</td>
+                  <td><span class="badge badge-accent"><span class="loading-dots"><span>·</span><span>·</span><span>·</span></span> 运行中</span></td>
+                </tr>
+                <tr>
+                  <td class="td-mono text-muted">job-8820</td>
+                  <td><span class="badge badge-blue">SPLIT</span></td>
+                  <td>凡人修仙传 / v1</td>
+                  <td>切分</td>
+                  <td class="td-mono text-muted">10:30:55</td>
+                  <td><span class="badge badge-accent"><span class="loading-dots"><span>·</span><span>·</span><span>·</span></span> 运行中</span></td>
+                </tr>
+                <tr>
+                  <td class="td-mono text-muted">job-8819</td>
+                  <td><span class="badge badge-gray">DOWNLOAD</span></td>
+                  <td>遮天 / v1</td>
+                  <td>下载</td>
+                  <td class="td-mono text-muted">10:28:10</td>
+                  <td><span class="badge badge-red">失败</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── EMBEDDINGS PAGE ── -->
+    <div class="page" id="page-embeddings">
+      <div class="page-header"><div class="page-title">向量浏览</div><div class="page-sub">按 novel/version 过滤，查看原始向量与元数据</div></div>
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">过滤条件</div>
+          <div style="display:flex;gap:8px">
+            <select style="background:var(--bg3);border:1px solid var(--border2);color:var(--text2);border-radius:var(--r);padding:5px 10px;font-family:var(--font-mono);font-size:12px"><option>九阳帝尊</option></select>
+            <select style="background:var(--bg3);border:1px solid var(--border2);color:var(--text2);border-radius:var(--r);padding:5px 10px;font-family:var(--font-mono);font-size:12px"><option>v1</option></select>
+            <button class="btn btn-ghost btn-sm">查询</button>
+          </div>
+        </div>
+        <div class="card-body" style="padding:0">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>ID</th><th>chapter</th><th>chunk_type</th><th>tokens</th><th>文本预览</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td class="td-mono text-muted" style="font-size:11px">7dbe7345…</td>
+                  <td><span class="badge badge-gray">第4章</span></td>
+                  <td><span class="badge badge-accent">scene</span></td>
+                  <td class="td-mono">1,705</td>
+                  <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--text2)">狂喜的楚晨兴奋的仰天长啸，稚嫩的鹰啼冲霄而起…</td>
+                </tr>
+                <tr>
+                  <td class="td-mono text-muted" style="font-size:11px">53f3b444…</td>
+                  <td><span class="badge badge-gray">第5章</span></td>
+                  <td><span class="badge badge-accent">scene</span></td>
+                  <td class="td-mono">984</td>
+                  <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--text2)">楚晨盘腿坐在鹰巢之中，体内气息缓缓流动…</td>
+                </tr>
+                <tr>
+                  <td class="td-mono text-muted" style="font-size:11px">2f19af04…</td>
+                  <td><span class="badge badge-gray">第4章</span></td>
+                  <td><span class="badge badge-accent">scene</span></td>
+                  <td class="td-mono">1,203</td>
+                  <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--text2)">黑衣少女转身离去，留下楚晨独自在原地发呆…</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+function nav(id) {
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+  const page = document.getElementById('page-' + id);
+  if (page) page.classList.add('active');
+}
+
+function switchTab(e, id) {
+  const parent = e.target.closest('.page') || document.body;
+  parent.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  parent.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
+  e.target.classList.add('active');
+  const el = document.getElementById(id);
+  if (el) el.style.display = 'block';
+}
+
+function showDebugResult() {
+  document.getElementById('debug-result').style.display = 'block';
+}
+</script>
+</body>
+</html>

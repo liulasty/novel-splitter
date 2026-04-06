@@ -1,12 +1,10 @@
 package com.novel.splitter.embedding.store;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.novel.splitter.domain.model.Scene;
 import com.novel.splitter.domain.model.embedding.chroma.ChromaCollection;
 import com.novel.splitter.domain.model.embedding.chroma.ChromaQueryResponse;
 import com.novel.splitter.domain.model.embedding.VectorRecord;
 import com.novel.splitter.embedding.api.VectorStore;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -14,12 +12,13 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import java.lang.reflect.Array;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.ArrayList;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -40,7 +39,6 @@ public class ChromaVectorStore implements VectorStore {
 
     private final String collectionName;
     private final RestClient restClient;
-    private final ObjectMapper objectMapper;
 
     private static final String DEFAULT_TENANT = "default_tenant";
     private static final String DEFAULT_DATABASE = "default_database";
@@ -59,7 +57,6 @@ public class ChromaVectorStore implements VectorStore {
             @Value("${chroma.url:http://localhost:8081}") String chromaUrl,
             @Value("${chroma.collection:novel-splitter}") String collectionName) {
         this.collectionName = collectionName;
-        this.objectMapper = new ObjectMapper();
         this.restClient = builder.baseUrl(chromaUrl).build();
     }
 
@@ -307,5 +304,64 @@ public class ChromaVectorStore implements VectorStore {
                 throw new RuntimeException("Failed to ensure ChromaDB collection exists: " + collectionName, ex);
             }
         }
+    }
+
+    private List<Double> toDoubleList(float[] embedding) {
+        if (embedding == null || embedding.length == 0) {
+            return Collections.emptyList();
+        }
+        return IntStream.range(0, embedding.length)
+                .mapToObj(i -> (double) embedding[i])
+                .collect(Collectors.toList());
+    }
+
+    private String collectionUri(String suffix) {
+        String base = "/api/v2/tenants/" + DEFAULT_TENANT
+                + "/databases/" + DEFAULT_DATABASE
+                + "/collections/" + collectionId;
+        if (suffix == null || suffix.isBlank()) {
+            return base;
+        }
+        return base + suffix;
+    }
+
+    private Map<String, Object> buildWhereClause(Map<String, Object> filter) {
+        if (filter == null || filter.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        List<Map<String, Object>> clauses = filter.entrySet().stream()
+                .map(entry -> Map.<String, Object>of(entry.getKey(), buildOperatorClause(entry.getValue())))
+                .collect(Collectors.toList());
+
+        if (clauses.size() == 1) {
+            return clauses.get(0);
+        }
+        return Map.of("$and", clauses);
+    }
+
+    private Map<String, Object> buildOperatorClause(Object value) {
+        if (value == null) {
+            return Map.of("$eq", null);
+        }
+        if (value instanceof Map<?, ?> map) {
+            Map<String, Object> converted = new HashMap<>();
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                converted.put(String.valueOf(entry.getKey()), entry.getValue());
+            }
+            return converted;
+        }
+        if (value instanceof List<?> list) {
+            return Map.of("$in", list);
+        }
+        if (value.getClass().isArray()) {
+            int length = Array.getLength(value);
+            List<Object> list = new ArrayList<>(length);
+            for (int i = 0; i < length; i++) {
+                list.add(Array.get(value, i));
+            }
+            return Map.of("$in", list);
+        }
+        return Map.of("$eq", value);
     }
 }
