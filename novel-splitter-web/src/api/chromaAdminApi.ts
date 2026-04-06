@@ -97,4 +97,8 @@ export const chromaAdminApi = {
     const response = await apiClient.post(`/admin/chroma/collections/${collectionId}/query`, params);
     return response;
   },
+  countDocuments: async (collectionId: string): Promise<number> => {
+    const response = await apiClient.get(`/admin/chroma/collections/${collectionId}/count`);
+    return response as number;
+  },
 };
