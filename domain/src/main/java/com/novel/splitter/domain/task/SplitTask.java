@@ -1,7 +1,10 @@
 package com.novel.splitter.domain.task;
 
+import com.novel.splitter.domain.enums.TaskType;
+
 public class SplitTask {
     private String taskId;
+    private TaskType taskType;
     private String novelId;
     private String fileName;
     private int maxScenes;
@@ -28,9 +31,10 @@ public class SplitTask {
         this.progress = 0;
     }
 
-    public SplitTask(String taskId, String novelId, String fileName, int maxScenes, String version) {
+    public SplitTask(String taskId, TaskType taskType, String novelId, String fileName, int maxScenes, String version) {
         this();
         this.taskId = taskId;
+        this.taskType = taskType != null ? taskType : TaskType.SPLIT;
         this.novelId = novelId;
         this.fileName = fileName;
         this.maxScenes = maxScenes;
@@ -39,6 +43,9 @@ public class SplitTask {
 
     public String getTaskId() { return taskId; }
     public void setTaskId(String taskId) { this.taskId = taskId; }
+
+    public TaskType getTaskType() { return taskType; }
+    public void setTaskType(TaskType taskType) { this.taskType = taskType; }
 
     public String getNovelId() { return novelId; }
     public void setNovelId(String novelId) { this.novelId = novelId; }

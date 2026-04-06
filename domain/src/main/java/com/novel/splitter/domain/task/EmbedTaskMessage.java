@@ -14,5 +14,4 @@ public class EmbedTaskMessage implements Serializable {
     private String taskId;
     private String novelId;
     private String version;
-    private List<Long> sceneIds;
 }

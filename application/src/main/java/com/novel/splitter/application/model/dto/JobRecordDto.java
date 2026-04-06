@@ -1,5 +1,6 @@
 package com.novel.splitter.application.model.dto;
 
+import com.novel.splitter.domain.enums.TaskType;
 import com.novel.splitter.domain.task.SplitTask.TaskStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -13,6 +14,7 @@ import lombok.NoArgsConstructor;
 public class JobRecordDto {
     private String id; // Use id for standard job identification
     private String taskId;
+    private TaskType taskType;
     private String novelId;
     private String fileName;
     private int maxScenes;
