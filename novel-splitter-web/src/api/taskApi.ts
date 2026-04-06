@@ -61,8 +61,9 @@ export const taskApi = {
     return response;
   },
 
-  getTaskEvents: async (taskId: string): Promise<TaskProgressEvent[]> => {
-    const response = await apiClient.get<TaskProgressEvent[]>(`/tasks/${taskId}/events`);
+  getTaskEvents: async (taskId: string, sinceTimestamp?: number): Promise<TaskProgressEvent[]> => {
+    const params = sinceTimestamp ? { sinceTimestamp } : undefined;
+    const response = await apiClient.get<TaskProgressEvent[]>(`/tasks/${taskId}/events`, { params });
     return response;
   },
 

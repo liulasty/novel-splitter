@@ -55,7 +55,9 @@ public class TaskController {
 
     @GetMapping("/{taskId}/events")
     @Operation(summary = "获取单个切分任务的历史事件日志")
-    public List<TaskProgressEvent> getTaskEvents(@PathVariable String taskId) {
-        return taskService.getTaskEvents(taskId);
+    public List<TaskProgressEvent> getTaskEvents(
+            @PathVariable String taskId,
+            @RequestParam(required = false) Long sinceTimestamp) {
+        return taskService.getTaskEvents(taskId, sinceTimestamp);
     }
 }

@@ -78,16 +78,19 @@ export function useTaskDetail(taskId: string | null) {
         if (!isMountedRef.current) return;
         
         try {
+          // 获取上次日志中最后一条的时间戳，如果存在的话
+          const lastEventTimestamp = logs.length > 0 ? logs[logs.length - 1].timestamp : undefined;
+          
           const [currentTask, newEvents] = await Promise.all([
              taskApi.getTask(taskId),
-             taskApi.getTaskEvents(taskId)
+             taskApi.getTaskEvents(taskId, lastEventTimestamp)
           ]);
           
           if (!isMountedRef.current) return;
           
           setTask(currentTask);
           if (newEvents && newEvents.length > 0) {
-             setLogs(newEvents);
+             setLogs(prev => [...prev, ...newEvents]);
           }
           
           // 状态完成，停止轮询

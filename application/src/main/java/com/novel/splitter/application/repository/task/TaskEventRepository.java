@@ -26,6 +26,12 @@ public class TaskEventRepository {
                 .collect(Collectors.toList());
     }
 
+    public List<TaskProgressEvent> findByTaskIdSince(String taskId, long sinceTimestamp) {
+        return jpaTaskEventRepository.findByTaskIdAndCreatedAtGreaterThanOrderByCreatedAtAsc(taskId, sinceTimestamp).stream()
+                .map(this::toDomain)
+                .collect(Collectors.toList());
+    }
+
     private JpaTaskEventEntity toEntity(TaskProgressEvent event) {
         return JpaTaskEventEntity.builder()
                 .taskId(event.getTaskId())
