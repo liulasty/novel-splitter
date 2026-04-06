@@ -18,74 +18,42 @@ public class ChromaAdminServiceImpl implements ChromaAdminService {
 
     @Override
     public Map<String, Object> getStats() {
-        try {
-            long count = vectorStore.count();
-            return Map.of(
-                    "count", count,
-                    "storeType", vectorStore.getClass().getSimpleName()
-            );
-        } catch (Exception e) {
-            log.error("获取Chroma统计信息失败", e);
-            throw new RuntimeException("获取Chroma统计信息失败: " + e.getMessage(), e);
-        }
+        long count = vectorStore.count();
+        return Map.of(
+                "count", count,
+                "storeType", vectorStore.getClass().getSimpleName()
+        );
     }
 
     @Override
     public Map<String, String> reset() {
-        try {
-            vectorStore.reset();
-            return Map.of("message", "Database reset successfully");
-        } catch (Exception e) {
-            log.error("重置Chroma数据库失败", e);
-            throw new RuntimeException("重置Chroma数据库失败: " + e.getMessage(), e);
-        }
+        vectorStore.reset();
+        return Map.of("message", "Database reset successfully");
     }
 
     @Override
     public Map<String, String> delete(Map<String, Object> filter) {
-        try {
-            if (filter == null || filter.isEmpty()) {
-                throw new IllegalArgumentException("Filter cannot be empty");
-            }
-            vectorStore.delete(filter);
-            return Map.of("message", "Documents deleted successfully");
-        } catch (IllegalArgumentException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("删除Chroma文档失败", e);
-            throw new RuntimeException("删除Chroma文档失败: " + e.getMessage(), e);
+        if (filter == null || filter.isEmpty()) {
+            throw new IllegalArgumentException("Filter cannot be empty");
         }
+        vectorStore.delete(filter);
+        return Map.of("message", "Documents deleted successfully");
     }
 
     @Override
     public Map<String, Object> healthcheck() {
-        try {
-            return chromaApiClient.getMap("/api/v2/healthcheck");
-        } catch (Exception e) {
-            log.error("获取Chroma健康状态失败", e);
-            throw new RuntimeException("获取Chroma健康状态失败: " + e.getMessage(), e);
-        }
+        return chromaApiClient.getMap("/api/v2/healthcheck");
     }
 
     @Override
     public Map<String, String> version() {
-        try {
-            String version = chromaApiClient.getString("/api/v2/version");
-            return Map.of("version", version != null ? version.replace("\"", "") : "unknown");
-        } catch (Exception e) {
-            log.error("获取Chroma版本失败", e);
-            throw new RuntimeException("获取Chroma版本失败: " + e.getMessage(), e);
-        }
+        String version = chromaApiClient.getString("/api/v2/version");
+        return Map.of("version", version != null ? version.replace("\"", "") : "unknown");
     }
 
     @Override
     public Map<String, Object> heartbeat() {
-        try {
-            return chromaApiClient.getMap("/api/v2/heartbeat");
-        } catch (Exception e) {
-            log.error("获取Chroma心跳失败", e);
-            throw new RuntimeException("获取Chroma心跳失败: " + e.getMessage(), e);
-        }
+        return chromaApiClient.getMap("/api/v2/heartbeat");
     }
 
     @Override
