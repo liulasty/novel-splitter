@@ -11,14 +11,19 @@ export function useIngestTask() {
     // UI State
     const [activeTab, setActiveTab] = useState<'upload' | 'download'>('upload');
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
-    const [uploadedFileName, setUploadedFileName] = useState<string>("");
+    const [novelName, setNovelName] = useState<string>("");
     
     // Download State
     const [downloadUrl, setDownloadUrl] = useState("");
-    const [downloadName, setDownloadName] = useState("");
 
+    // Split Config
     const [version, setVersion] = useState("v1");
-    const [maxScenes, setMaxScenes] = useState(0);
+    const [strategy, setStrategy] = useState("semantic");
+    const [maxTokens, setMaxTokens] = useState(512);
+    const [overlapTokens, setOverlapTokens] = useState(64);
+    
+    // Flow State
+    const [currentNovelId, setCurrentNovelId] = useState<string>("");
     const [ingestStatus, setIngestStatus] = useState<string>("");
     const [isError, setIsError] = useState(false);
     const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
@@ -39,11 +44,11 @@ export function useIngestTask() {
     const uploadMutation = useMutation({
         mutationFn: novelApi.uploadNovel,
         onSuccess: (data) => {
-            const msg = `上传成功：${data.message}`;
+            const msg = `上传成功！Novel ID: ${data.novelId}`;
             setIngestStatus(msg); 
             setIsError(false);
             toast.success(msg);
-            if (data.fileName) setUploadedFileName(data.fileName);
+            setCurrentNovelId(data.novelId);
             queryClient.invalidateQueries({ queryKey: ['novels'] });
         },
         onError: (error: any) => {
@@ -54,10 +59,26 @@ export function useIngestTask() {
         },
     });
 
-    const ingestMutation = useMutation({
-        mutationFn: novelApi.ingestNovel,
+    const splitMutation = useMutation({
+        mutationFn: (novelId: string) => novelApi.splitNovel(novelId, { version, strategy, maxTokens, overlapTokens }),
         onSuccess: (data) => {
-            const msg = `入库成功：${data.message}`;
+            const msg = `切分任务已提交：${data.message}`;
+            setIngestStatus(msg);
+            setIsError(false);
+            toast.success(msg);
+        },
+        onError: (error: any) => {
+            const msg = `切分失败：${error.response?.data?.error || error.message}`;
+            setIngestStatus(msg);
+            setIsError(true);
+            toast.error(msg);
+        },
+    });
+
+    const embedMutation = useMutation({
+        mutationFn: (novelId: string) => novelApi.embedNovel(novelId),
+        onSuccess: (data) => {
+            const msg = `向量化入库任务已提交：${data.message}`;
             setIngestStatus(msg);
             setIsError(false);
             toast.success(msg);
@@ -77,9 +98,7 @@ export function useIngestTask() {
             setIngestStatus(msg);
             setIsError(false);
             toast.success(msg);
-            // 可以选择清空表单
             setDownloadUrl("");
-            setDownloadName("");
         },
         onError: (error: any) => {
             const msg = `下载入库失败：${error.response?.data?.error || error.message}`;
@@ -101,7 +120,7 @@ export function useIngestTask() {
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files?.[0]) {
             setSelectedFile(e.target.files[0]);
-            setUploadedFileName("");
+            setNovelName(e.target.files[0].name.replace('.txt', ''));
             setIngestStatus("");
             setIsError(false);
         }
@@ -113,26 +132,35 @@ export function useIngestTask() {
         }
     };
 
-    const handleIngest = () => {
-        if (!uploadedFileName) {
-            setIngestStatus(selectedFile ? "请先点击「上传文件」完成上传" : "请先选择并上传文件");
+    const handleSplit = () => {
+        if (!currentNovelId) {
+            setIngestStatus("请先上传文件或选择小说");
             setIsError(true);
             return;
         }
-        ingestMutation.mutate({ fileName: uploadedFileName, version, maxScenes });
+        splitMutation.mutate(currentNovelId);
+    };
+
+    const handleEmbed = () => {
+        if (!currentNovelId) {
+            setIngestStatus("请先完成上传和切分");
+            setIsError(true);
+            return;
+        }
+        embedMutation.mutate(currentNovelId);
     };
 
     const handleDownloadAndIngest = () => {
-        if (!downloadUrl || !downloadName) {
-            setIngestStatus("请填写下载地址和保存文件名");
+        if (!downloadUrl || !novelName) {
+            setIngestStatus("请填写下载地址和小说名称");
             setIsError(true);
             return;
         }
         downloadAndIngestMutation.mutate({
             url: downloadUrl,
-            name: downloadName,
+            name: novelName,
             version,
-            maxScenes
+            maxScenes: 0 // backward compatibility for download api
         });
     };
 
@@ -140,29 +168,35 @@ export function useIngestTask() {
         state: {
             activeTab,
             selectedFile,
-            uploadedFileName,
+            novelName,
             downloadUrl,
-            downloadName,
             version,
-            maxScenes,
+            strategy,
+            maxTokens,
+            overlapTokens,
+            currentNovelId,
             ingestStatus,
             isError,
             tasks,
             selectedTaskId,
             isUploading: uploadMutation.isPending,
-            isIngesting: ingestMutation.isPending,
+            isSplitting: splitMutation.isPending,
+            isEmbedding: embedMutation.isPending,
             isDownloading: downloadAndIngestMutation.isPending,
         },
         actions: {
             setActiveTab,
             setVersion,
-            setMaxScenes,
+            setStrategy,
+            setMaxTokens,
+            setOverlapTokens,
+            setNovelName,
             setSelectedTaskId,
             setDownloadUrl,
-            setDownloadName,
             handleFileChange,
             handleUpload,
-            handleIngest,
+            handleSplit,
+            handleEmbed,
             handleDownloadAndIngest,
             deleteTask: (id: string) => deleteTaskMutation.mutate(id),
         }

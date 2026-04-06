@@ -1,56 +1,41 @@
 import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
-import { splitApi, SplitPreviewRequestDto, ChunkPreviewDto } from '@/api/splitApi';
-import { Loader2, Play, X, FileText, ChevronRight } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { novelApi } from '@/api/novelApi';
+import { Loader2, FileText, X, ChevronRight, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
 
 interface SplitPreviewModalProps {
     isOpen: boolean;
     onClose: () => void;
+    novelId: string;
 }
 
-export function SplitPreviewModal({ isOpen, onClose }: SplitPreviewModalProps) {
-    const [sourceText, setSourceText] = useState('');
-    const [strategy, setStrategy] = useState('scene');
-    const [maxTokens, setMaxTokens] = useState(1200);
-    const [overlapTokens, setOverlapTokens] = useState(0);
-    const [chunks, setChunks] = useState<ChunkPreviewDto[]>([]);
+export function SplitPreviewModal({ isOpen, onClose, novelId }: SplitPreviewModalProps) {
+    const [selectedChapterId, setSelectedChapterId] = useState<string | null>(null);
 
-    const previewMutation = useMutation({
-        mutationFn: splitApi.previewSplit,
-        onSuccess: (data) => {
-            setChunks(data);
-            toast.success('预览切分成功', { description: `共切分为 ${data.length} 个区块` });
-        },
-        onError: (error: any) => {
-            toast.error('预览切分失败', { description: error.message || String(error) });
-        }
+    const { data: chapters, isLoading: isChaptersLoading } = useQuery({
+        queryKey: ['chapters', novelId],
+        queryFn: () => novelApi.getChapters(novelId),
+        enabled: isOpen && !!novelId,
     });
 
-    const handlePreview = () => {
-        if (!sourceText.trim()) {
-            toast.error('请输入测试文本');
-            return;
-        }
-        previewMutation.mutate({
-            sourceText,
-            strategy,
-            maxTokens,
-            overlapTokens
-        });
-    };
+    const { data: scenes, isLoading: isScenesLoading } = useQuery({
+        queryKey: ['scenes', novelId, selectedChapterId],
+        queryFn: () => novelApi.getScenes(novelId, selectedChapterId!),
+        enabled: isOpen && !!novelId && !!selectedChapterId,
+    });
 
     if (!isOpen) return null;
 
     return (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 sm:p-6">
-            <div className="bg-white rounded-2xl w-full max-w-6xl max-h-[90vh] shadow-2xl flex flex-col overflow-hidden">
+            <div className="bg-white rounded-2xl w-full max-w-6xl h-[80vh] shadow-2xl flex flex-col overflow-hidden">
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50/50">
                     <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
                         <FileText className="w-5 h-5 text-indigo-600" />
-                        内存切分效果预览
+                        切分结果预览
+                        {novelId && <span className="text-sm font-normal text-gray-500 ml-2">ID: {novelId}</span>}
                     </h2>
                     <button
                         onClick={onClose}
@@ -62,95 +47,72 @@ export function SplitPreviewModal({ isOpen, onClose }: SplitPreviewModalProps) {
 
                 {/* Body */}
                 <div className="flex flex-1 overflow-hidden">
-                    {/* Left: Input & Config */}
+                    {/* Left: Chapters Tree */}
                     <div className="w-1/3 flex flex-col border-r border-gray-100 bg-white">
-                        <div className="p-4 border-b border-gray-100 space-y-4 bg-gray-50/30">
-                            <div>
-                                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">切分策略</label>
-                                <select
-                                    value={strategy}
-                                    onChange={(e) => setStrategy(e.target.value)}
-                                    className="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                                >
-                                    <option value="scene">Scene (按场景)</option>
-                                    <option value="semantic">Semantic (语义聚合)</option>
-                                    <option value="overlap">Overlap (重叠切分)</option>
-                                </select>
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">最大 Token</label>
-                                    <input
-                                        type="number"
-                                        value={maxTokens}
-                                        onChange={(e) => setMaxTokens(Number(e.target.value))}
-                                        className="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">重叠 Token</label>
-                                    <input
-                                        type="number"
-                                        value={overlapTokens}
-                                        onChange={(e) => setOverlapTokens(Number(e.target.value))}
-                                        className="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                                    />
-                                </div>
-                            </div>
-                            <button
-                                onClick={handlePreview}
-                                disabled={previewMutation.isPending}
-                                className="w-full flex items-center justify-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50"
-                            >
-                                {previewMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-                                执行实时切分
-                            </button>
+                        <div className="p-4 border-b border-gray-100 bg-gray-50/30">
+                            <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                                <BookOpen className="w-4 h-4" /> 章节列表
+                            </h3>
                         </div>
-                        <div className="flex-1 p-4 flex flex-col gap-2">
-                            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">测试文本内容</label>
-                            <textarea
-                                value={sourceText}
-                                onChange={(e) => setSourceText(e.target.value)}
-                                placeholder="粘贴你要测试的小说片段..."
-                                className="flex-1 w-full resize-none rounded-lg border-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm p-3"
-                            />
+                        <div className="flex-1 overflow-y-auto p-3 space-y-1">
+                            {isChaptersLoading ? (
+                                <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-gray-400" /></div>
+                            ) : chapters?.length === 0 ? (
+                                <div className="text-center py-8 text-sm text-gray-500">暂无章节数据，请确认是否已完成切分任务。</div>
+                            ) : (
+                                chapters?.map((chapter) => (
+                                    <button
+                                        key={chapter.chapterId}
+                                        onClick={() => setSelectedChapterId(chapter.chapterId)}
+                                        className={cn(
+                                            "w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center justify-between group",
+                                            selectedChapterId === chapter.chapterId 
+                                                ? "bg-indigo-50 text-indigo-700" 
+                                                : "text-gray-600 hover:bg-gray-50"
+                                        )}
+                                    >
+                                        <span className="truncate flex-1 pr-2">{chapter.title}</span>
+                                        <ChevronRight className={cn(
+                                            "w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity",
+                                            selectedChapterId === chapter.chapterId ? "opacity-100 text-indigo-500" : "text-gray-400"
+                                        )} />
+                                    </button>
+                                ))
+                            )}
                         </div>
                     </div>
 
-                    {/* Right: Results */}
+                    {/* Right: Scenes List */}
                     <div className="w-2/3 bg-slate-50 flex flex-col relative">
-                        {previewMutation.isPending ? (
-                            <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/50 backdrop-blur-sm z-10">
-                                <Loader2 className="w-8 h-8 animate-spin text-indigo-500 mb-4" />
-                                <p className="text-sm text-gray-600 font-medium">正在进行内存切分计算...</p>
-                            </div>
-                        ) : null}
-                        
+                        <div className="p-4 border-b border-gray-100 bg-white flex justify-between items-center">
+                            <h3 className="text-sm font-semibold text-gray-700">切分片段 (Scenes)</h3>
+                            {scenes && <span className="text-xs text-gray-500">共 {scenes.length} 个片段</span>}
+                        </div>
                         <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                            {chunks.length === 0 ? (
+                            {!selectedChapterId ? (
                                 <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                                    <FileText className="w-12 h-12 mb-3 text-gray-300" />
-                                    <p className="text-sm">左侧输入文本并点击执行预览</p>
+                                    <BookOpen className="w-12 h-12 mb-3 text-gray-300" />
+                                    <p className="text-sm">请在左侧选择一个章节</p>
                                 </div>
+                            ) : isScenesLoading ? (
+                                <div className="h-full flex flex-col items-center justify-center">
+                                    <Loader2 className="w-8 h-8 animate-spin text-indigo-500 mb-4" />
+                                </div>
+                            ) : scenes?.length === 0 ? (
+                                <div className="text-center py-8 text-sm text-gray-500">该章节暂无切分片段。</div>
                             ) : (
-                                chunks.map((chunk, idx) => (
-                                    <div key={idx} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                                scenes?.map((scene, idx) => (
+                                    <div key={scene.sceneId} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                                         <div className="flex items-center justify-between px-4 py-2 bg-gray-50/80 border-b border-gray-100">
-                                            <span className="text-xs font-semibold text-gray-500">Chunk #{chunk.index + 1}</span>
+                                            <span className="text-xs font-semibold text-gray-500">Scene #{idx + 1}</span>
                                             <div className="flex items-center gap-2">
-                                                <span className={cn(
-                                                    "px-2 py-0.5 rounded text-[10px] font-medium tracking-wide",
-                                                    chunk.type === 'SCENE' ? "bg-blue-100 text-blue-700" :
-                                                    chunk.type === 'DIALOGUE' ? "bg-amber-100 text-amber-700" :
-                                                    "bg-gray-100 text-gray-700"
-                                                )}>
-                                                    {chunk.type}
+                                                <span className="px-2 py-0.5 rounded text-[10px] font-medium tracking-wide bg-blue-100 text-blue-700">
+                                                    Tokens: {scene.tokens}
                                                 </span>
-                                                <span className="text-xs text-gray-400">长度: {chunk.length}</span>
                                             </div>
                                         </div>
                                         <div className="p-4 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
-                                            {chunk.text}
+                                            {scene.content}
                                         </div>
                                     </div>
                                 ))

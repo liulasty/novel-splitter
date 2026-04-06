@@ -1,22 +1,41 @@
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Trash2, Search, Loader2, Server, Database, Activity, Clock } from "lucide-react";
+import { Loader2, Server, Database, Activity, Clock, CheckCircle2, XCircle, ArrowRight } from "lucide-react";
 import { vectorApi } from "@/api/vectorApi";
 import { chromaApi } from "@/api/chromaApi";
+import { novelApi } from "@/api/novelApi";
+import { taskApi } from "@/api/taskApi";
 import { cn } from "@/lib/utils";
-import { toast } from 'sonner';
 
 export default function SystemPage() {
     const queryClient = useQueryClient();
-    const [searchQuery, setSearchQuery] = useState("");
-    const [searchResults, setSearchResults] = useState<any[]>([]);
-    const [isSearching, setIsSearching] = useState(false);
 
     // Stats Query
-    const { data: stats, isLoading: isStatsLoading } = useQuery({
+    const { data: vectorStats, isLoading: isVectorStatsLoading } = useQuery({
         queryKey: ['vectorStats'],
         queryFn: vectorApi.getStats,
+    });
+
+    const { data: dashboardStats, isLoading: isDashboardStatsLoading } = useQuery({
+        queryKey: ['dashboardStats'],
+        queryFn: novelApi.getDashboardStats,
+    });
+
+    const { data: modelHealth, isLoading: isModelHealthLoading } = useQuery({
+        queryKey: ['modelHealth'],
+        queryFn: novelApi.getModelHealth,
+        refetchInterval: 30000,
+    });
+
+    const { data: novels, isLoading: isNovelsLoading } = useQuery({
+        queryKey: ['novels'],
+        queryFn: novelApi.getNovels,
+    });
+
+    const { data: tasks, isLoading: isTasksLoading } = useQuery({
+        queryKey: ['tasks'],
+        queryFn: taskApi.getAllTasks,
+        refetchInterval: 5000,
     });
 
     // Chroma Queries
@@ -50,47 +69,6 @@ export default function SystemPage() {
         },
     });
 
-    // Reset Mutation
-    const resetMutation = useMutation({
-        mutationFn: vectorApi.reset,
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['vectorStats'] });
-            queryClient.invalidateQueries({ queryKey: ['chromaCollections'] });
-            toast.success("数据库已清空");
-        },
-        onError: (error) => {
-            toast.error(`清空失败: ${error}`);
-        }
-    });
-
-    const handleSearch = async () => {
-        if (!searchQuery.trim()) return;
-        setIsSearching(true);
-        try {
-            const results = await vectorApi.search({ query: searchQuery, topK: 5 });
-            setSearchResults(results);
-        } catch (error) {
-            console.error(error);
-            toast.error("搜索失败");
-        } finally {
-            setIsSearching(false);
-        }
-    };
-
-    const handleReset = () => {
-        toast("确定要清空所有向量数据吗？", {
-            description: "此操作不可逆！",
-            action: {
-                label: "确定清空",
-                onClick: () => resetMutation.mutate(),
-            },
-            cancel: {
-                label: "取消",
-                onClick: () => {},
-            },
-        });
-    };
-
     return (
         <div className="max-w-4xl mx-auto space-y-8">
             <div className="flex flex-col gap-2">
@@ -103,198 +81,224 @@ export default function SystemPage() {
             </div>
 
             <div className="grid gap-6 md:grid-cols-4">
-                {/* Stats Card */}
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
-                            <Database className="w-4 h-4" />总文档数
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">
-                            {isStatsLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : stats?.count ?? "--"}
+                {/* Stats Cards */}
+                <Card className="bg-indigo-50/50 border-indigo-100">
+                    <CardContent className="p-6">
+                        <div className="text-xs font-semibold text-indigo-500 uppercase tracking-wider mb-2">入库小说</div>
+                        <div className="text-3xl font-bold text-indigo-900">
+                            {isNovelsLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : novels?.length ?? 0}
                         </div>
-                        <p className="text-xs text-gray-500 mt-1">
-                            {stats?.type || "Vector Store"}
-                        </p>
+                        <div className="text-xs text-indigo-600/70 mt-2">已入库版本</div>
                     </CardContent>
                 </Card>
 
-                {/* Health Card - 已修复 */}
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
-                            <Activity className="w-4 h-4" />运行状态
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">
-                            {health === undefined ? (
-                                <Loader2 className="w-6 h-6 animate-spin" />
-                            ) : health?.['is_executor_ready'] ? (
-                                <span className="text-green-600">在线</span>
-                            ) : (
-                                <span className="text-red-600">离线</span>
-                            )}
+                <Card className="bg-emerald-50/50 border-emerald-100">
+                    <CardContent className="p-6">
+                        <div className="text-xs font-semibold text-emerald-500 uppercase tracking-wider mb-2">向量总数</div>
+                        <div className="text-3xl font-bold text-emerald-900">
+                            {isVectorStatsLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : vectorStats?.count ?? 0}
                         </div>
-                        <p className="text-xs text-gray-500 mt-1">Chroma 服务状态</p>
+                        <div className="text-xs text-emerald-600/70 mt-2">ChromaDB</div>
                     </CardContent>
                 </Card>
 
-                {/* Version Card */}
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
-                            <Server className="w-4 h-4" />服务版本
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">
-                            {!version ? <Loader2 className="w-6 h-6 animate-spin" /> : version.version ?? "未知"}
+                <Card className="bg-blue-50/50 border-blue-100">
+                    <CardContent className="p-6">
+                        <div className="text-xs font-semibold text-blue-500 uppercase tracking-wider mb-2">问答次数</div>
+                        <div className="text-3xl font-bold text-blue-900">
+                            {isDashboardStatsLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : dashboardStats?.qaCount ?? 0}
                         </div>
-                        <p className="text-xs text-gray-500 mt-1">Chroma DB 版本</p>
+                        <div className="text-xs text-blue-600/70 mt-2">今日 {dashboardStats?.todayQaCount ?? 0} 次</div>
                     </CardContent>
                 </Card>
 
-                {/* Heartbeat Card - 已修复 */}
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
-                            <Clock className="w-4 h-4" />心跳检测
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-xl font-bold truncate">
-                            {heartbeat === undefined ? (
-                                <Loader2 className="w-6 h-6 animate-spin" />
-                            ) : heartbeat?.['nanosecond heartbeat'] ? (
-                                <span className="text-green-600">正常</span>
-                            ) : (
-                                <span className="text-red-600">异常</span>
-                            )}
+                <Card className="bg-amber-50/50 border-amber-100">
+                    <CardContent className="p-6">
+                        <div className="text-xs font-semibold text-amber-500 uppercase tracking-wider mb-2">平均检索耗时</div>
+                        <div className="text-3xl font-bold text-amber-900">
+                            {isDashboardStatsLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : `${dashboardStats?.avgRetrievalTimeMs ?? 0}ms`}
                         </div>
-                        <p className="text-xs text-gray-500 mt-1 truncate" title={heartbeat?.['nanosecond heartbeat'] ? heartbeat['nanosecond heartbeat'].toString() : ""}>
-                            {heartbeat?.['nanosecond heartbeat'] || "--"}
-                        </p>
+                        <div className="text-xs text-amber-600/70 mt-2">{dashboardStats?.retrievalTimeTrend ?? '--'}</div>
                     </CardContent>
                 </Card>
             </div>
 
-            {/* Collections Section */}
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <Database className="w-5 h-5" />
-                        集合管理 (Collections)
-                    </CardTitle>
-                    <CardDescription>
-                        当前系统中的所有向量集合
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    {isCollectionsLoading ? (
-                        <div className="flex justify-center py-4">
-                            <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+            <div className="grid gap-6 md:grid-cols-2">
+                {/* Recent Tasks */}
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2 border-b border-gray-100">
+                        <CardTitle className="text-base">近期入库任务</CardTitle>
+                        <span className="bg-emerald-100 text-emerald-700 text-xs font-medium px-2.5 py-0.5 rounded-full">
+                            {tasks?.filter(t => t.status === 'PROCESSING').length || 0} 运行中
+                        </span>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm text-left">
+                                <thead className="text-xs text-gray-500 bg-gray-50/50 border-b border-gray-100">
+                                    <tr>
+                                        <th className="px-4 py-3 font-medium">小说</th>
+                                        <th className="px-4 py-3 font-medium">阶段</th>
+                                        <th className="px-4 py-3 font-medium">进度</th>
+                                        <th className="px-4 py-3 font-medium text-center">状态</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {isTasksLoading ? (
+                                        <tr><td colSpan={4} className="text-center py-8 text-gray-500"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></td></tr>
+                                    ) : tasks?.slice(0, 4).map((task) => (
+                                        <tr key={task.taskId} className="hover:bg-gray-50/50">
+                                            <td className="px-4 py-3">
+                                                <div className="font-medium text-gray-900">{task.novelId}</div>
+                                                <div className="text-xs text-gray-500 font-mono mt-0.5">{task.version}</div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <span className={cn(
+                                                    "text-xs font-medium px-2 py-0.5 rounded-full",
+                                                    task.taskType === 'EMBED' ? "bg-indigo-100 text-indigo-700" : "bg-blue-100 text-blue-700"
+                                                )}>
+                                                    {task.taskType === 'EMBED' ? '向量化' : '切分'}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                                        <div 
+                                                            className={cn("h-full rounded-full", task.status === 'FAILED' ? "bg-red-500" : "bg-blue-500")} 
+                                                            style={{ width: `${task.progress}%` }} 
+                                                        />
+                                                    </div>
+                                                    <span className="text-xs text-gray-500 font-mono">{task.progress}%</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3 text-center">
+                                                {task.status === 'PROCESSING' && <Loader2 className="w-4 h-4 animate-spin text-blue-500 mx-auto" />}
+                                                {task.status === 'SUCCESS' && <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" />}
+                                                {task.status === 'FAILED' && <XCircle className="w-4 h-4 text-red-500 mx-auto" />}
+                                                {task.status === 'PENDING' && <Clock className="w-4 h-4 text-gray-400 mx-auto" />}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {tasks?.length === 0 && (
+                                        <tr><td colSpan={4} className="text-center py-8 text-gray-500">暂无任务</td></tr>
+                                    )}
+                                </tbody>
+                            </table>
                         </div>
-                    ) : collections && collections.length > 0 ? (
-                        <div className="grid gap-4 md:grid-cols-2">
-                            {collections.map((col: any) => (
-                                <div key={col.id} className="p-4 rounded-lg border border-gray-200 bg-white shadow-sm flex flex-col gap-2">
-                                    <div className="flex justify-between items-start">
-                                        <h4 className="font-medium text-gray-900">{col.name}</h4>
-                                        <span className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded-full truncate max-w-[120px]" title={col.id}>
-                                      ID: {col.id.substring(0, 8)}...
-                                  </span>
-                                    </div>
-                                    <div className="text-sm text-gray-500 mt-2">
-                                        <p>数据库: {col.database}</p>
-                                        <p>租户: {col.tenant}</p>
-                                    </div>
+                    </CardContent>
+                </Card>
+
+                {/* Chroma Health & Model Health */}
+                <Card>
+                    <CardHeader className="pb-2 border-b border-gray-100">
+                        <CardTitle className="text-base">ChromaDB 健康状态</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        <div className="divide-y divide-gray-100">
+                            <div className="flex justify-between items-center px-6 py-3">
+                                <div>
+                                    <div className="text-sm font-medium text-gray-900">Collection</div>
+                                    <div className="text-xs text-gray-500">novel-splitter</div>
                                 </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="text-center py-8 text-gray-500 border rounded-lg bg-gray-50">
-                            暂无集合数据
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-
-            {/* Vector Search Debugger */}
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <Search className="w-5 h-5" />
-                        向量检索调试
-                    </CardTitle>
-                    <CardDescription>
-                        输入文本测试向量检索结果，验证 Embedding 质量。
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="flex gap-2">
-                        <input
-                            type="text"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="输入查询文本..."
-                            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                        />
-                        <button
-                            onClick={handleSearch}
-                            disabled={isSearching || !searchQuery.trim()}
-                            className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                        >
-                            {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : "搜索"}
-                        </button>
-                    </div>
-
-                    {searchResults.length > 0 && (
-                        <div className="space-y-2 mt-4">
-                            <h4 className="text-sm font-medium text-gray-700">检索结果 (Top 5)</h4>
-                            <div className="space-y-2">
-                                {searchResults.map((result, idx) => (
-                                    <div key={idx} className="bg-gray-50 p-3 rounded border text-sm">
-                                        <div className="flex justify-between text-xs text-gray-500 mb-1">
-                                            <span>ID: {result.chunkId}</span>
-                                            <span>Score: {result.score.toFixed(4)}</span>
-                                        </div>
-                                    </div>
-                                ))}
+                                <span className="bg-emerald-100 text-emerald-700 text-xs font-medium px-2.5 py-0.5 rounded-full">在线</span>
+                            </div>
+                            <div className="flex justify-between items-center px-6 py-3">
+                                <div>
+                                    <div className="text-sm font-medium text-gray-900">总向量数</div>
+                                    <div className="text-xs text-gray-500">所有版本合计</div>
+                                </div>
+                                <span className="font-mono text-sm font-medium text-indigo-600">{vectorStats?.count ?? '--'}</span>
+                            </div>
+                            <div className="flex justify-between items-center px-6 py-3">
+                                <div>
+                                    <div className="text-sm font-medium text-gray-900">Embedding 模型</div>
+                                    <div className="text-xs text-gray-500">本地 ONNX</div>
+                                </div>
+                                {isModelHealthLoading ? <Loader2 className="w-4 h-4 animate-spin text-gray-400" /> : (
+                                    <span className={cn("text-xs font-medium px-2.5 py-0.5 rounded-full", modelHealth?.embeddingModelLoaded ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700")}>
+                                        {modelHealth?.embeddingModelLoaded ? "已加载" : "未加载"}
+                                    </span>
+                                )}
+                            </div>
+                            <div className="flex justify-between items-center px-6 py-3">
+                                <div>
+                                    <div className="text-sm font-medium text-gray-900">LLM 后端</div>
+                                    <div className="text-xs text-gray-500">API 连接性</div>
+                                </div>
+                                {isModelHealthLoading ? <Loader2 className="w-4 h-4 animate-spin text-gray-400" /> : (
+                                    <span className={cn("text-xs font-medium px-2.5 py-0.5 rounded-full", modelHealth?.llmBackendReachable ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700")}>
+                                        {modelHealth?.llmBackendReachable ? "可达" : "不可达"}
+                                    </span>
+                                )}
                             </div>
                         </div>
-                    )}
-                </CardContent>
-            </Card>
+                    </CardContent>
+                </Card>
+            </div>
 
-            <Card className="border-red-100 bg-red-50/30">
-                <CardHeader>
-                    <CardTitle className="text-red-700 flex items-center gap-2">
-                        <Trash2 className="w-5 h-5" />
-                        危险操作区
-                    </CardTitle>
-                    <CardDescription className="text-red-600/80">
-                        这些操作不可逆，请谨慎执行。
-                    </CardDescription>
+            {/* Pipeline Data Flow */}
+            <Card>
+                <CardHeader className="pb-4 border-b border-gray-100">
+                    <CardTitle className="text-base">入库数据流向</CardTitle>
                 </CardHeader>
-                <CardContent className="flex items-center justify-between">
-                    <div>
-                        <p className="font-medium text-gray-900">清空数据库</p>
-                        <p className="text-sm text-gray-500">永久删除所有向量数据。</p>
+                <CardContent className="p-6">
+                    <div className="flex flex-col gap-6">
+                        <div className="flex items-center gap-2 overflow-x-auto pb-2">
+                            <div className="flex-shrink-0 flex flex-col items-center gap-1.5 p-3 rounded-lg border border-emerald-200 bg-emerald-50 min-w-[100px]">
+                                <span className="text-xs font-bold text-emerald-700">下载/读取</span>
+                                <span className="text-[10px] text-gray-500 font-mono">novelDownloader</span>
+                            </div>
+                            <ArrowRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                            <div className="flex-shrink-0 flex flex-col items-center gap-1.5 p-3 rounded-lg border border-emerald-200 bg-emerald-50 min-w-[100px]">
+                                <span className="text-xs font-bold text-emerald-700">切分</span>
+                                <span className="text-[10px] text-gray-500 font-mono">splitter</span>
+                            </div>
+                            <ArrowRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                            <div className="flex-shrink-0 flex flex-col items-center gap-1.5 p-3 rounded-lg border border-emerald-200 bg-emerald-50 min-w-[100px]">
+                                <span className="text-xs font-bold text-emerald-700">校验</span>
+                                <span className="text-[10px] text-gray-500 font-mono">validation</span>
+                            </div>
+                            <ArrowRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                            <div className="flex-shrink-0 flex flex-col items-center gap-1.5 p-3 rounded-lg border border-indigo-200 bg-indigo-50 min-w-[100px]">
+                                <span className="text-xs font-bold text-indigo-700">向量化</span>
+                                <span className="text-[10px] text-gray-500 font-mono">embedding</span>
+                            </div>
+                            <ArrowRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                            <div className="flex-shrink-0 flex flex-col items-center gap-1.5 p-3 rounded-lg border border-gray-200 bg-gray-50 min-w-[100px] opacity-70">
+                                <span className="text-xs font-bold text-gray-700">入库</span>
+                                <span className="text-[10px] text-gray-500 font-mono">repository</span>
+                            </div>
+                        </div>
+
+                        <div className="h-px bg-gray-100" />
+
+                        <div className="flex items-center gap-2 overflow-x-auto pb-2">
+                            <div className="flex-shrink-0 flex flex-col items-center gap-1.5 p-3 rounded-lg border border-emerald-200 bg-emerald-50 min-w-[100px]">
+                                <span className="text-xs font-bold text-emerald-700">问题输入</span>
+                                <span className="text-[10px] text-gray-500 font-mono">application</span>
+                            </div>
+                            <ArrowRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                            <div className="flex-shrink-0 flex flex-col items-center gap-1.5 p-3 rounded-lg border border-emerald-200 bg-emerald-50 min-w-[100px]">
+                                <span className="text-xs font-bold text-emerald-700">向量化</span>
+                                <span className="text-[10px] text-gray-500 font-mono">embedding</span>
+                            </div>
+                            <ArrowRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                            <div className="flex-shrink-0 flex flex-col items-center gap-1.5 p-3 rounded-lg border border-emerald-200 bg-emerald-50 min-w-[100px]">
+                                <span className="text-xs font-bold text-emerald-700">召回</span>
+                                <span className="text-[10px] text-gray-500 font-mono">retrieval</span>
+                            </div>
+                            <ArrowRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                            <div className="flex-shrink-0 flex flex-col items-center gap-1.5 p-3 rounded-lg border border-emerald-200 bg-emerald-50 min-w-[100px]">
+                                <span className="text-xs font-bold text-emerald-700">组装</span>
+                                <span className="text-[10px] text-gray-500 font-mono">context-assembler</span>
+                            </div>
+                            <ArrowRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                            <div className="flex-shrink-0 flex flex-col items-center gap-1.5 p-3 rounded-lg border border-emerald-200 bg-emerald-50 min-w-[100px]">
+                                <span className="text-xs font-bold text-emerald-700">生成</span>
+                                <span className="text-[10px] text-gray-500 font-mono">llm-client</span>
+                            </div>
+                        </div>
                     </div>
-                    <button
-                        onClick={handleReset}
-                        disabled={resetMutation.isPending}
-                        className={cn(
-                            "bg-red-600 text-white hover:bg-red-700 px-4 py-2 rounded-md text-sm font-medium shadow-sm transition-colors flex items-center gap-2",
-                            resetMutation.isPending && "opacity-50 cursor-not-allowed"
-                        )}
-                    >
-                        {resetMutation.isPending && <Loader2 className="w-4 h-6 animate-spin" />}
-                        确认清空
-                    </button>
                 </CardContent>
             </Card>
         </div>
