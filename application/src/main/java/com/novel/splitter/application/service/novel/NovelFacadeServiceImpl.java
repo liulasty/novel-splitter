@@ -6,6 +6,9 @@ import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.domain.task.SplitTaskMessage;
 import com.novel.splitter.domain.model.dto.DownloadAndIngestRequest;
 import com.novel.splitter.domain.model.dto.IngestRequest;
+import com.novel.splitter.domain.model.dto.NovelStatRecordDto;
+import com.novel.splitter.domain.task.SplitTask;
+import com.novel.splitter.repository.api.JpaSceneRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -15,9 +18,18 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -30,6 +42,93 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
     private final TaskService taskService;
     private final RabbitTemplate rabbitTemplate;
     private final DownloadService downloadService;
+    private final JpaSceneRepository jpaSceneRepository;
+
+    @Override
+    public List<NovelStatRecordDto> getNovelStats() {
+        List<Object[]> sceneCounts = jpaSceneRepository.countScenesByNovelAndVersion();
+
+        // Map: novelName -> map of version -> count
+        Map<String, Map<String, Long>> novelVersionCounts = new HashMap<>();
+        for (Object[] row : sceneCounts) {
+            String novelName = (String) row[0];
+            String version = (String) row[1];
+            long count = ((Number) row[2]).longValue();
+            novelVersionCounts.computeIfAbsent(novelName, k -> new HashMap<>()).put(version, count);
+        }
+
+        List<SplitTask> allTasks = taskService.getAllTasks();
+        // Group tasks by novelId
+        Map<String, List<SplitTask>> tasksByNovel = allTasks.stream()
+                .filter(t -> t.getNovelId() != null)
+                .collect(Collectors.groupingBy(SplitTask::getNovelId));
+
+        List<NovelStatRecordDto> stats = new ArrayList<>();
+
+        // Merge data
+        for (Map.Entry<String, Map<String, Long>> entry : novelVersionCounts.entrySet()) {
+            String novelName = entry.getKey();
+            Map<String, Long> versionMap = entry.getValue();
+
+            List<String> versions = new ArrayList<>(versionMap.keySet());
+            long totalScenes = versionMap.values().stream().mapToLong(Long::longValue).sum();
+
+            // Get latest task for this novel
+            List<SplitTask> novelTasks = tasksByNovel.getOrDefault(novelName, Collections.emptyList());
+            SplitTask latestTask = novelTasks.stream()
+                    .max(Comparator.comparing(SplitTask::getCreatedAt))
+                    .orElse(null);
+
+            String ingestTime = null;
+            String status = "UNKNOWN";
+
+            if (latestTask != null) {
+                LocalDateTime dt = LocalDateTime.ofInstant(Instant.ofEpochMilli(latestTask.getCreatedAt()), ZoneId.systemDefault());
+                ingestTime = dt.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+                status = latestTask.getStatus() != null ? latestTask.getStatus().name() : "UNKNOWN";
+            }
+
+            NovelStatRecordDto dto = NovelStatRecordDto.builder()
+                    .novelName(novelName)
+                    .versions(versions)
+                    .sceneCount(totalScenes)
+                    .vectorCount(totalScenes) // Assume 1 scene = 1 vector
+                    .ingestTime(ingestTime)
+                    .status(status)
+                    .build();
+            stats.add(dto);
+        }
+
+        // Add novels that have tasks but no scenes yet
+        for (Map.Entry<String, List<SplitTask>> entry : tasksByNovel.entrySet()) {
+            String novelName = entry.getKey();
+            if (!novelVersionCounts.containsKey(novelName)) {
+                SplitTask latestTask = entry.getValue().stream()
+                        .max(Comparator.comparing(SplitTask::getCreatedAt))
+                        .orElse(null);
+
+                String ingestTime = null;
+                String status = "UNKNOWN";
+                if (latestTask != null) {
+                    LocalDateTime dt = LocalDateTime.ofInstant(Instant.ofEpochMilli(latestTask.getCreatedAt()), ZoneId.systemDefault());
+                    ingestTime = dt.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+                    status = latestTask.getStatus() != null ? latestTask.getStatus().name() : "UNKNOWN";
+                }
+
+                NovelStatRecordDto dto = NovelStatRecordDto.builder()
+                        .novelName(novelName)
+                        .versions(Collections.emptyList())
+                        .sceneCount(0)
+                        .vectorCount(0)
+                        .ingestTime(ingestTime)
+                        .status(status)
+                        .build();
+                stats.add(dto);
+            }
+        }
+
+        return stats;
+    }
 
     @Override
     public List<String> listNovels() throws IOException {

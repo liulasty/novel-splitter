@@ -4,12 +4,19 @@ import com.novel.splitter.domain.task.SplitTask;
 import com.novel.splitter.domain.task.TaskProgressEvent;
 import com.novel.splitter.application.repository.task.TaskRepository;
 import com.novel.splitter.application.repository.task.TaskEventRepository;
+import com.novel.splitter.application.model.dto.JobStatSummaryDto;
+import com.novel.splitter.application.model.dto.JobRecordDto;
+import com.novel.splitter.repository.api.JpaSplitTaskRepository;
+import com.novel.splitter.domain.entity.JpaSplitTaskEntity;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class TaskService {
@@ -17,12 +24,14 @@ public class TaskService {
     private final TaskRepository taskRepository;
     private final TaskEventRepository taskEventRepository;
     private final TaskEventPublisher taskEventPublisher;
+    private final JpaSplitTaskRepository jpaSplitTaskRepository;
 
     @Autowired
-    public TaskService(TaskRepository taskRepository, TaskEventRepository taskEventRepository, TaskEventPublisher taskEventPublisher) {
+    public TaskService(TaskRepository taskRepository, TaskEventRepository taskEventRepository, TaskEventPublisher taskEventPublisher, JpaSplitTaskRepository jpaSplitTaskRepository) {
         this.taskRepository = taskRepository;
         this.taskEventRepository = taskEventRepository;
         this.taskEventPublisher = taskEventPublisher;
+        this.jpaSplitTaskRepository = jpaSplitTaskRepository;
     }
 
     @Transactional
@@ -67,5 +76,48 @@ public class TaskService {
     @Transactional(readOnly = true)
     public List<TaskProgressEvent> getTaskEvents(String taskId) {
         return taskEventRepository.findByTaskId(taskId);
+    }
+
+    @Transactional(readOnly = true)
+    public JobStatSummaryDto getJobStats() {
+        long startOfDay = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
+        
+        long running = jpaSplitTaskRepository.countByStatus(SplitTask.TaskStatus.PROCESSING);
+        long waiting = jpaSplitTaskRepository.countByStatus(SplitTask.TaskStatus.PENDING);
+        long completedToday = jpaSplitTaskRepository.countByStatusAndUpdatedAtGreaterThanEqual(SplitTask.TaskStatus.SUCCESS, startOfDay);
+        long failedToday = jpaSplitTaskRepository.countByStatusAndUpdatedAtGreaterThanEqual(SplitTask.TaskStatus.FAILED, startOfDay);
+        
+        return JobStatSummaryDto.builder()
+                .running(running)
+                .waiting(waiting)
+                .completedToday(completedToday)
+                .failedToday(failedToday)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public List<JobRecordDto> getAllJobs() {
+        return jpaSplitTaskRepository.findAll().stream()
+                .map(this::mapToJobRecordDto)
+                .sorted(Comparator.comparing(JobRecordDto::getCreatedAt).reversed())
+                .collect(Collectors.toList());
+    }
+
+    private JobRecordDto mapToJobRecordDto(JpaSplitTaskEntity entity) {
+        return JobRecordDto.builder()
+                .id(entity.getTaskId())
+                .taskId(entity.getTaskId())
+                .novelId(entity.getNovelId())
+                .fileName(entity.getFileName())
+                .maxScenes(entity.getMaxScenes())
+                .version(entity.getVersion())
+                .status(entity.getStatus())
+                .progress(entity.getProgress())
+                .message(entity.getMessage())
+                .createdAt(entity.getCreatedAt())
+                .updatedAt(entity.getUpdatedAt())
+                .totalScenes(entity.getTotalScenes())
+                .completedScenes(entity.getCompletedScenes())
+                .build();
     }
 }

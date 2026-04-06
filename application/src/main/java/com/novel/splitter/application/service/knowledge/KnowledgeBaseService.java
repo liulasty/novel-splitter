@@ -1,6 +1,10 @@
 package com.novel.splitter.application.service.knowledge;
 
 import com.novel.splitter.domain.model.Scene;
+import com.novel.splitter.domain.model.dto.VectorPreviewRecordDto;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import java.util.List;
 
 /**
@@ -8,6 +12,13 @@ import java.util.List;
  */
 public interface KnowledgeBaseService {
     
+    /**
+     * 获取轻量级场景分页列表
+     * @param pageable 分页参数
+     * @return 轻量级场景分页列表
+     */
+    Page<VectorPreviewRecordDto> getLightweightScenes(Pageable pageable);
+
     /**
      * 获取指定小说的所有 Scene
      * @param novelName 小说名称
