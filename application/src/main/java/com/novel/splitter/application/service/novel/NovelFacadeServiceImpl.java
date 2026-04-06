@@ -3,9 +3,11 @@ package com.novel.splitter.application.service.novel;
 import com.novel.splitter.application.config.RabbitConfig;
 import com.novel.splitter.application.service.download.DownloadService;
 import com.novel.splitter.application.service.task.TaskService;
-import com.novel.splitter.domain.task.SplitTaskMessage;
+import com.novel.splitter.domain.enums.TaskType;
+import com.novel.splitter.domain.task.EmbedTaskMessage;
 import com.novel.splitter.domain.model.dto.DownloadAndIngestRequest;
 import com.novel.splitter.domain.model.dto.IngestRequest;
+import com.novel.splitter.domain.task.SplitTaskMessage;
 import com.novel.splitter.domain.model.dto.NovelStatRecordDto;
 import com.novel.splitter.domain.task.SplitTask;
 import com.novel.splitter.repository.api.JpaSceneRepository;
@@ -39,6 +41,8 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
     private static final String DEFAULT_VERSION = "v1";
 
     private final NovelStorageService novelStorageService;
+    private final NovelService novelService;
+    private final ChapterService chapterService;
     private final TaskService taskService;
     private final RabbitTemplate rabbitTemplate;
     private final DownloadService downloadService;
@@ -136,14 +140,59 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
     }
 
     @Override
-    public Map<String, String> uploadNovel(MultipartFile file) throws IOException {
-        String newFilename = novelStorageService.saveNovel(file);
-        return Map.of("message", "文件上传成功: " + newFilename, "fileName", newFilename);
+    public Map<String, String> uploadNovel(MultipartFile file, String title, String author, String description) throws IOException {
+        String novelId = novelService.createNovel(file, title, author, description);
+        return Map.of("message", "文件上传成功", "novelId", novelId);
+    }
+
+    @Override
+    public Map<String, String> split(String novelId, IngestRequest request) throws IOException {
+        log.info("接收到切分请求: novelId={}, request={}", novelId, request);
+        
+        com.novel.splitter.domain.entity.JpaNovelEntity novel = novelService.getNovelById(novelId);
+        if (novel == null) {
+            throw new IllegalArgumentException("Novel not found: " + novelId);
+        }
+
+        String taskId = UUID.randomUUID().toString();
+        int maxScenes = request.getMaxScenes() > 0 ? request.getMaxScenes() : Integer.MAX_VALUE;
+        String version = normalizeVersion(request.getVersion());
+
+        taskService.createTask(taskId, TaskType.SPLIT, novelId, novel.getFilePath(), maxScenes, version);
+        
+        SplitTaskMessage message = new SplitTaskMessage(taskId, novelId, maxScenes, version);
+        rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "load", message);
+        log.info("Sent taskId {} to load queue for split", taskId);
+
+        return Map.of("message", "切分任务已提交到队列", "taskId", taskId);
+    }
+
+    @Override
+    public Map<String, String> embed(String novelId) throws IOException {
+        log.info("接收到向量化请求: novelId={}", novelId);
+        
+        com.novel.splitter.domain.entity.JpaNovelEntity novel = novelService.getNovelById(novelId);
+        if (novel == null) {
+            throw new IllegalArgumentException("Novel not found: " + novelId);
+        }
+
+        String taskId = UUID.randomUUID().toString();
+        // Here we assume the latest version or a default one if version is not provided in request
+        String version = DEFAULT_VERSION;
+        
+        taskService.createTask(taskId, TaskType.EMBED, novelId, novel.getFilePath(), Integer.MAX_VALUE, version);
+        
+        EmbedTaskMessage message = new EmbedTaskMessage(taskId, novelId, version);
+        rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "embed", message);
+        log.info("Sent taskId {} to embed queue", taskId);
+
+        return Map.of("message", "向量化任务已提交到队列", "taskId", taskId);
     }
 
     @Override
     public Map<String, String> ingest(IngestRequest request) throws IOException {
-        log.info("接收到入库请求: {}", request);
+        // 保留原有的 ingest 作为向前兼容，或者直接复用
+        log.info("接收到原 ingest 请求: {}", request);
 
         Path novelPath = novelStorageService.resolveExistingNovelPath(request.getFileName());
         String taskId = UUID.randomUUID().toString();
@@ -151,7 +200,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         int maxScenes = request.getMaxScenes() > 0 ? request.getMaxScenes() : Integer.MAX_VALUE;
         String version = normalizeVersion(request.getVersion());
 
-        taskService.createTask(taskId, novelId, request.getFileName(), maxScenes, version);
+        taskService.createTask(taskId, TaskType.SPLIT, novelId, request.getFileName(), maxScenes, version);
         
         SplitTaskMessage message = new SplitTaskMessage(taskId, novelId, maxScenes, version);
         rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "load", message);
@@ -176,6 +225,21 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         ingestRequest.setMaxScenes(request.getMaxScenes());
         
         return ingest(ingestRequest);
+    }
+
+    @Override
+    public List<com.novel.splitter.domain.entity.JpaChapterEntity> getChapters(String novelId) {
+        return chapterService.getChaptersByNovelId(novelId);
+    }
+
+    @Override
+    public List<com.novel.splitter.domain.entity.JpaSceneEntity> getScenesByChapter(String novelId, Long chapterId) {
+        return jpaSceneRepository.findAll((root, query, cb) -> {
+            return cb.and(
+                cb.equal(root.get("novel").get("id"), novelId),
+                cb.equal(root.get("chapter").get("id"), chapterId)
+            );
+        });
     }
 
     private String normalizeNovelId(String fileName) {

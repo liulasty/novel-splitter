@@ -48,8 +48,11 @@ public class NovelController {
     @Operation(summary = "上传小说文件", description = "上传本地小说文件到服务器存储目录，并自动生成唯一文件名")
     @PostMapping(value = "/upload", consumes = "multipart/form-data")
     public Map<String, String> uploadNovel(
-            @Parameter(description = "上传的文件对象", required = true) @RequestParam("file") MultipartFile file) throws IOException {
-        return novelFacadeService.uploadNovel(file);
+            @Parameter(description = "上传的文件对象", required = true) @RequestParam("file") MultipartFile file,
+            @Parameter(description = "小说标题") @RequestParam(value = "title", required = false) String title,
+            @Parameter(description = "小说作者") @RequestParam(value = "author", required = false) String author,
+            @Parameter(description = "小说描述") @RequestParam(value = "description", required = false) String description) throws IOException {
+        return novelFacadeService.uploadNovel(file, title, author, description);
     }
 
     /**
@@ -58,7 +61,30 @@ public class NovelController {
      * @param request 入库请求参数
      * @return 启动入库任务的响应信息
      */
-    @Operation(summary = "小说入库处理", description = "异步启动指定小说文件的解析、分块及向量化入库流程")
+    @Operation(summary = "获取小说章节树", description = "获取小说的所有章节层级结构")
+    @GetMapping("/{novelId}/chapters")
+    public List<com.novel.splitter.domain.entity.JpaChapterEntity> getChapters(@PathVariable String novelId) {
+        return novelFacadeService.getChapters(novelId);
+    }
+
+    @Operation(summary = "获取章节片段", description = "获取某章节下的所有切分片段 (Scenes)")
+    @GetMapping("/{novelId}/chapters/{chapterId}/scenes")
+    public List<com.novel.splitter.domain.entity.JpaSceneEntity> getScenesByChapter(@PathVariable String novelId, @PathVariable Long chapterId) {
+        return novelFacadeService.getScenesByChapter(novelId, chapterId);
+    }
+    @PostMapping("/{novelId}/split")
+    public Map<String, String> splitNovel(@PathVariable String novelId, @Valid @RequestBody IngestRequest request) throws IOException {
+        return novelFacadeService.split(novelId, request);
+    }
+
+    @Operation(summary = "启动小说向量化", description = "触发已切分小说的异步向量化入库流程")
+    @PostMapping("/{novelId}/embed")
+    public Map<String, String> embedNovel(@PathVariable String novelId) throws IOException {
+        return novelFacadeService.embed(novelId);
+    }
+
+    @Deprecated
+    @Operation(summary = "小说一键入库(已废弃)", description = "异步启动指定小说文件的解析、分块及向量化入库流程")
     @PostMapping("/ingest")
     public Map<String, String> ingest(@Valid @RequestBody IngestRequest request) throws IOException {
         return novelFacadeService.ingest(request);
