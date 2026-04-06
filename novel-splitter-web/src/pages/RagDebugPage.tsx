@@ -3,6 +3,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { novelApi } from '@/api/novelApi';
 import { knowledgeApi } from '@/api/knowledgeApi';
 import { ragApi } from '@/api/ragApi';
+import { chromaAdminApi, ChromaCollection } from '@/api/chromaAdminApi';
 import type { RagDebugResponse, ChatRequest } from '@/types/api';
 import { estimateTokens } from '@/utils/tokenEstimator';
 import { toast } from 'sonner';
@@ -17,6 +18,13 @@ export default function RagDebugPage() {
   const [topK, setTopK] = useState<number>(5);
   
   const [result, setResult] = useState<RagDebugResponse | null>(null);
+  
+  // ChromaDB Diagnostics State
+  const [chromaCollection, setChromaCollection] = useState<ChromaCollection | null>(null);
+  const [collectionCount, setCollectionCount] = useState<number | null>(null);
+  const [versionRecordCount, setVersionRecordCount] = useState<number | null>(null);
+  const [versionSampleRecord, setVersionSampleRecord] = useState<any | null>(null);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,6 +47,10 @@ export default function RagDebugPage() {
     setLoading(true);
     setError(null);
     setResult(null);
+    setChromaCollection(null);
+    setCollectionCount(null);
+    setVersionRecordCount(null);
+    setVersionSampleRecord(null);
     
     try {
       const request: ChatRequest = {
@@ -47,7 +59,48 @@ export default function RagDebugPage() {
         version: selectedVersion,
         topK
       };
-      const data = await ragApi.debug(request);
+      
+      // 并行执行 RAG 调试请求和 ChromaDB 诊断请求
+      const [data] = await Promise.all([
+        ragApi.debug(request),
+        (async () => {
+          try {
+            const collections = await chromaAdminApi.getCollections();
+            const collection = collections.find(c => c.name === 'novel-splitter') || collections[0];
+            if (collection) {
+              setChromaCollection(collection);
+              const count = await chromaAdminApi.countDocuments(collection.id);
+              setCollectionCount(count);
+              
+              if (selectedNovel && selectedVersion) {
+                const records = await chromaAdminApi.getRecords(collection.id, {
+                  where: {
+                    novel: selectedNovel,
+                    version: selectedVersion
+                  },
+                  limit: 1,
+                  include: ["metadatas", "documents"]
+                });
+                
+                if (records && records.ids && records.ids.length > 0) {
+                  setVersionSampleRecord({
+                    id: records.ids[0],
+                    metadata: records.metadatas ? records.metadatas[0] : null,
+                    document: records.documents ? records.documents[0] : null
+                  });
+                  setVersionRecordCount(records.ids.length);
+                } else {
+                  setVersionSampleRecord(null);
+                  setVersionRecordCount(0);
+                }
+              }
+            }
+          } catch (e) {
+            console.error('Failed to fetch ChromaDB diagnostics', e);
+          }
+        })()
+      ]);
+      
       setResult(data);
     } catch (err: any) {
       setError(err.message || 'Failed to execute debug request');
@@ -165,6 +218,61 @@ export default function RagDebugPage() {
       {/* Results */}
       {result && (
         <div className="space-y-6">
+          {/* ChromaDB Diagnostics */}
+          {chromaCollection && (
+            <Card>
+              <CardHeader>
+                <CardTitle>ChromaDB 诊断信息 (Diagnostics)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-3 bg-gray-50 rounded space-y-2">
+                    <h3 className="font-bold text-sm text-gray-700 border-b pb-1">集合级状态 (Collection Stats)</h3>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">集合名称:</span>
+                      <span className="font-mono">{chromaCollection.name}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">距离空间 (hnsw:space):</span>
+                      <span className={`font-mono font-bold ${chromaCollection.metadata?.['hnsw:space'] !== 'cosine' ? 'text-red-600' : 'text-green-600'}`}>
+                        {chromaCollection.metadata?.['hnsw:space'] || 'l2 (未设置/默认)'}
+                        {chromaCollection.metadata?.['hnsw:space'] !== 'cosine' && <span className="text-xs ml-1 text-red-500">(公式退化风险)</span>}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">总向量数:</span>
+                      <span className="font-mono">{collectionCount !== null ? collectionCount : '获取中...'}</span>
+                    </div>
+                  </div>
+
+                  {selectedNovel && selectedVersion && (
+                    <div className="p-3 bg-gray-50 rounded space-y-2">
+                      <h3 className="font-bold text-sm text-gray-700 border-b pb-1">版本级验证 (Version Data)</h3>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">过滤条件:</span>
+                        <span className="font-mono text-xs truncate">novel={selectedNovel}, version={selectedVersion}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">是否有数据:</span>
+                        <span className={`font-mono font-bold ${versionRecordCount === 0 ? 'text-red-600' : 'text-green-600'}`}>
+                          {versionRecordCount === null ? '获取中...' : (versionRecordCount > 0 ? '存在数据 (✅)' : '无数据 (❌)')}
+                        </span>
+                      </div>
+                      {versionSampleRecord && (
+                        <div className="mt-2 text-xs">
+                          <span className="text-gray-500 block mb-1">采样记录 (ID: {versionSampleRecord.id}):</span>
+                          <pre className="bg-gray-100 p-2 rounded overflow-x-auto max-h-24">
+                            {JSON.stringify(versionSampleRecord.metadata, null, 2)}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Stats */}
           <Card>
             <CardHeader>
@@ -185,7 +293,14 @@ export default function RagDebugPage() {
           {/* 1. Retrieval Results */}
           <Card>
             <CardHeader>
-              <CardTitle>步骤 1: 原始检索 (Raw Retrieval) - {result.retrievedScenes.length} 条</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                步骤 1: 原始检索 (Raw Retrieval) - {result.retrievedScenes.length} 条
+                {result.retrievedScenes.length < topK && (
+                  <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded font-normal">
+                    ⚠️ 数量少于期望的 Top K ({topK})
+                  </span>
+                )}
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4 max-h-[500px] overflow-y-auto">
