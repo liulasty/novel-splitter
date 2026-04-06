@@ -18,6 +18,12 @@ const TABS = [
   { id: 'stats', label: '执行统计 (Stats)' },
 ];
 
+interface VersionSampleRecord {
+  id: string;
+  metadata: Record<string, unknown> | null;
+  document: string | null;
+}
+
 export default function RagDebugPage() {
   const [novels, setNovels] = useState<string[]>([]);
   const [versions, setVersions] = useState<string[]>([]);
@@ -33,7 +39,7 @@ export default function RagDebugPage() {
   const [chromaCollection, setChromaCollection] = useState<ChromaCollection | null>(null);
   const [collectionCount, setCollectionCount] = useState<number | null>(null);
   const [versionRecordCount, setVersionRecordCount] = useState<number | null>(null);
-  const [versionSampleRecord, setVersionSampleRecord] = useState<Record<string, unknown> | null>(null);
+  const [versionSampleRecord, setVersionSampleRecord] = useState<VersionSampleRecord | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -102,7 +108,7 @@ export default function RagDebugPage() {
                 if (records && records.ids && records.ids.length > 0) {
                   setVersionSampleRecord({
                     id: records.ids[0],
-                    metadata: records.metadatas ? records.metadatas[0] : null,
+                    metadata: records.metadatas ? (records.metadatas[0] as Record<string, unknown>) : null,
                     document: records.documents ? records.documents[0] : null
                   });
                   setVersionRecordCount(records.ids.length);
