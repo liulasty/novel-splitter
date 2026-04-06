@@ -1,5 +1,7 @@
-import { UploadCloud, FileText, Loader2, CheckCircle, AlertCircle, DownloadCloud } from "lucide-react";
+import { UploadCloud, FileText, Loader2, CheckCircle, AlertCircle, DownloadCloud, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useState } from 'react';
+import { SplitPreviewModal } from './SplitPreviewModal';
 
 interface UploadPanelProps {
     state: {
@@ -30,9 +32,10 @@ interface UploadPanelProps {
 
 export function UploadPanel({ state, actions }: UploadPanelProps) {
     const { activeTab, selectedFile, downloadUrl, downloadName, version, maxScenes, ingestStatus, isError, isUploading, isIngesting, isDownloading } = state;
+    const [previewOpen, setPreviewOpen] = useState(false);
 
     return (
-        <div className="rounded-2xl border-2 border-dashed border-amber-200 bg-gradient-to-br from-amber-50/60 via-white to-violet-50/40 p-6">
+        <div className="rounded-2xl border-2 border-dashed border-amber-200 bg-gradient-to-br from-amber-50/60 via-white to-violet-50/40 p-6 relative">
             {/* Tabs */}
             <div className="flex gap-2 mb-6 p-1 bg-white/50 rounded-lg w-fit border border-gray-100">
                 <button
@@ -106,26 +109,34 @@ export function UploadPanel({ state, actions }: UploadPanelProps) {
             )}
 
             {/* Config */}
-            <div className="grid grid-cols-2 gap-4 mb-5">
-                <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">版本号 Version</label>
-                    <input
-                        type="text" 
-                        value={version} 
-                        onChange={(e) => actions.setVersion(e.target.value)}
-                        placeholder="v1"
-                        className="w-full h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-400"
-                    />
+            <div className="flex items-end gap-4 mb-5">
+                <div className="grid grid-cols-2 gap-4 flex-1">
+                    <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">版本号 Version</label>
+                        <input
+                            type="text" 
+                            value={version} 
+                            onChange={(e) => actions.setVersion(e.target.value)}
+                            placeholder="v1"
+                            className="w-full h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                        />
+                    </div>
+                    <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">最大场景数（0 = 全部）</label>
+                        <input
+                            type="number" 
+                            value={maxScenes} 
+                            onChange={(e) => actions.setMaxScenes(Number(e.target.value))}
+                            className="w-full h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                        />
+                    </div>
                 </div>
-                <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">最大场景数（0 = 全部）</label>
-                    <input
-                        type="number" 
-                        value={maxScenes} 
-                        onChange={(e) => actions.setMaxScenes(Number(e.target.value))}
-                        className="w-full h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-400"
-                    />
-                </div>
+                <button
+                    onClick={() => setPreviewOpen(true)}
+                    className="flex items-center gap-1.5 h-9 px-4 py-2 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg hover:bg-indigo-100 transition-colors"
+                >
+                    <Eye className="w-4 h-4" /> 效果预览
+                </button>
             </div>
 
             {/* Actions */}
@@ -172,6 +183,9 @@ export function UploadPanel({ state, actions }: UploadPanelProps) {
                     {ingestStatus}
                 </div>
             )}
+
+            {/* Split Preview Modal */}
+            <SplitPreviewModal isOpen={previewOpen} onClose={() => setPreviewOpen(false)} />
         </div>
     );
 }

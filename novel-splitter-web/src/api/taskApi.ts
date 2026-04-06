@@ -21,9 +21,34 @@ export interface TaskProgressEvent {
   timestamp: number;
 }
 
+export interface JobStatSummaryDto {
+  running: number;
+  waiting: number;
+  completedToday: number;
+  failedToday: number;
+}
+
+export interface JobRecordDto {
+  id: string;
+  type: string;
+  status: string;
+  createTime: string;
+  // ... other fields based on backend
+}
+
 export const taskApi = {
   getAllTasks: async (): Promise<SplitTask[]> => {
     const response = await apiClient.get<SplitTask[]>('/tasks');
+    return response;
+  },
+
+  getJobStats: async (): Promise<JobStatSummaryDto> => {
+    const response = await apiClient.get<JobStatSummaryDto>('/jobs/stats');
+    return response;
+  },
+
+  getJobs: async (): Promise<JobRecordDto[]> => {
+    const response = await apiClient.get<JobRecordDto[]>('/jobs');
     return response;
   },
 

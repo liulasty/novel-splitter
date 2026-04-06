@@ -1,9 +1,21 @@
 import { apiClient } from './client';
 import type { IngestRequest, NovelUploadResponse } from '@/types/api';
 
+export interface NovelStatRecordDto {
+  novelId: string;
+  version: string;
+  sceneCount: number;
+  vectorCount: number;
+}
+
 export const novelApi = {
   getNovels: async (): Promise<string[]> => {
     const response = await apiClient.get<string[]>('/novels');
+    return response;
+  },
+
+  getNovelStats: async (): Promise<NovelStatRecordDto[]> => {
+    const response = await apiClient.get<NovelStatRecordDto[]>('/novels/stats');
     return response;
   },
 

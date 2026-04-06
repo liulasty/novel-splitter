@@ -1,7 +1,8 @@
-import { Clock, Loader2, CheckCircle, AlertCircle } from "lucide-react";
+import { Clock, Loader2, CheckCircle, AlertCircle, Activity, PlayCircle, XCircle } from "lucide-react";
 import { TaskItem } from "@/components/TaskItem";
 import { TaskDetailDrawer } from "@/components/TaskDetailDrawer";
-import type { SplitTask } from "@/api/taskApi";
+import { taskApi, SplitTask } from "@/api/taskApi";
+import { useQuery } from "@tanstack/react-query";
 
 const STATUS_CONFIG = {
     PENDING:    { label: 'PENDING',    pill: 'bg-gray-100 text-gray-600',    bar: 'bg-gray-400',  Icon: Clock },
@@ -20,8 +21,46 @@ interface TaskQueueBoardProps {
 }
 
 export function TaskQueueBoard({ tasks, selectedTaskId, actions }: TaskQueueBoardProps) {
+    const { data: stats } = useQuery({
+        queryKey: ['jobStats'],
+        queryFn: taskApi.getJobStats,
+        refetchInterval: 5000,
+    });
+
     return (
-        <>
+        <div className="space-y-4">
+            {/* Global Queue Stats Dashboard */}
+            <div className="grid grid-cols-4 gap-4">
+                <div className="bg-white rounded-xl p-4 border border-blue-100 shadow-sm">
+                    <div className="flex items-center gap-2 text-blue-600 mb-2">
+                        <PlayCircle className="w-4 h-4" />
+                        <span className="text-xs font-bold uppercase tracking-wider">运行中</span>
+                    </div>
+                    <div className="text-2xl font-bold text-gray-900">{stats?.running ?? '-'}</div>
+                </div>
+                <div className="bg-white rounded-xl p-4 border border-amber-100 shadow-sm">
+                    <div className="flex items-center gap-2 text-amber-600 mb-2">
+                        <Clock className="w-4 h-4" />
+                        <span className="text-xs font-bold uppercase tracking-wider">等待中</span>
+                    </div>
+                    <div className="text-2xl font-bold text-gray-900">{stats?.waiting ?? '-'}</div>
+                </div>
+                <div className="bg-white rounded-xl p-4 border border-green-100 shadow-sm">
+                    <div className="flex items-center gap-2 text-green-600 mb-2">
+                        <CheckCircle className="w-4 h-4" />
+                        <span className="text-xs font-bold uppercase tracking-wider">今日完成</span>
+                    </div>
+                    <div className="text-2xl font-bold text-gray-900">{stats?.completedToday ?? '-'}</div>
+                </div>
+                <div className="bg-white rounded-xl p-4 border border-red-100 shadow-sm">
+                    <div className="flex items-center gap-2 text-red-600 mb-2">
+                        <XCircle className="w-4 h-4" />
+                        <span className="text-xs font-bold uppercase tracking-wider">今日失败</span>
+                    </div>
+                    <div className="text-2xl font-bold text-gray-900">{stats?.failedToday ?? '-'}</div>
+                </div>
+            </div>
+
             <div className="rounded-2xl border border-gray-100 shadow-sm bg-white overflow-hidden">
                 <div className="px-5 py-3.5 bg-gradient-to-r from-violet-50 to-blue-50 border-b border-gray-100 flex items-center justify-between">
                     <h3 className="text-sm font-semibold text-violet-800">入库任务队列</h3>
@@ -55,6 +94,6 @@ export function TaskQueueBoard({ tasks, selectedTaskId, actions }: TaskQueueBoar
                 taskId={selectedTaskId} 
                 onClose={() => actions.setSelectedTaskId(null)} 
             />
-        </>
+        </div>
     );
 }
