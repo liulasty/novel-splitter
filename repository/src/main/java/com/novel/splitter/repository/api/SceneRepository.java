@@ -13,12 +13,13 @@ import java.util.List;
 public interface SceneRepository {
     /**
      * 保存切分好的 Scene 列表，并返回持久化后的 ID 列表
+     * @param novelId 小说ID
      * @param novelName 小说名称
      * @param version 策略版本
      * @param scenes Scene 列表
      * @return 数据库中的自增主键 ID 列表
      */
-    List<Long> saveScenes(String novelName, String version, List<Scene> scenes);
+    List<Long> saveScenes(String novelId, String novelName, String version, List<Scene> scenes);
 
     /**
      * 加载指定版本的切分结果

@@ -48,7 +48,7 @@ public class SplitWorker {
 
             Novel novel = novelCacheService.load(taskId);
             
-            List<Long> sceneIds = splitNovelUseCase.split(taskId, novel, task.getMaxScenes(), task.getVersion(), (progress, info) -> {
+            List<Long> sceneIds = splitNovelUseCase.split(taskId, message.getNovelId(), novel, task.getMaxScenes(), task.getVersion(), (progress, info) -> {
                 taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, progress, info);
             });
             // 清理缓存

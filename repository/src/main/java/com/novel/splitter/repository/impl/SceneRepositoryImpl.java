@@ -2,8 +2,12 @@ package com.novel.splitter.repository.impl;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.novel.splitter.domain.entity.JpaChapterEntity;
+import com.novel.splitter.domain.entity.JpaNovelEntity;
 import com.novel.splitter.domain.model.Scene;
 import com.novel.splitter.domain.model.SceneMetadata;
+import com.novel.splitter.repository.api.JpaChapterRepository;
+import com.novel.splitter.repository.api.JpaNovelRepository;
 import com.novel.splitter.repository.api.JpaSceneRepository;
 import com.novel.splitter.repository.api.SceneRepository;
 import com.novel.splitter.domain.entity.JpaSceneEntity;
@@ -13,7 +17,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -22,10 +28,27 @@ import java.util.stream.Collectors;
 public class SceneRepositoryImpl implements SceneRepository {
 
     private final JpaSceneRepository jpaSceneRepository;
+    private final JpaNovelRepository jpaNovelRepository;
+    private final JpaChapterRepository jpaChapterRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
-    public List<Long> saveScenes(String novelName, String version, List<Scene> scenes) {
+    public List<Long> saveScenes(String novelId, String novelName, String version, List<Scene> scenes) {
+        JpaNovelEntity novelEntity = null;
+        Map<Integer, JpaChapterEntity> chapterMap = new HashMap<>();
+
+        if (novelId != null && !novelId.isEmpty()) {
+            novelEntity = jpaNovelRepository.findById(novelId).orElse(null);
+            List<JpaChapterEntity> chapterEntities = jpaChapterRepository.findByNovelIdOrderByIndexNumAsc(novelId);
+            if (chapterEntities != null) {
+                for (JpaChapterEntity c : chapterEntities) {
+                    chapterMap.put(c.getIndexNum(), c);
+                }
+            }
+        }
+
+        final JpaNovelEntity finalNovelEntity = novelEntity;
+        
         List<JpaSceneEntity> entities = scenes.stream().map(scene -> {
             JpaSceneEntity entity = new JpaSceneEntity();
             entity.setSceneId(scene.getId());
@@ -39,6 +62,15 @@ public class SceneRepositoryImpl implements SceneRepository {
             entity.setWordCount(scene.getWordCount());
             entity.setPrefixContext(scene.getPrefixContext());
             entity.setCanSplit(scene.isCanSplit());
+            
+            if (finalNovelEntity != null) {
+                entity.setNovel(finalNovelEntity);
+            }
+            JpaChapterEntity chapterEntity = chapterMap.get(scene.getChapterIndex());
+            if (chapterEntity != null) {
+                entity.setChapter(chapterEntity);
+            }
+
             try {
                 if (scene.getMetadata() != null) {
                     scene.getMetadata().setNovel(novelName);
