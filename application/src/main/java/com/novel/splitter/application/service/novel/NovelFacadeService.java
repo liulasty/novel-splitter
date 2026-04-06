@@ -17,4 +17,6 @@ public interface NovelFacadeService {
     Map<String, String> ingest(IngestRequest request) throws IOException;
 
     Map<String, String> downloadAndIngest(DownloadAndIngestRequest request) throws IOException;
+
+    List<com.novel.splitter.domain.model.dto.NovelStatRecordDto> getNovelStats();
 }

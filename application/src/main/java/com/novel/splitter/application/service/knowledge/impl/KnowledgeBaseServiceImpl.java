@@ -8,6 +8,10 @@ import com.novel.splitter.domain.task.CleanupTaskMessage;
 import com.novel.splitter.embedding.api.VectorStore;
 import com.novel.splitter.repository.api.JpaCleanupTaskRepository;
 import com.novel.splitter.repository.api.SceneRepository;
+import com.novel.splitter.domain.model.dto.VectorPreviewRecordDto;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import com.novel.splitter.repository.api.JpaSceneRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -25,12 +29,18 @@ import java.util.List;
 public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
 
     private final SceneRepository sceneRepository;
+    private final JpaSceneRepository jpaSceneRepository;
     private final VectorStore vectorStore;
     private final JpaCleanupTaskRepository cleanupTaskRepository;
     private final RabbitTemplate rabbitTemplate;
     
     @org.springframework.beans.factory.annotation.Value("${splitter.storage.root-path}")
     private String novelStoragePath;
+
+    @Override
+    public Page<VectorPreviewRecordDto> getLightweightScenes(Pageable pageable) {
+        return jpaSceneRepository.findLightweightScenes(pageable);
+    }
 
     @Override
     public List<Scene> getScenesByNovel(String novelName) {

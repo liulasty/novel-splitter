@@ -16,6 +16,10 @@ public interface ChromaAdminService {
 
     Map<String, Object> heartbeat();
 
+    Map<String, String> rebuildCollection();
+
+    com.novel.splitter.application.model.dto.ChromaVersionDiagnosticDto getVersionDiagnostics(String novel, String version);
+
     Object proxyGet(String path);
 
     Object proxyPost(String path, Object body);

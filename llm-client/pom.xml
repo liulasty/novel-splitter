@@ -57,7 +57,7 @@
     <repositories>
         <repository>
             <id>aliyun-public</id>
-            <url>https://maven.aliyun.com/repository/public</url>
+            <url>https://repo.maven.apache.org/maven2</url>
             <releases><enabled>true</enabled></releases>
             <snapshots><enabled>false</enabled></snapshots>
         </repository>

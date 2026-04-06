@@ -5,6 +5,9 @@ import com.novel.splitter.domain.model.Scene;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import com.novel.splitter.domain.model.dto.VectorPreviewRecordDto;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -16,6 +19,12 @@ import java.util.List;
 public class KnowledgeBaseController {
 
     private final KnowledgeBaseService knowledgeBaseService;
+
+    @Operation(summary = "获取轻量级场景分页列表")
+    @GetMapping("/scenes/lightweight")
+    public Page<VectorPreviewRecordDto> getLightweightScenes(Pageable pageable) {
+        return knowledgeBaseService.getLightweightScenes(pageable);
+    }
 
     @Operation(summary = "获取指定小说的所有段落")
     @GetMapping("/{novelName}/scenes")

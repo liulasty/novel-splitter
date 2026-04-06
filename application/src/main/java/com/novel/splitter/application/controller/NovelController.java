@@ -10,6 +10,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.novel.splitter.domain.model.dto.NovelStatRecordDto;
+
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
@@ -60,5 +62,16 @@ public class NovelController {
     @PostMapping("/ingest")
     public Map<String, String> ingest(@Valid @RequestBody IngestRequest request) throws IOException {
         return novelFacadeService.ingest(request);
+    }
+
+    /**
+     * 获取所有小说的入库统计信息
+     *
+     * @return 小说统计信息列表
+     */
+    @Operation(summary = "获取小说统计信息", description = "返回每本小说的版本、分块数、向量数及入库状态")
+    @GetMapping("/stats")
+    public List<NovelStatRecordDto> getNovelStats() {
+        return novelFacadeService.getNovelStats();
     }
 }
