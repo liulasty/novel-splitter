@@ -153,7 +153,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
 
         taskService.createTask(taskId, novelId, request.getFileName(), maxScenes, version);
         
-        SplitTaskMessage message = new SplitTaskMessage(taskId, novelId, novelPath.toAbsolutePath().toString(), maxScenes, version);
+        SplitTaskMessage message = new SplitTaskMessage(taskId, novelId, maxScenes, version);
         rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "load", message);
         log.info("Sent taskId {} to load queue", taskId);
 

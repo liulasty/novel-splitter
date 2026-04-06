@@ -60,7 +60,6 @@ class NovelFacadeServiceTest {
         SplitTaskMessage message = messageCaptor.getValue();
         assertEquals(taskIdCaptor.getValue(), message.getTaskId());
         assertEquals(novelIdCaptor.getValue(), message.getNovelId());
-        assertEquals(Path.of("D:/novels/demo.txt").toAbsolutePath().toString(), message.getFilePath());
         assertEquals(Integer.MAX_VALUE, message.getMaxScenes());
         assertEquals("v1", message.getVersion());
 
