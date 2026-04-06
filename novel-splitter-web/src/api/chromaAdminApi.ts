@@ -49,52 +49,52 @@ export const chromaAdminApi = {
   // System
   getHealthcheck: async (): Promise<ChromaHealth> => {
     const response = await apiClient.get('/admin/chroma/healthcheck');
-    return response.data;
+    return response;
   },
   getVersion: async (): Promise<ChromaVersion> => {
     const response = await apiClient.get('/admin/chroma/version');
-    return response.data;
+    return response;
   },
   getHeartbeat: async (): Promise<ChromaHealth> => {
     const response = await apiClient.get('/admin/chroma/heartbeat');
-    return response.data;
+    return response;
   },
   getPreFlightChecks: async (): Promise<any> => {
     const response = await apiClient.get('/admin/chroma/pre-flight-checks');
-    return response.data;
+    return response;
   },
   getAuthIdentity: async (): Promise<any> => {
     const response = await apiClient.get('/admin/chroma/auth/identity');
-    return response.data;
+    return response;
   },
 
   // Tenants & Databases
   getTenants: async (): Promise<ChromaTenant[]> => {
     const response = await apiClient.get('/admin/chroma/tenants');
-    return response.data;
+    return response;
   },
   getDatabases: async (tenant: string): Promise<ChromaDatabase[]> => {
     const response = await apiClient.get(`/admin/chroma/tenants/${tenant}/databases`);
-    return response.data;
+    return response;
   },
 
   // Collections
   getCollections: async (): Promise<ChromaCollection[]> => {
     const response = await apiClient.get('/admin/chroma/collections');
-    return response.data;
+    return response;
   },
   getCollection: async (id: string): Promise<ChromaCollection> => {
     const response = await apiClient.get(`/admin/chroma/collections/${id}`);
-    return response.data;
+    return response;
   },
 
   // Records
   getRecords: async (collectionId: string, params: ChromaRecordQuery = {}): Promise<any> => {
     const response = await apiClient.post(`/admin/chroma/collections/${collectionId}/get`, params);
-    return response.data;
+    return response;
   },
   queryRecords: async (collectionId: string, params: ChromaQueryRequest): Promise<any> => {
     const response = await apiClient.post(`/admin/chroma/collections/${collectionId}/query`, params);
-    return response.data;
+    return response;
   },
 };
