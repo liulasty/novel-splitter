@@ -8,6 +8,9 @@ import com.novel.splitter.pipeline.etl.NovelCacheService;
 import com.novel.splitter.pipeline.orchestrator.LoadNovelUseCase;
 import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.application.service.novel.NovelService;
+import com.novel.splitter.application.service.novel.ChapterService;
+import com.novel.splitter.domain.entity.JpaChapterEntity;
+import com.novel.splitter.domain.entity.JpaNovelEntity;
 import com.novel.splitter.domain.enums.NovelStatus;
 import com.novel.splitter.domain.model.Novel;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +21,8 @@ import org.springframework.stereotype.Component;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -30,6 +35,7 @@ public class LoadWorker {
     private final RabbitTemplate rabbitTemplate;
     private final AppConfig appConfig;
     private final NovelService novelService;
+    private final ChapterService chapterService;
 
     @RabbitListener(queues = RabbitConfig.LOAD_TASK_QUEUE)
     public void processLoadTask(SplitTaskMessage message) {
@@ -56,6 +62,20 @@ public class LoadWorker {
             });
 
             novelCacheService.save(taskId, novel);
+
+            if (message.getNovelId() != null) {
+                JpaNovelEntity novelEntity = novelService.getNovelById(message.getNovelId());
+                List<JpaChapterEntity> chapterEntities = novel.getChapters().stream()
+                        .map(chapter -> JpaChapterEntity.builder()
+                                .novel(novelEntity)
+                                .title(chapter.getTitle())
+                                .indexNum(chapter.getIndex())
+                                .wordCount(0) // Could be calculated if needed
+                                .build())
+                        .collect(Collectors.toList());
+                chapterService.saveChapters(chapterEntities);
+                log.info("任务 {} 成功将 {} 个章节保存至数据库", taskId, chapterEntities.size());
+            }
 
             // Send to split queue
             rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "split", message);

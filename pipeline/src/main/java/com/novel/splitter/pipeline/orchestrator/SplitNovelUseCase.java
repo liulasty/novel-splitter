@@ -51,7 +51,7 @@ public class SplitNovelUseCase {
         return valid;
     }
 
-    public List<Long> split(String taskId, Novel novel, int maxScenes, String version, BiConsumer<Integer, String> progressCallback) {
+    public List<Long> split(String taskId, String novelId, Novel novel, int maxScenes, String version, BiConsumer<Integer, String> progressCallback) {
         log.info("=== Start Split Phase for: {} ===", novel.getTitle());
         
         List<Scene> scenes = new ArrayList<>();
@@ -110,7 +110,7 @@ public class SplitNovelUseCase {
         if (progressCallback != null) {
             progressCallback.accept(IngestProgress.SAVE_START, "正在保存场景到本地存储...");
         }
-        List<Long> sceneIds = sceneRepository.saveScenes(novel.getTitle(), finalVersion, scenes);
+        List<Long> sceneIds = sceneRepository.saveScenes(novelId, novel.getTitle(), finalVersion, scenes);
         if (progressCallback != null) {
             progressCallback.accept(IngestProgress.SAVE_END, String.format("本地存储完成，共 %d 个场景", scenes.size()));
         }

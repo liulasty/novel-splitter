@@ -229,11 +229,27 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
 
     @Override
     public List<com.novel.splitter.domain.entity.JpaChapterEntity> getChapters(String novelId) {
+        com.novel.splitter.domain.entity.JpaNovelEntity novel = novelService.getNovelById(novelId);
+        if (novel == null) {
+            throw new IllegalArgumentException("Novel not found: " + novelId);
+        }
+        if (novel.getStatus() == com.novel.splitter.domain.enums.NovelStatus.PENDING || 
+            novel.getStatus() == com.novel.splitter.domain.enums.NovelStatus.SPLITTING) {
+            throw new IllegalStateException("小说正在切分中，请稍后再试");
+        }
         return chapterService.getChaptersByNovelId(novelId);
     }
 
     @Override
     public List<com.novel.splitter.domain.entity.JpaSceneEntity> getScenesByChapter(String novelId, Long chapterId) {
+        com.novel.splitter.domain.entity.JpaNovelEntity novel = novelService.getNovelById(novelId);
+        if (novel == null) {
+            throw new IllegalArgumentException("Novel not found: " + novelId);
+        }
+        if (novel.getStatus() == com.novel.splitter.domain.enums.NovelStatus.PENDING || 
+            novel.getStatus() == com.novel.splitter.domain.enums.NovelStatus.SPLITTING) {
+            throw new IllegalStateException("小说正在切分中，请稍后再试");
+        }
         return jpaSceneRepository.findAll((root, query, cb) -> {
             return cb.and(
                 cb.equal(root.get("novel").get("id"), novelId),
