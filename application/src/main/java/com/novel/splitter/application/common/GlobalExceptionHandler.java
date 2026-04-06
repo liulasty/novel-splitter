@@ -76,9 +76,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleAllExceptions(Exception e) {
         log.error("系统发生未预期的异常", e);
-        String errorMsg = e.getMessage() != null ? e.getMessage() : "服务器内部未知错误";
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "服务器异常: " + errorMsg));
+                .body(ApiResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "服务器繁忙，请稍后再试"));
     }
 
     private String buildFieldErrorMessage(FieldError fieldError) {

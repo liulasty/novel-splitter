@@ -25,7 +25,6 @@ public class SceneRepositoryImpl implements SceneRepository {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
-    @Transactional
     public List<Long> saveScenes(String novelName, String version, List<Scene> scenes) {
         List<JpaSceneEntity> entities = scenes.stream().map(scene -> {
             JpaSceneEntity entity = new JpaSceneEntity();
@@ -52,8 +51,15 @@ public class SceneRepositoryImpl implements SceneRepository {
             return entity;
         }).collect(Collectors.toList());
 
-        List<JpaSceneEntity> savedEntities = jpaSceneRepository.saveAll(entities);
-        return savedEntities.stream().map(JpaSceneEntity::getId).collect(Collectors.toList());
+        List<Long> savedIds = new ArrayList<>();
+        int batchSize = 500;
+        for (int i = 0; i < entities.size(); i += batchSize) {
+            int end = Math.min(i + batchSize, entities.size());
+            List<JpaSceneEntity> batch = entities.subList(i, end);
+            List<JpaSceneEntity> savedBatch = jpaSceneRepository.saveAll(batch);
+            savedBatch.forEach(entity -> savedIds.add(entity.getId()));
+        }
+        return savedIds;
     }
 
     @Override
