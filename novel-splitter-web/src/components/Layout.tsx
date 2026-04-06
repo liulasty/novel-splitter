@@ -13,7 +13,8 @@ export default function Layout() {
     { path: '/knowledge', label: '知识库', icon: Database },
     { path: '/ingest', label: '入库处理', icon: FileInput },
     { path: '/debug', label: 'RAG 调试', icon: Bug },
-    { path: '/system', label: '系统管理', icon: Settings },
+    { path: '/settings', label: '系统配置', icon: Settings },
+    { path: '/system', label: '系统管理', icon: Server },
     { path: '/chroma-admin', label: 'Chroma 管理', icon: Server },
   ];
 

@@ -3,6 +3,7 @@ import Layout from '@/components/Layout';
 import ChatPage from '@/pages/ChatPage';
 import KnowledgePage from '@/pages/KnowledgePage';
 import IngestPage from '@/pages/IngestPage';
+import SettingsPage from '@/pages/SettingsPage';
 import SystemPage from '@/pages/SystemPage';
 import ChromaAdminPage from '@/pages/ChromaAdminPage';
 import ErrorPage from '@/pages/ErrorPage';
@@ -25,6 +26,10 @@ export const router = createBrowserRouter([
       {
         path: 'ingest',
         element: <IngestPage />,
+      },
+      {
+        path: 'settings',
+        element: <SettingsPage />,
       },
       {
         path: 'system',

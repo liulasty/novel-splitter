@@ -3,10 +3,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Loader2, Book, Trash2, AlertCircle } from "lucide-react";
 import { knowledgeApi } from "@/api/knowledgeApi";
+import { novelApi, NovelStatRecordDto } from "@/api/novelApi";
 import { toast } from 'sonner';
 import { VersionTag } from "./VersionTag";
 
-export function NovelVersionsCard({ novel }: { novel: string }) {
+export function NovelVersionsCard({ novel, stats }: { novel: string, stats: NovelStatRecordDto[] }) {
     const queryClient = useQueryClient();
     const [deleteConfirming, setDeleteConfirming] = useState(false);
 
@@ -126,13 +127,14 @@ export function NovelVersionsCard({ novel }: { novel: string }) {
                         获取版本列表失败
                     </div>
                 ) : versions && versions.length > 0 ? (
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="flex flex-col gap-2">
                         {versions.map((v) => (
                             <VersionTag
                                 key={v}
                                 version={v}
                                 onDelete={() => deleteVersionMutation.mutate(v)}
                                 isPending={deleteVersionMutation.isPending}
+                                stat={stats.find(s => s.version === v)}
                             />
                         ))}
                     </div>

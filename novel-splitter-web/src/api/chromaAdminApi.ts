@@ -45,6 +45,14 @@ export interface ChromaQueryRequest {
   query_texts?: string[];
 }
 
+export interface ChromaVersionDiagnosticDto {
+  localDbCount: number;
+  chromaCount: number;
+  isConsistent: boolean;
+  sampleDataValid: boolean;
+  message?: string;
+}
+
 export const chromaAdminApi = {
   // System
   getHealthcheck: async (): Promise<ChromaHealth> => {
@@ -100,5 +108,15 @@ export const chromaAdminApi = {
   countDocuments: async (collectionId: string): Promise<number> => {
     const response = await apiClient.get(`/admin/chroma/collections/${collectionId}/count`);
     return response as number;
+  },
+
+  // Diagnostics & Rebuild
+  getDiagnostics: async (novel: string, version: string): Promise<ChromaVersionDiagnosticDto> => {
+    const response = await apiClient.get<ChromaVersionDiagnosticDto>(`/admin/chroma/diagnostics?novel=${encodeURIComponent(novel)}&version=${encodeURIComponent(version)}`);
+    return response;
+  },
+  rebuildCollection: async (): Promise<{ message: string }> => {
+    const response = await apiClient.post<{ message: string }>('/admin/chroma/collections/rebuild');
+    return response;
   },
 };
