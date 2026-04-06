@@ -4,12 +4,12 @@ import type { SystemStats, VectorSearchRequest, VectorRecord } from '@/types/api
 export const vectorApi = {
   getStats: async (): Promise<SystemStats> => {
     const response = await apiClient.get<SystemStats>('/admin/vector/stats');
-    return response.data;
+    return response;
   },
 
   search: async (request: VectorSearchRequest): Promise<VectorRecord[]> => {
     const response = await apiClient.post<VectorRecord[]>('/admin/vector/search', request);
-    return response.data;
+    return response;
   },
 
   delete: async (filter: Record<string, any>): Promise<void> => {

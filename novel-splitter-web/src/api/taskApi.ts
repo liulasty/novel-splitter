@@ -24,17 +24,17 @@ export interface TaskProgressEvent {
 export const taskApi = {
   getAllTasks: async (): Promise<SplitTask[]> => {
     const response = await apiClient.get<SplitTask[]>('/tasks');
-    return response.data;
+    return response;
   },
 
   getTask: async (taskId: string): Promise<SplitTask> => {
     const response = await apiClient.get<SplitTask>(`/tasks/${taskId}`);
-    return response.data;
+    return response;
   },
 
   getTaskEvents: async (taskId: string): Promise<TaskProgressEvent[]> => {
     const response = await apiClient.get<TaskProgressEvent[]>(`/tasks/${taskId}/events`);
-    return response.data;
+    return response;
   },
 
   deleteTask: async (taskId: string): Promise<void> => {
