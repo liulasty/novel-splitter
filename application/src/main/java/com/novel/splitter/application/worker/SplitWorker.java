@@ -47,8 +47,8 @@ public class SplitWorker {
             List<Long> sceneIds = splitNovelUseCase.split(taskId, novel, task.getMaxScenes(), task.getVersion(), (progress, info) -> {
                 taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, progress, info);
             });
-            
-            novelCacheService.remove(taskId); // 清理缓存
+            // 清理缓存
+            novelCacheService.remove(taskId);
 
             if (sceneIds == null || sceneIds.isEmpty()) {
                 log.warn("任务 {} 切分后没有场景，直接标记为成功", taskId);

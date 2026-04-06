@@ -40,6 +40,14 @@ export default function SystemPage() {
     const { data: collections, isLoading: isCollectionsLoading } = useQuery({
         queryKey: ['chromaCollections'],
         queryFn: chromaApi.getCollections,
+        // ✅ 关键：自动解析 JSON 字符串为数组
+        select: (res) => {
+            try {
+                return JSON.parse(res.data);
+            } catch (e) {
+                return []; // 解析失败返回空数组，防止报错
+            }
+        },
     });
 
     // Reset Mutation

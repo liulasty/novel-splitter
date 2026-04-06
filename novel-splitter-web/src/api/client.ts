@@ -1,4 +1,4 @@
-import axios, { AxiosRequestConfig } from 'axios';
+import axios from 'axios';
 import { toast } from 'sonner';
 
 // 扩展 AxiosRequestConfig 支持自定义属性，并修改拦截器返回值类型
