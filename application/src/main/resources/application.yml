@@ -101,10 +101,12 @@ splitter:
   
   ingestion:
     batch-size: 10
+    chunk-size: 500
+    chunk-overlap: 100
     
   rule:
     target-length: 1200
-    min-length: 200
+    min-length: 50
     max-length: 3000
     ignore-empty-lines: true
     

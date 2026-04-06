@@ -87,7 +87,8 @@ public class ChromaVectorStore implements VectorStore {
                             
                             if (s.getMetadata() != null) {
                                 if (s.getMetadata().getNovel() != null) {
-                                    map.put("novel", s.getMetadata().getNovel());
+                                    map.put("novelId", s.getMetadata().getNovel());
+                                    map.put("novel", s.getMetadata().getNovel()); // Keep for backward compatibility
                                 }
                                 if (s.getMetadata().getVersion() != null) {
                                     map.put("version", s.getMetadata().getVersion());
@@ -97,6 +98,9 @@ public class ChromaVectorStore implements VectorStore {
                                 }
                                 if (s.getMetadata().getChunkType() != null) {
                                     map.put("chunk_type", s.getMetadata().getChunkType());
+                                }
+                                if (s.getMetadata().getSequenceNum() != null) {
+                                    map.put("sequenceNum", s.getMetadata().getSequenceNum());
                                 }
                             }
                             return map;

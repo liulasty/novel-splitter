@@ -70,6 +70,9 @@ public class SplitWorker {
             
             if (message.getNovelId() != null) {
                 novelService.updateNovelStatus(message.getNovelId(), NovelStatus.SPLIT_COMPLETED);
+                // [FUTURE] 预留: 发送消息到 ENRICH_TASK_QUEUE 进行 AI 语义增强
+                // rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "enrich", new EnrichTaskMessage(taskId, message.getNovelId(), ...));
+                log.info("=== [AI Enrichment Placeholder] === Would trigger AI enrichment MQ task here for novel {}", message.getNovelId());
             }
             
             log.info("任务 {} Split 阶段完成，共处理 {} 个场景", taskId, sceneIds.size());
