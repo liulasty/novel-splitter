@@ -22,12 +22,24 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class VectorRetrievalService implements RetrievalService {
 
+    private static final String META_NOVEL = "novel";
+    private static final String META_VERSION = "version";
+    private static final String META_PARENT_SCENE_ID = "parent_scene_id";
+    private static final String KEY_SEPARATOR = "::";
+
     private final EmbeddingService embeddingService;
     private final VectorStore vectorStore;
     private final SceneRepository sceneRepository;
 
     @Override
     public List<Scene> retrieve(RetrievalQuery query) {
+        if (query == null || query.getQuestion() == null || query.getQuestion().isBlank()) {
+            throw new IllegalArgumentException("Question cannot be null or blank");
+        }
+        if (query.getTopK() < 1) {
+            throw new IllegalArgumentException("TopK must be greater than or equal to 1");
+        }
+
         log.info("Processing retrieval query: '{}' (topK={})", query.getQuestion(), query.getTopK());
 
         // 1. Embedding
@@ -36,10 +48,10 @@ public class VectorRetrievalService implements RetrievalService {
         // 2. Vector Search
         Map<String, Object> filter = new HashMap<>();
         if (query.getNovel() != null && !query.getNovel().isBlank()) {
-            filter.put("novel", query.getNovel());
+            filter.put(META_NOVEL, query.getNovel());
         }
         if (query.getVersion() != null && !query.getVersion().isBlank()) {
-            filter.put("version", query.getVersion());
+            filter.put(META_VERSION, query.getVersion());
         }
 
         log.info("Executing vector search with filter: {}", filter);
@@ -54,44 +66,42 @@ public class VectorRetrievalService implements RetrievalService {
 
         for (VectorRecord record : records) {
             Map<String, Object> meta = record.getMetadata();
-            if (meta == null || !meta.containsKey("novel") || !meta.containsKey("version")) {
+            if (meta == null || !meta.containsKey(META_NOVEL) || !meta.containsKey(META_VERSION)) {
                 log.warn("Vector record {} missing metadata (novel/version), skipping hydration", record.getChunkId());
                 continue;
             }
-            String key = meta.get("novel") + "::" + meta.get("version");
+            String key = meta.get(META_NOVEL) + KEY_SEPARATOR + meta.get(META_VERSION);
             groupedRecords.computeIfAbsent(key, k -> new ArrayList<>()).add(record);
             processingOrder.add(record);
         }
 
-        // Load scenes batch by batch
+        // Collect all target IDs to fetch them in a single IO operation
+        List<String> allTargetIds = processingOrder.stream()
+                .map(this::resolveTargetId)
+                .distinct()
+                .collect(Collectors.toList());
+
+        Map<String, Scene> allScenesMap = new HashMap<>();
+        if (!allTargetIds.isEmpty()) {
+            List<Scene> allScenes = sceneRepository.findBySceneIds(allTargetIds);
+            allScenesMap = allScenes.stream()
+                    .collect(Collectors.toMap(Scene::getId, s -> s, (v1, v2) -> v1));
+        }
+
+        // Hydrate scenes and track failures
         Map<String, Scene> hydratedScenes = new HashMap<>();
+        List<String> failedGroups = new ArrayList<>();
+
         for (Map.Entry<String, List<VectorRecord>> entry : groupedRecords.entrySet()) {
-            String[] parts = entry.getKey().split("::");
+            String[] parts = entry.getKey().split(KEY_SEPARATOR, 2);
             String novel = parts[0];
-            String version = parts[1];
+            String version = parts.length > 1 ? parts[1] : "";
 
             try {
-                List<String> targetIds = entry.getValue().stream()
-                        .map(r -> {
-                            if (r.getMetadata() != null && r.getMetadata().containsKey("parent_scene_id")) {
-                                return (String) r.getMetadata().get("parent_scene_id");
-                            }
-                            return r.getChunkId();
-                        })
-                        .distinct()
-                        .collect(Collectors.toList());
-
-                List<Scene> scenes = sceneRepository.findBySceneIds(targetIds);
-                Map<String, Scene> sceneMap = scenes.stream()
-                        .collect(Collectors.toMap(Scene::getId, s -> s, (v1, v2) -> v1));
-                
                 for (VectorRecord r : entry.getValue()) {
-                    String targetId = r.getChunkId();
-                    if (r.getMetadata() != null && r.getMetadata().containsKey("parent_scene_id")) {
-                        targetId = (String) r.getMetadata().get("parent_scene_id");
-                    }
+                    String targetId = resolveTargetId(r);
+                    Scene s = allScenesMap.get(targetId);
                     
-                    Scene s = sceneMap.get(targetId);
                     if (s != null) {
                         // Deduplicate: keep the highest score for the parent scene
                         if (hydratedScenes.containsKey(targetId)) {
@@ -109,17 +119,19 @@ public class VectorRetrievalService implements RetrievalService {
                 }
             } catch (Exception e) {
                 log.error("Failed to load scenes for {}/{}", novel, version, e);
+                failedGroups.add(novel + "/" + version);
             }
+        }
+
+        if (!failedGroups.isEmpty()) {
+            log.warn("Hydration failed for the following novel/version groups: {}", String.join(", ", failedGroups));
         }
 
         // Restore order based on vector search results, avoiding duplicates
         List<Scene> resultList = new ArrayList<>();
         Set<String> seenIds = new HashSet<>();
         for (VectorRecord r : processingOrder) {
-            String targetId = r.getChunkId();
-            if (r.getMetadata() != null && r.getMetadata().containsKey("parent_scene_id")) {
-                targetId = (String) r.getMetadata().get("parent_scene_id");
-            }
+            String targetId = resolveTargetId(r);
             if (!seenIds.contains(targetId)) {
                 Scene s = hydratedScenes.get(targetId);
                 if (s != null) {
@@ -130,5 +142,18 @@ public class VectorRetrievalService implements RetrievalService {
         }
         
         return resultList;
+    }
+
+    /**
+     * 从 VectorRecord 元数据中解析 targetId，如果存在 parent_scene_id 则返回，否则返回 chunkId
+     *
+     * @param record 向量记录
+     * @return 目标 Scene 的 ID
+     */
+    private String resolveTargetId(VectorRecord record) {
+        if (record.getMetadata() != null && record.getMetadata().containsKey(META_PARENT_SCENE_ID)) {
+            return (String) record.getMetadata().get(META_PARENT_SCENE_ID);
+        }
+        return record.getChunkId();
     }
 }
