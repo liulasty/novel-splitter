@@ -17,99 +17,106 @@ public class ChromaAdminServiceImpl implements ChromaAdminService {
     private final ChromaApiClient chromaApiClient;
 
     @Override
-    public ResponseEntity<Map<String, Object>> getStats() {
+    public Map<String, Object> getStats() {
         try {
             long count = vectorStore.count();
-            return ResponseEntity.ok(Map.of(
+            return Map.of(
                     "count", count,
                     "storeType", vectorStore.getClass().getSimpleName()
-            ));
+            );
         } catch (Exception e) {
             log.error("获取Chroma统计信息失败", e);
-            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+            throw new RuntimeException("获取Chroma统计信息失败: " + e.getMessage(), e);
         }
     }
 
     @Override
-    public ResponseEntity<Map<String, String>> reset() {
+    public Map<String, String> reset() {
         try {
             vectorStore.reset();
-            return ResponseEntity.ok(Map.of("message", "Database reset successfully"));
+            return Map.of("message", "Database reset successfully");
         } catch (Exception e) {
             log.error("重置Chroma数据库失败", e);
-            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+            throw new RuntimeException("重置Chroma数据库失败: " + e.getMessage(), e);
         }
     }
 
     @Override
-    public ResponseEntity<Map<String, String>> delete(Map<String, Object> filter) {
+    public Map<String, String> delete(Map<String, Object> filter) {
         try {
             if (filter == null || filter.isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Filter cannot be empty"));
+                throw new IllegalArgumentException("Filter cannot be empty");
             }
             vectorStore.delete(filter);
-            return ResponseEntity.ok(Map.of("message", "Documents deleted successfully"));
+            return Map.of("message", "Documents deleted successfully");
+        } catch (IllegalArgumentException e) {
+            throw e;
         } catch (Exception e) {
             log.error("删除Chroma文档失败", e);
-            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+            throw new RuntimeException("删除Chroma文档失败: " + e.getMessage(), e);
         }
     }
 
     @Override
-    public ResponseEntity<Map<String, Object>> healthcheck() {
+    public Map<String, Object> healthcheck() {
         try {
-            Map<String, Object> response = chromaApiClient.getMap("/api/v2/healthcheck");
-            return ResponseEntity.ok(response);
+            return chromaApiClient.getMap("/api/v2/healthcheck");
         } catch (Exception e) {
             log.error("获取Chroma健康状态失败", e);
-            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage(), "status", "down"));
+            throw new RuntimeException("获取Chroma健康状态失败: " + e.getMessage(), e);
         }
     }
 
     @Override
-    public ResponseEntity<Map<String, String>> version() {
+    public Map<String, String> version() {
         try {
             String version = chromaApiClient.getString("/api/v2/version");
-            return ResponseEntity.ok(Map.of("version", version != null ? version.replace("\"", "") : "unknown"));
+            return Map.of("version", version != null ? version.replace("\"", "") : "unknown");
         } catch (Exception e) {
             log.error("获取Chroma版本失败", e);
-            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+            throw new RuntimeException("获取Chroma版本失败: " + e.getMessage(), e);
         }
     }
 
     @Override
-    public ResponseEntity<Map<String, Object>> heartbeat() {
+    public Map<String, Object> heartbeat() {
         try {
-            Map<String, Object> response = chromaApiClient.getMap("/api/v2/heartbeat");
-            return ResponseEntity.ok(response);
+            return chromaApiClient.getMap("/api/v2/heartbeat");
         } catch (Exception e) {
             log.error("获取Chroma心跳失败", e);
-            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+            throw new RuntimeException("获取Chroma心跳失败: " + e.getMessage(), e);
         }
     }
 
     @Override
-    public ResponseEntity<?> proxyGet(String path) {
-        return chromaApiClient.get(path);
+    public Object proxyGet(String path) {
+        return extractBody(chromaApiClient.get(path));
     }
 
     @Override
-    public ResponseEntity<?> proxyPost(String path, Object body) {
-        return chromaApiClient.post(path, body);
+    public Object proxyPost(String path, Object body) {
+        return extractBody(chromaApiClient.post(path, body));
     }
 
     @Override
-    public ResponseEntity<?> proxyPut(String path, Object body) {
-        return chromaApiClient.put(path, body);
+    public Object proxyPut(String path, Object body) {
+        return extractBody(chromaApiClient.put(path, body));
     }
 
     @Override
-    public ResponseEntity<?> proxyPatch(String path, Object body) {
-        return chromaApiClient.patch(path, body);
+    public Object proxyPatch(String path, Object body) {
+        return extractBody(chromaApiClient.patch(path, body));
     }
 
     @Override
-    public ResponseEntity<?> proxyDelete(String path) {
-        return chromaApiClient.delete(path);
+    public Object proxyDelete(String path) {
+        return extractBody(chromaApiClient.delete(path));
+    }
+
+    private Object extractBody(ResponseEntity<?> responseEntity) {
+        if (responseEntity.getStatusCode().isError()) {
+            throw new RuntimeException("Proxy request failed with status " + responseEntity.getStatusCode());
+        }
+        return responseEntity.getBody();
     }
 }
