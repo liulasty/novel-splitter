@@ -35,6 +35,13 @@ apiClient.interceptors.response.use(
     if (enableApiLog) {
       console.log(`[API Response] <- ${response.config.method?.toUpperCase()} ${response.config.url}`, response);
     }
+    
+    // 统一解包后端 ApiResponse 格式
+    // 采用替换 response.data 的方式，避免破坏所有上层 API 的 `return response.data` 签名
+    if (response.data && response.data.code === 200) {
+      response.data = response.data.data;
+    }
+    
     return response;
   },
   (error) => {
