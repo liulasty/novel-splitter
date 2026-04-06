@@ -1,6 +1,6 @@
-package com.novel.splitter.embedding.admin;
+package com.novel.splitter.application.service.vector;
 
-import com.novel.splitter.domain.model.dto.VectorSearchRequest;
+import com.novel.splitter.application.model.dto.VectorSearchRequest;
 import com.novel.splitter.domain.model.embedding.VectorRecord;
 import com.novel.splitter.embedding.api.EmbeddingService;
 import com.novel.splitter.embedding.api.VectorStore;

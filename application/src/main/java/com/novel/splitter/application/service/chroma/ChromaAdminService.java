@@ -1,4 +1,4 @@
-package com.novel.splitter.embedding.admin;
+package com.novel.splitter.application.service.chroma;
 
 import org.springframework.http.ResponseEntity;
 
@@ -17,4 +17,14 @@ public interface ChromaAdminService {
     ResponseEntity<Map<String, String>> version();
 
     ResponseEntity<Map<String, Object>> heartbeat();
+
+    ResponseEntity<?> proxyGet(String path);
+
+    ResponseEntity<?> proxyPost(String path, Object body);
+
+    ResponseEntity<?> proxyPut(String path, Object body);
+
+    ResponseEntity<?> proxyPatch(String path, Object body);
+
+    ResponseEntity<?> proxyDelete(String path);
 }

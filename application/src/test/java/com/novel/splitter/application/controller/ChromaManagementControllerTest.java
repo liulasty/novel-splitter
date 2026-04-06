@@ -2,8 +2,7 @@ package com.novel.splitter.application.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.novel.splitter.application.common.AuthInterceptor;
-import com.novel.splitter.embedding.admin.ChromaAdminService;
-import com.novel.splitter.application.service.chroma.ChromaHttpProxy;
+import com.novel.splitter.application.service.chroma.ChromaAdminService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.ResponseEntity;
@@ -38,9 +37,6 @@ class ChromaManagementControllerTest {
     private ChromaAdminService chromaAdminService;
 
     @Mock
-    private ChromaHttpProxy chromaHttpProxy;
-
-    @Mock
     private AuthInterceptor authInterceptor;
 
     @InjectMocks
@@ -69,7 +65,7 @@ class ChromaManagementControllerTest {
     @Test
     void shouldDelegateTenantCreationToService() throws Exception {
         ResponseEntity<?> response = ResponseEntity.ok(Map.of("message", "ok"));
-        doReturn(response).when(chromaHttpProxy).post(anyString(), any());
+        doReturn(response).when(chromaAdminService).proxyPost(anyString(), any());
 
         mockMvc.perform(post("/api/admin/chroma/tenants")
                         .contentType(APPLICATION_JSON)
@@ -77,6 +73,6 @@ class ChromaManagementControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("ok"));
 
-        verify(chromaHttpProxy).post(anyString(), any());
+        verify(chromaAdminService).proxyPost(anyString(), any());
     }
 }
