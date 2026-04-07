@@ -232,10 +232,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         if (novel == null) {
             throw new IllegalArgumentException("Novel not found: " + novelId);
         }
-        if (novel.getStatus() == NovelStatus.PENDING || 
-            novel.getStatus() == NovelStatus.SPLITTING) {
-            throw new IllegalStateException("小说正在切分中，请稍后再试");
-        }
+        novel.checkCanReadChapters();
         return com.novel.splitter.application.mapper.DtoMapper.INSTANCE.toChapterDtos(chapterService.getChaptersByNovelId(novelId));
     }
 
@@ -245,10 +242,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         if (novel == null) {
             throw new IllegalArgumentException("Novel not found: " + novelId);
         }
-        if (novel.getStatus() == NovelStatus.PENDING || 
-            novel.getStatus() == NovelStatus.SPLITTING) {
-            throw new IllegalStateException("小说正在切分中，请稍后再试");
-        }
+        novel.checkCanReadChapters();
         return sceneRepository.findByNovelIdAndChapterId(novelId, chapterId).stream()
           .map(com.novel.splitter.application.mapper.DtoMapper.INSTANCE::toSceneDto)
           .collect(Collectors.toList());

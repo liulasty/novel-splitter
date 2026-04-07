@@ -87,4 +87,39 @@ public class SplitTask {
     public void setTotalScenes(int totalScenes) { this.totalScenes = totalScenes; }
 
     public java.util.concurrent.atomic.AtomicInteger getCompletedScenes() { return completedScenes; }
+
+    // 领域行为
+    public void startProcessing(String message) {
+        if (this.status == TaskStatus.SUCCESS) {
+            throw new IllegalStateException("Task is already completed successfully.");
+        }
+        this.status = TaskStatus.PROCESSING;
+        this.message = message;
+        this.updatedAt = System.currentTimeMillis();
+    }
+
+    public void updateProgress(int progress, String message) {
+        this.progress = progress;
+        if (message != null) {
+            this.message = message;
+        }
+        this.updatedAt = System.currentTimeMillis();
+    }
+
+    public void markAsSuccess(String message) {
+        this.status = TaskStatus.SUCCESS;
+        this.progress = 100;
+        this.message = message;
+        this.updatedAt = System.currentTimeMillis();
+    }
+
+    public void markAsFailed(String message) {
+        this.status = TaskStatus.FAILED;
+        this.message = message;
+        this.updatedAt = System.currentTimeMillis();
+    }
+
+    public boolean isTerminal() {
+        return this.status == TaskStatus.SUCCESS || this.status == TaskStatus.FAILED;
+    }
 }

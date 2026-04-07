@@ -54,10 +54,25 @@ public class TaskService {
     public void updateTaskStatus(String taskId, SplitTask.TaskStatus status, int progress, String message) {
         SplitTask task = taskRepository.findById(taskId).orElse(null);
         if (task != null) {
-            task.setStatus(status);
-            task.setProgress(progress);
-            if (message != null) {
-                task.setMessage(message);
+            switch (status) {
+                case PENDING:
+                    task.setStatus(status);
+                    task.setProgress(progress);
+                    if (message != null) task.setMessage(message);
+                    break;
+                case PROCESSING:
+                    if (task.getStatus() == SplitTask.TaskStatus.PENDING) {
+                        task.startProcessing(message);
+                    } else {
+                        task.updateProgress(progress, message);
+                    }
+                    break;
+                case SUCCESS:
+                    task.markAsSuccess(message);
+                    break;
+                case FAILED:
+                    task.markAsFailed(message);
+                    break;
             }
             taskRepository.save(task);
             

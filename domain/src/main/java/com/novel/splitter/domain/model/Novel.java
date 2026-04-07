@@ -43,6 +43,30 @@ public class Novel {
     private List<RawParagraph> paragraphs;
 
     // 领域行为
+    public void startSplitting() {
+        if (this.status != NovelStatus.PENDING && this.status != NovelStatus.FAILED) {
+            throw new IllegalStateException("当前状态不支持启动切分任务: " + this.status);
+        }
+        this.status = NovelStatus.SPLITTING;
+        this.updatedAt = System.currentTimeMillis();
+    }
+
+    public void completeSplitting() {
+        if (this.status != NovelStatus.SPLITTING) {
+            throw new IllegalStateException("只有处于切分中的任务才能完成切分: " + this.status);
+        }
+        this.status = NovelStatus.SPLIT_COMPLETED;
+        this.updatedAt = System.currentTimeMillis();
+    }
+
+    public void startEmbedding() {
+        if (this.status != NovelStatus.SPLIT_COMPLETED && this.status != NovelStatus.FAILED) {
+            throw new IllegalStateException("当前状态不支持启动入库任务: " + this.status);
+        }
+        this.status = NovelStatus.EMBEDDING;
+        this.updatedAt = System.currentTimeMillis();
+    }
+
     public void completeTask() {
         this.status = NovelStatus.COMPLETED;
         this.updatedAt = System.currentTimeMillis();
@@ -56,5 +80,11 @@ public class Novel {
     public void updateStatus(NovelStatus newStatus) {
         this.status = newStatus;
         this.updatedAt = System.currentTimeMillis();
+    }
+
+    public void checkCanReadChapters() {
+        if (this.status == NovelStatus.PENDING || this.status == NovelStatus.SPLITTING) {
+            throw new IllegalStateException("小说正在切分中，请稍后再试");
+        }
     }
 }
