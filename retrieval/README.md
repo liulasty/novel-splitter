@@ -1,8 +1,47 @@
-## retrieval
+# retrieval
 
-`retrieval` 模块是本系统 RAG（检索增强生成）架构的“大脑中枢”，核心职责是根据用户的自然语言查询，在海量的知识库中精准检索并召回最相关的背景上下文。该模块不仅是简单地向向量数据库发起查询，更承担了复杂的检索策略编排工作。其主要功能包括：解析用户查询并构建标准化的 `RetrievalQuery`；结合预设的业务规则（如小说特定的过滤条件）过滤干扰数据；以及调度底层的向量服务执行高维相似度匹配。在外部依赖方面，它深度依赖 `embedding` 模块来获取底层的向量检索能力，同时依赖 `domain` 模块来处理相关的实体数据结构。通过将检索逻辑与底层的存储实现解耦，该模块能够灵活地引入重排序（Reranking）、混合检索（如关键字+向量）等高级检索策略，从而不断提升问答系统召回结果的精准度。
+## 模块概述
+作为系统的知识检索与问答中枢，实现了完整的 RAG（检索增强生成）流程，负责从向量库中精准召回相关文本片段，组装上下文，并驱动大模型生成结构化的问答结果。
 
-**典型使用场景与入口类说明：**
-* 核心接口为 `RetrievalService`，定义了系统提供知识检索能力的统一标准。
-* 典型的具体实现如 `VectorRetrievalService`，它负责执行基于向量相似度的具体检索业务逻辑。
-* 在智能问答的生命周期中，应用层接收到用户的聊天请求后，首先会调用本模块进行知识召回，为后续的 Prompt 组装与大模型推理提供核心素材。
+## 核心职责
+- **RAG 全流程编排**：提供 `RagFacade` 门面类，统筹“查询向量化 → 向量相似度检索 → 上下文组装 → LLM 提示词生成 → LLM 推理”的完整链路。
+- **语义相似度检索**：通过 `RetrievalService` 和 `VectorRetrievalService` 将用户的自然语言提问转换为 Embedding，并在目标小说的集合（Collection）中检索 Top-K 场景。
+- **智能意图分类**：通过 `AnswerPolicyClassifier` 和 `RuleBasedPolicyClassifier`，根据问题的复杂度或类型（如事实性、总结性），自动选择最优的大语言模型响应策略。
+- **查询与结果适配**：提供 `RagRequest` 和 `RetrievalQueryBuilder`，标准化检索条件（如最小置信度过滤）；利用 `ContextAdapter` 统一上下文格式，并支持返回详细的诊断信息（`RagDebugResponse`）。
+
+## 技术栈
+- 核心语言：Java 21
+- 主要依赖：Spring Context, JUnit Jupiter (Test)
+
+## 模块依赖
+- 本模块依赖的内部子模块：`domain`, `embedding`, `context-assembler`, `llm-client`
+- 依赖本模块的内部子模块：`application`
+
+## 核心组件
+| 组件名称 | 类型 | 核心职责 |
+|----------|------|----------|
+| `RagFacade` | 服务门面 | RAG 链路的对外入口，封装了对 `embedding`、`assembler` 和 `llm-client` 模块的协调调用。 |
+| `RetrievalService` | 接口 | 核心检索契约，定义如何根据查询意图从向量库提取高相关性的领域文本（Scene）。 |
+| `VectorRetrievalService` | 实现类 | 基于 `EmbeddingService` 和 `VectorStore` 实现的基于语义相似度的具体检索逻辑。 |
+| `AnswerPolicyClassifier` | 接口 | 回答策略分类器，决定如何根据不同问题类型选择或定制 LLM 的提示词策略。 |
+| `RagProperties` | 配置类 | 读取并映射 `application.yml` 中定义的检索阈值（如 `min-confidence`）和 Top-K 数量。 |
+
+## 使用示例
+```java
+// 构建带有参数的检索请求
+RagRequest request = new RagRequest();
+request.setNovelId("novel-1");
+request.setQuery("小说的主角叫什么？");
+request.setTopK(5);
+
+// 通过门面发起 RAG 流程，直接获取大模型回答及引用出处
+String answerJson = ragFacade.chat(request);
+```
+
+## 扩展点
+- **扩展点 1**：可实现更高级的 `AnswerPolicyClassifier`，引入诸如意图识别大模型（Router LLM）来动态路由请求至不同尺寸的大模型，平衡成本与质量。
+- **扩展点 2**：在 `RetrievalService` 层引入混合检索（Hybrid Search，如 BM25 + 向量召回）以提高准确率。
+
+## 注意事项
+- **注意 1**：为了支撑前端复杂的引用溯源与 Debug 需求，`RagFacade` 需确保返回结果（如 `RagDebugResponse`）中完整保留所选用片段的 `chunkId` 和 `confidence`。
+- **注意 2**：检索阈值（`min-confidence`）配置过高可能导致有效上下文被丢弃，大模型将因为“没有找到答案”而拒绝回答。

@@ -1,8 +1,45 @@
-## context-assembler
+# context-assembler
 
-`context-assembler` 模块是本系统在向大语言模型（LLM）发起请求前的“最后一道工序”，其核心职责是将检索召回的零散知识片段与用户的原始指令进行智能化的清洗、排序和组装，生成最终的高质量 Prompt（提示词）。由于大模型通常存在严格的 Token 窗口限制，该模块的主要功能聚焦于：精确计算文本的 Token 消耗（如通过 `SimpleTokenCounter`）；根据可用预算对多余的上下文进行动态截断；合并相邻的连贯场景以增强语义完整性；以及应用重打分（ReScore）机制以确保最具参考价值的信息被优先放置。在外部依赖上，它主要依赖 `domain` 模块中定义的领域模型以及检索模块提供的原始结果。通过提供一个标准的、经过严格约束配置的 5 阶段流水线（ReScore、去重、合并、预算控制、组装），该模块最大化地提高了 LLM 生成回答的准确性和丰富度。
+## 模块概述
+作为 RAG 链路的关键枢纽，负责将向量数据库召回的离散知识片段（Scene）进行去重、合并、重排序以及精确的 Token 预算控制，最终组装成大语言模型（LLM）易于理解的上下文。
 
-**典型使用场景与入口类说明：**
-* 核心接口为 `ContextAssembler`，定义了上下文组装的规范契约。
-* 典型实现类如 `StandardContextAssembler`，它负责执行核心的 5 阶段组装 Pipeline。
-* 在 RAG 问答流程中，介于知识检索（`retrieval`）和模型推理（`llm-client`）之间，负责将粗糙的检索结果提炼为 LLM 易于消化的结构化 Prompt 字符串。
+## 核心职责
+- **上下文拼接与合并**：将多个相关的上下文块（`ContextBlock`）按章节、段落顺序进行合并组装，提供 `StandardContextAssembler` 标准组装器。
+- **阶段性处理流**：提供 `SceneDeduplicator`（去重）、`SceneMerger`（相邻合并）、`SceneReScorer`（重排序）等多个处理阶段（Stage），优化上下文连贯性。
+- **Token 预算管理**：实现 `TokenCounter` 接口（如 `SimpleTokenCounter`）和 `TokenBudgetAllocator` 阶段，严格控制组装后的总 Token 长度，防止超出 LLM 的上下文窗口。
+- **配置与参数化**：通过 `AssemblerConfig` 结合 `application.yml` 中的参数（如最大片段数、最大 Token 数）动态控制组装行为。
+
+## 技术栈
+- 核心语言：Java 21
+- 主要依赖：Spring Boot Starter, Lombok
+- 无外部依赖：以纯净的 Java 逻辑为主，依赖 Spring 管理 Bean 生命周期。
+
+## 模块依赖
+- 本模块依赖的内部子模块：`domain`
+- 依赖本模块的内部子模块：`application`, `retrieval`
+
+## 核心组件
+| 组件名称 | 类型 | 核心职责 |
+|----------|------|----------|
+| `ContextAssembler` | 接口 | 核心契约，定义了将一系列召回文本块组装为单个合并上下文字符串的能力。 |
+| `StandardContextAssembler` | 实现类 | 默认的上下文组装流水线，依次执行去重、排序、合并及 Token 截断阶段。 |
+| `TokenCounter` | 接口 | 定义评估文本占用 Token 数量的规范。 |
+| `TokenBudgetAllocator` | 处理阶段 | 依据预设的 `max-context-tokens` 预算，剔除多余或低优先级的召回片段。 |
+| `SceneMerger` | 处理阶段 | 识别并合并物理上相邻的文本场景，还原小说段落连贯性。 |
+
+## 使用示例
+```java
+// 组装召回的上下文块
+List<ContextBlock> retrievedBlocks = getFromVectorStore();
+String promptContext = contextAssembler.assemble(retrievedBlocks, maxTokens);
+
+// 此时 promptContext 已经过去重、合并和长度截断，可安全发送给 LLM
+```
+
+## 扩展点
+- **扩展点 1**：可实现更复杂的 `TokenCounter`（如基于 JTokkit 的精确 BPE Token 计数器）替换现有的简单字数估算（`SimpleTokenCounter`）。
+- **扩展点 2**：可新增处理阶段（如添加基于 BM25 或 CrossEncoder 的 `SceneReScorer`），并注入到组装流水线中以提高上下文质量。
+
+## 注意事项
+- **注意 1**：组装器必须保证召回片段的顺序（如按原书的物理顺序排序），否则会导致 LLM 生成回答时产生幻觉或逻辑错乱。
+- **注意 2**：`TokenBudgetAllocator` 必须是流水线的最后一道关卡，确保严格遵循大模型 Token 上限，避免触发 API 调用异常。

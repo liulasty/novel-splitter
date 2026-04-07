@@ -1,32 +1,35 @@
-## splitter
+# text-processing
 
-`splitter` 模块是本系统的核心智能处理引擎，专门负责将冗长且结构复杂的原始小说文本，通过一系列先进的算法策略拆分为具有高度语义完整性的段落和场景。其核心职责是解决长文本在 RAG（检索增强生成）场景下由于上下文截断而导致的信息丢失问题。该模块的主要功能包括：运用基于正则表达式与启发式规则的章节识别技术对小说结构进行初步划分；基于文本语义密度的动态窗口机制进行精细化的段落切分；以及通过上下文感知算法自动识别并合并分散的“人物对话”与“叙述性旁白”，从而生成连贯的语义段（SemanticSegment）。在外部依赖关系上，它深度依赖 `domain` 模块以获取核心业务模型，并在部分高级策略中可选地结合 `embedding` 模块进行更深层次的语义相似度分析。通过高度可配置的拆分规则链，该模块不仅保证了文本拆分的高质量，还赋予了开发者根据不同小说体裁灵活调整拆分行为的强大能力。
+## 模块概述
+作为本项目的核心自然语言与文本引擎，负责小说原始文本的章节识别、段落切割、语义密度分析以及基于上下文的场景组装，是实现智能拆分的“大脑”。
 
-**典型使用场景与入口类说明：**
-* 核心入口类为 `com.novel.splitter.validation.core.SemanticSegmentBuilder`，负责统筹并执行整个文本拆分的生命周期。
-* 开发者可以通过实现或配置不同的 `SplitRule`（如 Markdown 标题识别规则、对话合并规则等）来高度定制化拆分行为，以适应不同排版风格的小说文本。
-* 在系统的数据预处理流水线中，本模块处于承上启下的关键位置，接收原始文本输入，输出结构化且语义连贯的场景片段供后续校验与向量化存储使用。
+## 核心职责
+- **章节与段落切分**：提供基于正则或特定标记的 `ChapterRecognizer` 及针对 Markdown 等格式的 `ParagraphSplitter`，将长文本初步结构化。
+- **语义特征提取**：通过 `SemanticDensityAnalyzer` 提取段落的语义特征与相关性（如对话特征、关键词密度）。
+- **上下文感知组装**：通过 `ContextAwareSegmentBuilder` 和 `SceneAssembler`，结合各类切割规则（`SplitRule`），将离散段落组装成具有完整连贯语义的场景片段。
+- **规则策略应用**：提供长度限制、动态窗口等核心切分与合并规则的落地实现。
 
-### 核心切分流程与架构设计
+## 技术栈
+- 核心语言：Java 21
+- 主要依赖：Apache Commons Lang3
 
-本系统的切分算法经过多次迭代，形成了流水线式的多阶段切分机制（尤其是核心的 B3 和 B4 阶段），由 `SplitWorker` 驱动，并在 `NovelIngestionService` 中完成调度。
+## 模块依赖
+- 本模块依赖的内部子模块：`domain`, `embedding`, `validation`
+- 依赖本模块的内部子模块：`batch-processing`
 
-#### 1. 整体架构与职责边界
-在整个数据入库（Ingestion）流水线中，拆分流程采用**异步流式处理**架构：
-* **解耦与中继**：`SplitWorker` 作为流程编排器，通过 RabbitMQ 接收来自 `LoadWorker` 的任务。它从缓存（`NovelCacheService`）中按章节拉取文本，避免将百万字小说一次性载入内存（防 OOM）。
-* **逐章切分**：通过 `SceneAssembler.assembleChapter` 对每一章的段落执行精细化的 B3+B4 规则切分，并将结果落盘。
-* **分批流转**：切分完成后，`SplitWorker` 将生成的 Scene ID 分批次（可配置，如 `batchSize=10`）打散，发送到 Embed 队列，交由 `EmbedWorker` 进行向量化处理。
+## 核心组件
+| 组件名称 | 类型 | 核心职责 |
+|----------|------|----------|
+| `MarkdownParagraphSplitter` | 实现类 | 继承自 `ParagraphSplitter`，专门处理 Markdown 格式的段落切分。 |
+| `ChapterRecognizer` | 服务类 | 识别小说章节边界，抽取章节标题及内容元数据。 |
+| `SceneAssembler` | 服务类 | 核心组装引擎，基于相关性打分将段落聚合为完整的连贯场景。 |
+| `SemanticDensityAnalyzer` | 工具/服务类 | 分析文本语义密度（关键词频率、实体密度等），辅助决定切分点。 |
+| `SplitRule` | 接口 | 文本拆分与组合规则的抽象接口，其实现类如 `LengthRule` 规范拆分逻辑。 |
 
-#### 2. B3 阶段：上下文感知与语义段构建 (Context-Aware Segment Building)
-B3 阶段的核心目标是解决小说中特有的**“对话碎片化”**问题，将散落的旁白与人物对话合并为具有完整语义的片段（SemanticSegment）。
-* **SpeakerModel 规则路径**：默认且最常用的合并策略。通过启发式规则（如引号匹配、称谓识别）判定相邻段落是否属于同一角色的连续发言或强相关的叙述动作，并将其硬合并。
-* **向量语义合并（按需启用）**：`ContextAwareSegmentBuilder.evaluateSemanticMerge()` 支持利用 `EmbeddingService` 计算段落间的余弦相似度。但在生产环境的 `NovelIngestionService` 中，默认使用无参的 `new SceneAssembler()`（不注入 Embedding 模型）。
-  * **设计考量**：如果在切分阶段同步调用 ONNX 推理进行相似度计算，会极大地拖慢切分速度（增加 5~10 倍耗时），这与流水线的异步化与高吞吐初衷相悖。因此，切分过程默认保持**纯规则驱动**，语义向量计算被推迟到独立的 Embed 阶段或用于后续的质量打分。
+## 扩展点
+- **扩展点 1**：扩展 `ParagraphSplitter` 支持对 PDF 提取文本或 HTML 的段落切分逻辑。
+- **扩展点 2**：实现新的 `SplitRule` 或增强 `BoundaryKeywordDictionary`（边界词典），以支持特定流派小说的专属拆分策略。
 
-#### 3. B4 阶段：场景组装与动态窗口 (Scene Assembling & Dynamic Window)
-在 B3 生成语义段之后，B4 阶段负责将这些语义段组装为适合 RAG 检索的 Chunk（即 Scene）。
-* **长度限制与组装**：通过 `LengthLimitStrategy` 和 `DynamicWindowRule` 确保组装出的场景在 Token 长度上既满足大模型的上下文窗口，又不会因为强行截断而破坏段落的完整性。
-* **版本与元数据注入**：组装完成的场景会被打上统一的 `version` 标签，方便后续进行同一小说的多策略切分对比（如 A/B Test）。
-* **落盘与持久化**：最终的 Scene 对象会被保存到 PostgreSQL（或本地文件系统），并返回 ID 列表供 Embed 阶段索引。
-
-通过这种“粗筛（正则） -> 精整（B3 规则合并） -> 组装（B4 长度控制）”的阶梯式策略，`splitter` 模块实现了高性能与高质量的完美平衡。
+## 注意事项
+- **注意 1**：文本处理算法应重点考虑大文本输入情况下的内存消耗与垃圾回收压力。
+- **注意 2**：`SceneAssembler` 组装出的场景必须符合 `validation` 模块的校验规则。
