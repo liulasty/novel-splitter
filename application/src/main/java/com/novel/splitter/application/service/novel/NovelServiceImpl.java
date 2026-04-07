@@ -8,9 +8,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.util.DigestUtils;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -24,6 +26,15 @@ public class NovelServiceImpl implements NovelService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public String createNovel(MultipartFile file, String title, String author, String description) throws IOException {
+        String fileMd5 = DigestUtils.md5DigestAsHex(file.getInputStream());
+        long fileSize = file.getSize();
+
+        Optional<Novel> existingNovel = novelRepository.findByFileMd5(fileMd5);
+        if (existingNovel.isPresent()) {
+            log.info("File already exists with novelId: {}", existingNovel.get().getId());
+            return existingNovel.get().getId();
+        }
+
         String fileName = novelStorageService.saveNovel(file);
         
         String novelId = UUID.randomUUID().toString();
@@ -34,6 +45,8 @@ public class NovelServiceImpl implements NovelService {
                 .author(author)
                 .description(description)
                 .filePath(fileName)
+                .fileMd5(fileMd5)
+                .fileSize(fileSize)
                 .status(NovelStatus.PENDING)
                 .createdAt(System.currentTimeMillis())
                 .updatedAt(System.currentTimeMillis())

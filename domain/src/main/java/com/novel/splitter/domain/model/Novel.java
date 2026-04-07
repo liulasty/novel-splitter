@@ -27,6 +27,8 @@ public class Novel {
     private String description;
     private String coverUrl;
     private String filePath;
+    private String fileMd5;
+    private Long fileSize;
     private NovelStatus status;
     private long createdAt;
     private long updatedAt;

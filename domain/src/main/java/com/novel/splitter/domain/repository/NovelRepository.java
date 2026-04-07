@@ -21,6 +21,11 @@ public interface NovelRepository {
     Optional<Novel> findById(String id);
 
     /**
+     * 根据文件 MD5 查找小说
+     */
+    Optional<Novel> findByFileMd5(String fileMd5);
+
+    /**
      * 列出所有小说
      */
     List<Novel> findAll();

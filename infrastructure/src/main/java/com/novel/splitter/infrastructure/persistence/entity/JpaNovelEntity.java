@@ -36,6 +36,12 @@ public class JpaNovelEntity {
     @Column(name = "file_path")
     private String filePath;
 
+    @Column(name = "file_md5", length = 64)
+    private String fileMd5;
+
+    @Column(name = "file_size")
+    private Long fileSize;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private NovelStatus status;

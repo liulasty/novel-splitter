@@ -37,6 +37,11 @@ public class NovelRepositoryJpaImpl implements NovelRepository {
     }
 
     @Override
+    public Optional<Novel> findByFileMd5(String fileMd5) {
+        return jpaNovelRepository.findByFileMd5(fileMd5).map(novelMapper::toDomain);
+    }
+
+    @Override
     public List<Novel> findAll() {
         return jpaNovelRepository.findAll().stream()
                 .map(novelMapper::toDomain)
