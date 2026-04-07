@@ -27,10 +27,6 @@
         </dependency>
         <dependency>
             <groupId>com.novel.splitter</groupId>
-            <artifactId>infrastructure</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.novel.splitter</groupId>
             <artifactId>validation</artifactId>
         </dependency>
     </dependencies>

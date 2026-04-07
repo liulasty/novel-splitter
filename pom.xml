@@ -12,7 +12,6 @@
     <modules>
         <module>domain</module>
         <module>infrastructure</module>
-        <module>repository</module>
         <module>splitter</module>
         <module>pipeline</module>
         <module>validation</module>

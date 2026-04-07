@@ -4,8 +4,7 @@ import com.novel.splitter.application.config.RabbitConfig;
 import com.novel.splitter.domain.task.CleanupTask;
 import com.novel.splitter.domain.task.CleanupTaskMessage;
 import com.novel.splitter.embedding.api.VectorStore;
-import com.novel.splitter.infrastructure.persistence.repository.JpaCleanupTaskRepository;
-import com.novel.splitter.infrastructure.persistence.mapper.CleanupTaskMapper;
+import com.novel.splitter.domain.repository.CleanupTaskRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -23,8 +22,7 @@ import java.util.Optional;
 public class CleanupWorker {
 
     private final VectorStore vectorStore;
-    private final JpaCleanupTaskRepository cleanupTaskRepository; // Keep this direct usage for simplicity or refactor via domain service
-    private final CleanupTaskMapper cleanupTaskMapper = CleanupTaskMapper.INSTANCE;
+    private final CleanupTaskRepository cleanupTaskRepository;
 
     @Value("${splitter.storage.root-path}")
     private String novelStoragePath;
@@ -33,14 +31,13 @@ public class CleanupWorker {
     public void handleCleanupTask(CleanupTaskMessage message) {
         log.info("Received cleanup task for: {} {}", message.getTargetType(), message.getTargetId());
         
-        Optional<com.novel.splitter.infrastructure.persistence.entity.JpaCleanupTaskEntity> taskOpt = cleanupTaskRepository.findById(message.getCleanupTaskId());
+        Optional<CleanupTask> taskOpt = cleanupTaskRepository.findById(message.getCleanupTaskId());
         if (taskOpt.isEmpty()) {
             log.warn("Cleanup task {} not found in database, skipping", message.getCleanupTaskId());
             return;
         }
         
-        com.novel.splitter.infrastructure.persistence.entity.JpaCleanupTaskEntity entity = taskOpt.get();
-        CleanupTask task = cleanupTaskMapper.toDomain(entity);
+        CleanupTask task = taskOpt.get();
         if (!"PENDING".equals(task.getStatus()) && !"FAILED".equals(task.getStatus())) {
             log.info("Cleanup task {} is already in status {}, skipping", task.getId(), task.getStatus());
             return;
@@ -61,14 +58,14 @@ public class CleanupWorker {
             }
 
             task.setStatus("SUCCESS");
-            cleanupTaskRepository.save(cleanupTaskMapper.toEntity(task));
+            cleanupTaskRepository.save(task);
             log.info("Successfully completed cleanup task {}", task.getId());
 
         } catch (Exception e) {
             log.error("Failed to process cleanup task " + task.getId(), e);
             task.setStatus("FAILED");
             task.setErrorMessage(e.getMessage());
-            cleanupTaskRepository.save(cleanupTaskMapper.toEntity(task));
+            cleanupTaskRepository.save(task);
             
             // Re-throw to allow MQ to retry (based on retry policy)
             throw new RuntimeException("Failed to process cleanup task", e);

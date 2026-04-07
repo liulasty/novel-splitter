@@ -4,7 +4,7 @@ import com.novel.splitter.application.config.RabbitConfig;
 import com.novel.splitter.domain.task.SplitTask;
 import com.novel.splitter.domain.task.SplitTaskMessage;
 import com.novel.splitter.domain.task.EmbedTaskMessage;
-import com.novel.splitter.pipeline.etl.NovelCacheService;
+import com.novel.splitter.domain.repository.NovelCacheRepository;
 import com.novel.splitter.pipeline.orchestrator.SplitNovelUseCase;
 import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.application.service.novel.NovelService;
@@ -26,7 +26,7 @@ public class SplitWorker {
 
     private final SplitNovelUseCase splitNovelUseCase;
     private final TaskService taskService;
-    private final NovelCacheService novelCacheService;
+    private final NovelCacheRepository novelCacheRepository;
     private final RabbitTemplate rabbitTemplate;
 
     private final NovelService novelService;
@@ -46,13 +46,13 @@ public class SplitWorker {
                 task = taskService.createTask(taskId, message.getNovelId(), message.getFilePath(), message.getMaxScenes(), message.getVersion());
             }
 
-            Novel novel = novelCacheService.load(taskId);
+            Novel novel = novelCacheRepository.load(taskId);
             
             List<Long> sceneIds = splitNovelUseCase.split(taskId, message.getNovelId(), novel, task.getMaxScenes(), task.getVersion(), (progress, info) -> {
                 taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, progress, info);
             });
             // 清理缓存
-            novelCacheService.remove(taskId);
+            novelCacheRepository.remove(taskId);
 
             if (sceneIds == null || sceneIds.isEmpty()) {
                 log.warn("任务 {} 切分后没有场景，直接标记为成功", taskId);

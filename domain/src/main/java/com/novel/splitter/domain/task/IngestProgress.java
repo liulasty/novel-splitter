@@ -1,4 +1,4 @@
-package com.novel.splitter.infrastructure.progress;
+package com.novel.splitter.domain.task;
 
 public class IngestProgress {
 

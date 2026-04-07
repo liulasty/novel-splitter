@@ -1,4 +1,4 @@
-package com.novel.splitter.application;
+package com.novel.splitter.interfaces;
 
 import io.github.cdimascio.dotenv.Dotenv;
 import org.springframework.boot.SpringApplication;
@@ -14,8 +14,8 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 @SpringBootApplication
 @EnableConfigurationProperties
 @ComponentScan("com.novel.splitter")
-@EntityScan({"com.novel.splitter.domain.entity", "com.novel.splitter.repository.entity"})
-@EnableJpaRepositories("com.novel.splitter.repository.api")
+@EntityScan({"com.novel.splitter.infrastructure.persistence.entity"})
+@EnableJpaRepositories("com.novel.splitter.infrastructure.persistence.repository")
 public class NovelSplitApplication {
     public static void main(String[] args) {
         String activeProfile = resolveActiveProfile();

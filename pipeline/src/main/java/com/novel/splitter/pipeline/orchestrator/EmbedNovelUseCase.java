@@ -3,7 +3,7 @@ package com.novel.splitter.pipeline.orchestrator;
 import com.novel.splitter.domain.model.Scene;
 import com.novel.splitter.embedding.api.EmbeddingService;
 import com.novel.splitter.embedding.api.VectorStore;
-import com.novel.splitter.repository.api.SceneRepository;
+import com.novel.splitter.domain.repository.SceneRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

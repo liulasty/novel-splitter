@@ -1,7 +1,8 @@
-package com.novel.splitter.pipeline.etl;
+package com.novel.splitter.infrastructure.persistence.repository.impl;
 
 import com.novel.splitter.domain.model.Novel;
 import com.novel.splitter.domain.model.ChapterData;
+import com.novel.splitter.domain.repository.NovelCacheRepository;
 import com.novel.splitter.infrastructure.json.JsonUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,11 +16,11 @@ import java.util.stream.Stream;
 
 @Slf4j
 @Service
-public class NovelCacheService {
+public class NovelCacheRepositoryImpl implements NovelCacheRepository {
 
     private final Path cacheDir;
 
-    public NovelCacheService(@Value("${splitter.storage.root-path:data/novel-storage}") String storageRoot) {
+    public NovelCacheRepository(@Value("${splitter.storage.root-path:data/novel-storage}") String storageRoot) {
         this.cacheDir = Paths.get(storageRoot, "cache", "tasks");
         try {
             Files.createDirectories(cacheDir);

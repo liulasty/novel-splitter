@@ -1,9 +1,5 @@
 package com.novel.splitter.interfaces.api;
 
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.novel.splitter.domain.entity.JpaSceneEntity;
-import com.novel.splitter.repository.api.JpaSceneRepository;
 import com.novel.splitter.application.service.chroma.ChromaAdminService;
 import com.novel.splitter.application.model.dto.ChromaVersionDiagnosticDto;
 import io.swagger.v3.oas.annotations.Operation;
@@ -12,13 +8,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
-import java.io.IOException;
 import java.util.Map;
-import java.util.stream.Stream;
 
 /**
  * Chroma向量数据库管理控制器
@@ -31,36 +24,17 @@ import java.util.stream.Stream;
 public class ChromaManagementController {
 
     private final ChromaAdminService chromaAdminService;
-    private final JpaSceneRepository jpaSceneRepository;
-    private final ObjectMapper objectMapper;
 
     private static final String DEFAULT_TENANT = "default_tenant";
     private static final String DEFAULT_DATABASE = "default_database";
 
     @Operation(summary = "导出Chroma数据", description = "流式导出Chroma数据库中的向量数据为JSON")
     @GetMapping("/export")
-    @Transactional(readOnly = true)
     public ResponseEntity<StreamingResponseBody> export(
             @RequestParam(required = false) String novelName,
             @RequestParam(required = false) String version) {
         
-        StreamingResponseBody responseBody = outputStream -> {
-            try (Stream<JpaSceneEntity> sceneStream = (novelName != null && version != null) ?
-                    jpaSceneRepository.streamAllByNovelNameAndVersion(novelName, version) :
-                    jpaSceneRepository.streamAll();
-                 JsonGenerator jsonGenerator = objectMapper.getFactory().createGenerator(outputStream)) {
-                
-                jsonGenerator.writeStartArray();
-                sceneStream.forEach(entity -> {
-                    try {
-                        objectMapper.writeValue(jsonGenerator, entity);
-                    } catch (IOException e) {
-                        throw new RuntimeException("Error writing JSON for entity", e);
-                    }
-                });
-                jsonGenerator.writeEndArray();
-            }
-        };
+        StreamingResponseBody responseBody = chromaAdminService.exportData(novelName, version);
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"chroma_export.json\"")

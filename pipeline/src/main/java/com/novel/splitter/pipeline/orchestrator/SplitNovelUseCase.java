@@ -1,6 +1,6 @@
 package com.novel.splitter.pipeline.orchestrator;
 
-import com.novel.splitter.pipeline.etl.NovelCacheService;
+import com.novel.splitter.domain.repository.NovelCacheRepository;
 import com.novel.splitter.core.SceneAssembler;
 import com.novel.splitter.domain.model.Chapter;
 import com.novel.splitter.domain.model.ChapterData;
@@ -8,8 +8,8 @@ import com.novel.splitter.domain.model.Novel;
 import com.novel.splitter.domain.model.Scene;
 import com.novel.splitter.domain.strategy.ChunkingStrategy;
 import com.novel.splitter.domain.strategy.OverlapChunkingStrategy;
-import com.novel.splitter.infrastructure.progress.IngestProgress;
-import com.novel.splitter.repository.api.SceneRepository;
+import com.novel.splitter.domain.task.IngestProgress;
+import com.novel.splitter.domain.repository.SceneRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,7 +24,7 @@ import java.util.function.BiConsumer;
 @RequiredArgsConstructor
 public class SplitNovelUseCase {
 
-    private final NovelCacheService novelCacheService;
+    private final NovelCacheRepository novelCacheRepository;
     private final SceneRepository sceneRepository;
     
     private final SceneAssembler sceneAssembler = new SceneAssembler();
@@ -70,7 +70,7 @@ public class SplitNovelUseCase {
             Chapter chapter = chapters.get(i);
             
             // Load chapter data from cache
-            ChapterData chapterData = novelCacheService.loadChapter(taskId, chapter.getIndex());
+            ChapterData chapterData = novelCacheRepository.loadChapter(taskId, chapter.getIndex());
             
             List<Scene> chapterScenes = sceneAssembler.assembleChapter(chapter, chapterData.getParagraphs(), novel.getTitle());
             

@@ -20,10 +20,10 @@ import java.util.regex.Pattern;
 @Slf4j
 public class LocalNovelLoader {
 
-    private final NovelCacheService novelCacheService;
+    private final NovelCacheRepository novelCacheRepository;
 
-    public LocalNovelLoader(NovelCacheService novelCacheService) {
-        this.novelCacheService = novelCacheService;
+    public LocalNovelLoader(NovelCacheRepository novelCacheRepository) {
+        this.novelCacheRepository = novelCacheRepository;
     }
 
     // Matches "第123章 标题" or "第一章 标题"
@@ -67,7 +67,7 @@ public class LocalNovelLoader {
                                  .build();
                          chapters.add(finishedChapter);
                          if (taskId != null) {
-                             novelCacheService.saveChapter(taskId, finishedChapter.getIndex(), new ChapterData(finishedChapter, new ArrayList<>(currentChapterParagraphs)));
+                             novelCacheRepository.saveChapter(taskId, finishedChapter.getIndex(), new ChapterData(finishedChapter, new ArrayList<>(currentChapterParagraphs)));
                          }
                          currentChapterParagraphs.clear();
                     }
@@ -96,7 +96,7 @@ public class LocalNovelLoader {
                         .build();
                 chapters.add(finishedChapter);
                 if (taskId != null) {
-                    novelCacheService.saveChapter(taskId, finishedChapter.getIndex(), new ChapterData(finishedChapter, new ArrayList<>(currentChapterParagraphs)));
+                    novelCacheRepository.saveChapter(taskId, finishedChapter.getIndex(), new ChapterData(finishedChapter, new ArrayList<>(currentChapterParagraphs)));
                 }
             }
         }

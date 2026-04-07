@@ -5,7 +5,7 @@ import com.novel.splitter.retrieval.dto.RetrievalQuery;
 import com.novel.splitter.domain.model.embedding.VectorRecord;
 import com.novel.splitter.embedding.api.EmbeddingService;
 import com.novel.splitter.embedding.api.VectorStore;
-import com.novel.splitter.repository.api.SceneRepository;
+import com.novel.splitter.domain.repository.SceneRepository;
 import com.novel.splitter.retrieval.api.RetrievalService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

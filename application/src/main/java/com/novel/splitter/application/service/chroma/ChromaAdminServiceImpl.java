@@ -8,7 +8,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.JsonGenerator;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -21,9 +25,32 @@ public class ChromaAdminServiceImpl implements ChromaAdminService {
     private final VectorStore vectorStore;
     private final ChromaApiClient chromaApiClient;
     private final SceneRepository sceneRepository;
+    private final ObjectMapper objectMapper;
 
     @Value("${chroma.collection:novel-splitter}")
     private String collectionName;
+
+    @Override
+    public StreamingResponseBody exportData(String novelName, String version) {
+        return outputStream -> {
+            try (JsonGenerator jsonGenerator = objectMapper.getFactory().createGenerator(outputStream)) {
+                jsonGenerator.writeStartArray();
+                // Simple implementation fetching lists, could be optimized via streaming in Repository
+                List<com.novel.splitter.domain.model.Scene> scenes = (novelName != null && version != null) ?
+                        sceneRepository.loadScenes(novelName, version) :
+                        sceneRepository.findByNovel(novelName != null ? novelName : ""); // Placeholder for fetch all if novelName empty
+                
+                for (com.novel.splitter.domain.model.Scene scene : scenes) {
+                    try {
+                        objectMapper.writeValue(jsonGenerator, scene);
+                    } catch (IOException e) {
+                        throw new RuntimeException("Error writing JSON for entity", e);
+                    }
+                }
+                jsonGenerator.writeEndArray();
+            }
+        };
+    }
 
     @Override
     public Map<String, Object> getStats() {

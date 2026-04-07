@@ -1,8 +1,11 @@
 package com.novel.splitter.application.service.chroma;
 
 import java.util.Map;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 public interface ChromaAdminService {
+
+    StreamingResponseBody exportData(String novelName, String version);
 
     Map<String, Object> getStats();
 

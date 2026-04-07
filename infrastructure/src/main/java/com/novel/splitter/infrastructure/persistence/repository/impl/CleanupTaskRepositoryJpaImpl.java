@@ -31,4 +31,9 @@ public class CleanupTaskRepositoryJpaImpl implements CleanupTaskRepository {
                 .map(mapper::toDomain)
                 .collect(Collectors.toList());
     }
+
+    @Override
+    public java.util.Optional<CleanupTask> findById(Long id) {
+        return jpaCleanupTaskRepository.findById(id).map(mapper::toDomain);
+    }
 }

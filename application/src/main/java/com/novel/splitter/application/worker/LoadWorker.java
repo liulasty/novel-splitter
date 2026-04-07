@@ -4,7 +4,7 @@ import com.novel.splitter.application.config.AppConfig;
 import com.novel.splitter.application.config.RabbitConfig;
 import com.novel.splitter.domain.task.SplitTask;
 import com.novel.splitter.domain.task.SplitTaskMessage;
-import com.novel.splitter.pipeline.etl.NovelCacheService;
+import com.novel.splitter.domain.repository.NovelCacheRepository;
 import com.novel.splitter.pipeline.orchestrator.LoadNovelUseCase;
 import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.application.service.novel.NovelService;
@@ -30,7 +30,7 @@ public class LoadWorker {
 
     private final LoadNovelUseCase loadNovelUseCase;
     private final TaskService taskService;
-    private final NovelCacheService novelCacheService;
+    private final NovelCacheRepository novelCacheRepository;
     private final RabbitTemplate rabbitTemplate;
     private final AppConfig appConfig;
     private final NovelService novelService;
@@ -60,7 +60,7 @@ public class LoadWorker {
                 taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, progress, info);
             });
 
-            novelCacheService.save(taskId, novel);
+            novelCacheRepository.save(taskId, novel);
 
             if (message.getNovelId() != null) {
                 Novel novelEntity = novelService.getNovelById(message.getNovelId());
