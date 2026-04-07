@@ -1,17 +1,48 @@
-## application
+# application
 
-`application` 模块是整个多模块工程的“总控中心”与启动入口，其核心职责是将所有分散的业务模块组装成一个完整的、可独立运行的应用程序。该模块主要承担了暴露对外交互接口、统筹系统级任务调度以及管理 Spring 容器生命周期的重任。
+## 模块概述
+作为业务应用层，是系统功能的门面与编排中心。它承接来自接口层的外部请求，协调底层各个领域服务与引擎，并管理基于 RabbitMQ 的异步任务队列。
 
-其主要功能包括：基于 Spring Boot Web 提供用于小说上传、知识库管理和 RAG 问答的 RESTful 风格 API；集成并配置 RabbitMQ 以支持长耗时任务的异步消息队列处理；以及整合 Knife4j 自动生成友好的在线接口文档。此外，它还负责加载 `application.yml` 和 `.env`（通过 dotenv）等全局配置文件。在依赖关系上，作为顶层聚合模块，它向下囊括了 `pipeline`、`retrieval`、`llm-client` 等所有核心业务与支撑模块，并引入了 Spring Boot 全家桶作为基础运行环境。
+## 核心职责
+- **应用服务编排**：通过 `NovelFacadeService` 等 Facade 类，将 `domain`、`batch-processing` 等模块的原子能力组合为完整的用户用例。
+- **数据传输对象映射**：定义了丰富的 DTO（如 `NovelStatRecordDto`、`SplitTaskDto`），并使用 MapStruct (`DtoMapper`) 在应用 DTO 与领域模型之间进行安全转换。
+- **异步任务消费与发布**：集成 Spring AMQP，提供 `SplitWorker`、`EmbedWorker` 等后台消费者，处理耗时的拆分、向量化和清理任务。
+- **配置与环境管理**：维护 `application.yml` 核心配置文件，并利用 `dotenv-java` 等机制管理全局环境变量及服务注入配置（如 `AppConfig`、`RabbitConfig`）。
 
-**核心架构设计说明：**
-* **3 队列 MQ 架构（RabbitMQ）**：为了实现长耗时文档处理任务的高可用与解耦，系统设计了基于 RabbitMQ 的 3 队列异步处理架构，包含三个核心 Worker：
-  * **`LoadWorker`**：负责监听文档加载队列，将上传的小说或文档读取并解析为初步的文本块或页面数据，完成后将任务流转至拆分队列。
-  * **`SplitWorker`**：负责监听文本拆分队列，执行长耗时的语义拆分、重叠处理等操作，将大段文本分割为适合向量化的文本片段，完成后将任务流转至嵌入队列。
-  * **`EmbedWorker`**：负责监听向量嵌入队列，调用 LLM 接口计算文本片段的向量表示（Embedding），并最终持久化到向量数据库（如 Chroma）中。
-* **`ProgressSseService`**：为了在异步处理过程中向前端提供实时的进度反馈，本模块引入了 `ProgressSseService`。它基于 Server-Sent Events (SSE) 技术，允许后端主动向客户端推送各个 Worker 的执行进度与状态更新，极大提升了用户体验。
+## 技术栈
+- 核心语言：Java 21
+- 主要依赖：Spring Boot Starter AMQP, MapStruct, Dotenv, Lombok
 
-**典型使用场景与入口类说明：**
-* 系统的主启动类为 `NovelSplitApplication`，开发者或部署环境通过运行此类来启动整个后台服务进程。
-* 包含了如 `NovelController`、`TaskController` 和 `ChromaManagementController` 等各种 Web API 控制器，它们是前端页面（如 React 客户端）与系统交互的直接入口。
-* 在处理如“小说解析”这样的大型任务时，Controller 会发布消息至 RabbitMQ，而本模块内的异步监听器（`LoadWorker`、`SplitWorker`、`EmbedWorker`）则负责按序拉取消息并驱动底层 Pipeline 的分步运作。同时，进度信息通过 `ProgressSseService` 实时推送到前端。
+## 模块依赖
+- 本模块依赖的内部子模块：`domain`, `batch-processing`, `novelDownloader`, `embedding`, `retrieval`, `context-assembler`, `llm-client`
+- 依赖本模块的内部子模块：`interfaces`
+
+## 核心组件
+| 组件名称 | 类型 | 核心职责 |
+|----------|------|----------|
+| `NovelFacadeService` | 服务类 | 小说业务门面，编排小说上传、解析、删除等完整用例。 |
+| `SplitWorker` | MQ消费者 | 监听小说拆分队列，异步调度 `batch-processing` 执行分块与验证流程。 |
+| `TaskSseService` | 服务类 | 利用 Server-Sent Events (SSE) 向前端推送实时异步任务进度。 |
+| `DtoMapper` | 接口(MapStruct) | 提供统一的 `Domain <-> DTO` 映射机制，隔离内部模型与外部 API 数据结构。 |
+| `SystemSettingsService` | 服务类 | 读取、管理并向前端暴露系统的当前配置信息（如 LLM 提供商、切分规则）。 |
+
+## 使用示例
+```java
+// 典型的应用层用例调用（在 Controller 中）
+@Autowired
+private NovelFacadeService novelFacadeService;
+
+// 上传并触发异步处理流程
+Novel novel = novelFacadeService.uploadAndProcess(multipartFile, "小说名");
+
+// 查询任务进度状态DTO
+SplitTaskDto taskDto = taskService.getTaskStatus(novel.getId());
+```
+
+## 扩展点
+- **扩展点 1**：如果系统规模扩大，可将 `Worker`（消费者）类分离部署为独立微服务，实现解耦和弹性伸缩。
+- **扩展点 2**：在 `AppConfig` 中添加新的配置 Beans，轻松集成如 Redis（用于缓存小说元数据或分布式锁）等新组件。
+
+## 注意事项
+- **注意 1**：`application` 模块是唯一允许直接包含 `application.yml` 的地方，所有环境配置必须收敛于此，避免各模块配置碎片化。
+- **注意 2**：应用服务只负责“编排”逻辑（即决定先调A再调B），绝不能包含核心的领域规则计算（如如何分段、状态如何校验）。
