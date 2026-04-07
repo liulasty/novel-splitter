@@ -9,7 +9,7 @@
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>pipeline</artifactId>
+    <artifactId>text-processing</artifactId>
 
     <dependencies>
         <dependency>
@@ -18,29 +18,17 @@
         </dependency>
         <dependency>
             <groupId>com.novel.splitter</groupId>
-            <artifactId>splitter</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.novel.splitter</groupId>
             <artifactId>embedding</artifactId>
+        </dependency>
+        <!-- 可能需要一些工具类 -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
         </dependency>
         <dependency>
             <groupId>com.novel.splitter</groupId>
             <artifactId>validation</artifactId>
         </dependency>
-        <dependency>
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-context</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.novel.splitter</groupId>
-            <artifactId>infrastructure</artifactId>
-        </dependency>
-
     </dependencies>
 
 </project>

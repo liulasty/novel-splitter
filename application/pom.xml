@@ -28,7 +28,7 @@
         </dependency>
         <dependency>
             <groupId>com.novel.splitter</groupId>
-            <artifactId>pipeline</artifactId>
+            <artifactId>batch-processing</artifactId>
         </dependency>
         <dependency>
             <groupId>com.novel.splitter</groupId>

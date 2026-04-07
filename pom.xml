@@ -10,18 +10,23 @@
     <packaging>pom</packaging>
 
     <modules>
+        <!-- 核心业务模块 -->
         <module>domain</module>
         <module>infrastructure</module>
-        <module>splitter</module>
-        <module>pipeline</module>
+        <module>application</module>
+        <module>interfaces</module>
+
+        <!-- 处理引擎模块 -->
+        <module>batch-processing</module>
+        <module>text-processing</module>
         <module>validation</module>
-        <module>novelDownloader</module>
+
+        <!-- 外部集成模块 -->
         <module>embedding</module>
         <module>retrieval</module>
         <module>context-assembler</module>
         <module>llm-client</module>
-        <module>application</module>
-        <module>interfaces</module>
+        <module>novelDownloader</module>
     </modules>
 
     <properties>
@@ -72,12 +77,12 @@
             </dependency>
             <dependency>
                 <groupId>com.novel.splitter</groupId>
-                <artifactId>splitter</artifactId>
+                <artifactId>text-processing</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.novel.splitter</groupId>
-                <artifactId>pipeline</artifactId>
+                <artifactId>batch-processing</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -195,13 +200,41 @@
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-compiler-plugin</artifactId>
                     <version>3.11.0</version>
+                    <configuration>
+                        <useIncrementalCompilation>true</useIncrementalCompilation>
+                    </configuration>
                 </plugin>
                 <plugin>
                     <groupId>org.springframework.boot</groupId>
                     <artifactId>spring-boot-maven-plugin</artifactId>
                     <version>${spring-boot.version}</version>
                 </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-enforcer-plugin</artifactId>
+                    <version>3.4.1</version>
+                    <executions>
+                        <execution>
+                            <id>enforce-dependency-convergence</id>
+                            <goals>
+                                <goal>enforce</goal>
+                            </goals>
+                            <configuration>
+                                <rules>
+                                    <dependencyConvergence/>
+                                    <requireUpperBoundDeps/>
+                                </rules>
+                            </configuration>
+                        </execution>
+                    </executions>
+                </plugin>
             </plugins>
         </pluginManagement>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+            </plugin>
+        </plugins>
     </build>
 </project>
