@@ -1,7 +1,7 @@
 package com.novel.splitter.application.service.knowledge;
 
-import com.novel.splitter.domain.model.Scene;
-import com.novel.splitter.domain.model.dto.VectorPreviewRecordDto;
+import com.novel.splitter.application.model.dto.SceneDto;
+import com.novel.splitter.application.model.dto.VectorPreviewRecordDto;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -24,7 +24,7 @@ public interface KnowledgeBaseService {
      * @param novelName 小说名称
      * @return Scene 列表
      */
-    List<Scene> getScenesByNovel(String novelName);
+    List<SceneDto> getScenesByNovel(String novelName);
 
     /**
      * 删除指定版本的切分结果（及相关向量）

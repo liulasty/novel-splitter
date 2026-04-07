@@ -5,12 +5,11 @@ import com.novel.splitter.application.service.download.DownloadService;
 import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.domain.enums.TaskType;
 import com.novel.splitter.domain.task.EmbedTaskMessage;
-import com.novel.splitter.domain.model.dto.DownloadAndIngestRequest;
-import com.novel.splitter.domain.model.dto.IngestRequest;
+import com.novel.splitter.application.model.dto.DownloadAndIngestRequest;
+import com.novel.splitter.application.model.dto.IngestRequest;
 import com.novel.splitter.domain.task.SplitTaskMessage;
-import com.novel.splitter.domain.model.dto.NovelStatRecordDto;
+import com.novel.splitter.application.model.dto.NovelStatRecordDto;
 import com.novel.splitter.domain.task.SplitTask;
-import com.novel.splitter.repository.api.JpaSceneRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -46,11 +45,11 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
     private final TaskService taskService;
     private final RabbitTemplate rabbitTemplate;
     private final DownloadService downloadService;
-    private final JpaSceneRepository jpaSceneRepository;
+    private final com.novel.splitter.domain.repository.SceneRepository sceneRepository;
 
     @Override
     public List<NovelStatRecordDto> getNovelStats() {
-        List<Object[]> sceneCounts = jpaSceneRepository.countScenesByNovelAndVersion();
+        List<Object[]> sceneCounts = sceneRepository.countScenesByNovelAndVersion();
 
         // Map: novelName -> map of version -> count
         Map<String, Map<String, Long>> novelVersionCounts = new HashMap<>();
@@ -149,7 +148,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
     public Map<String, String> split(String novelId, IngestRequest request) throws IOException {
         log.info("接收到切分请求: novelId={}, request={}", novelId, request);
         
-        com.novel.splitter.domain.entity.JpaNovelEntity novel = novelService.getNovelById(novelId);
+        com.novel.splitter.domain.model.Novel novel = novelService.getNovelById(novelId);
         if (novel == null) {
             throw new IllegalArgumentException("Novel not found: " + novelId);
         }
@@ -171,7 +170,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
     public Map<String, String> embed(String novelId) throws IOException {
         log.info("接收到向量化请求: novelId={}", novelId);
         
-        com.novel.splitter.domain.entity.JpaNovelEntity novel = novelService.getNovelById(novelId);
+        com.novel.splitter.domain.model.Novel novel = novelService.getNovelById(novelId);
         if (novel == null) {
             throw new IllegalArgumentException("Novel not found: " + novelId);
         }
@@ -228,34 +227,25 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
     }
 
     @Override
-    public List<com.novel.splitter.domain.entity.JpaChapterEntity> getChapters(String novelId) {
-        com.novel.splitter.domain.entity.JpaNovelEntity novel = novelService.getNovelById(novelId);
+    public List<com.novel.splitter.application.model.dto.ChapterDto> getChapters(String novelId) {
+        com.novel.splitter.domain.model.Novel novel = novelService.getNovelById(novelId);
         if (novel == null) {
             throw new IllegalArgumentException("Novel not found: " + novelId);
         }
-        if (novel.getStatus() == com.novel.splitter.domain.enums.NovelStatus.PENDING || 
-            novel.getStatus() == com.novel.splitter.domain.enums.NovelStatus.SPLITTING) {
-            throw new IllegalStateException("小说正在切分中，请稍后再试");
-        }
-        return chapterService.getChaptersByNovelId(novelId);
+        novel.checkCanReadChapters();
+        return com.novel.splitter.application.mapper.DtoMapper.INSTANCE.toChapterDtos(chapterService.getChaptersByNovelId(novelId));
     }
 
     @Override
-    public List<com.novel.splitter.domain.entity.JpaSceneEntity> getScenesByChapter(String novelId, Long chapterId) {
-        com.novel.splitter.domain.entity.JpaNovelEntity novel = novelService.getNovelById(novelId);
+    public List<com.novel.splitter.application.model.dto.SceneDto> getScenesByChapter(String novelId, Long chapterId) {
+        com.novel.splitter.domain.model.Novel novel = novelService.getNovelById(novelId);
         if (novel == null) {
             throw new IllegalArgumentException("Novel not found: " + novelId);
         }
-        if (novel.getStatus() == com.novel.splitter.domain.enums.NovelStatus.PENDING || 
-            novel.getStatus() == com.novel.splitter.domain.enums.NovelStatus.SPLITTING) {
-            throw new IllegalStateException("小说正在切分中，请稍后再试");
-        }
-        return jpaSceneRepository.findAll((root, query, cb) -> {
-            return cb.and(
-                cb.equal(root.get("novel").get("id"), novelId),
-                cb.equal(root.get("chapter").get("id"), chapterId)
-            );
-        });
+        novel.checkCanReadChapters();
+        return sceneRepository.findByNovelIdAndChapterId(novelId, chapterId).stream()
+          .map(com.novel.splitter.application.mapper.DtoMapper.INSTANCE::toSceneDto)
+          .collect(Collectors.toList());
     }
 
     private String normalizeNovelId(String fileName) {

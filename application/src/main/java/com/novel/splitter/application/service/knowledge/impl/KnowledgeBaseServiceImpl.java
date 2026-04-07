@@ -2,16 +2,16 @@ package com.novel.splitter.application.service.knowledge.impl;
 
 import com.novel.splitter.application.config.RabbitConfig;
 import com.novel.splitter.application.service.knowledge.KnowledgeBaseService;
-import com.novel.splitter.domain.entity.JpaCleanupTaskEntity;
-import com.novel.splitter.domain.model.Scene;
+import com.novel.splitter.application.model.dto.SceneDto;
+import com.novel.splitter.application.mapper.DtoMapper;
+import com.novel.splitter.domain.task.CleanupTask;
 import com.novel.splitter.domain.task.CleanupTaskMessage;
 import com.novel.splitter.embedding.api.VectorStore;
-import com.novel.splitter.repository.api.JpaCleanupTaskRepository;
-import com.novel.splitter.repository.api.SceneRepository;
-import com.novel.splitter.domain.model.dto.VectorPreviewRecordDto;
+import com.novel.splitter.domain.repository.CleanupTaskRepository;
+import com.novel.splitter.domain.repository.SceneRepository;
+import com.novel.splitter.application.model.dto.VectorPreviewRecordDto;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import com.novel.splitter.repository.api.JpaSceneRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -29,9 +29,8 @@ import java.util.List;
 public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
 
     private final SceneRepository sceneRepository;
-    private final JpaSceneRepository jpaSceneRepository;
     private final VectorStore vectorStore;
-    private final JpaCleanupTaskRepository cleanupTaskRepository;
+    private final CleanupTaskRepository cleanupTaskRepository;
     private final RabbitTemplate rabbitTemplate;
     
     @org.springframework.beans.factory.annotation.Value("${splitter.storage.root-path}")
@@ -39,12 +38,33 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
 
     @Override
     public Page<VectorPreviewRecordDto> getLightweightScenes(Pageable pageable) {
-        return jpaSceneRepository.findLightweightScenes(pageable);
+        return sceneRepository.findLightweightScenes(pageable).map(scene -> new VectorPreviewRecordDto() {
+            @Override
+            public Long getId() {
+                return scene.getId() != null ? Long.valueOf(scene.getId()) : null;
+            }
+            @Override
+            public Integer getChapterIndex() {
+                return scene.getChapterIndex();
+            }
+            @Override
+            public String getType() {
+                return scene.getChapterTitle(); // Using chapterTitle as type hack from JpaImpl
+            }
+            @Override
+            public Integer getTokenCount() {
+                return scene.getWordCount();
+            }
+            @Override
+            public String getTextContent() {
+                return scene.getText();
+            }
+        });
     }
 
     @Override
-    public List<Scene> getScenesByNovel(String novelName) {
-        return sceneRepository.findByNovel(normalizeNovelName(novelName));
+    public List<SceneDto> getScenesByNovel(String novelName) {
+        return DtoMapper.INSTANCE.toSceneDtos(sceneRepository.findByNovel(normalizeNovelName(novelName)));
     }
 
     @Override
@@ -54,7 +74,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         log.info("Logical deleting version: {}/{}", normalizedNovelName, version);
         sceneRepository.deleteVersion(normalizedNovelName, version);
         
-        JpaCleanupTaskEntity task = JpaCleanupTaskEntity.builder()
+        CleanupTask task = CleanupTask.builder()
                 .targetId(normalizedNovelName)
                 .targetType("VERSION")
                 .version(version)
@@ -80,7 +100,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         log.info("Logical deleting knowledge base for: {}", normalizedNovelName);
         sceneRepository.deleteNovel(normalizedNovelName);
         
-        JpaCleanupTaskEntity task = JpaCleanupTaskEntity.builder()
+        CleanupTask task = CleanupTask.builder()
                 .targetId(normalizedNovelName)
                 .targetType("NOVEL")
                 .status("PENDING")

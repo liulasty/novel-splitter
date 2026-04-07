@@ -22,10 +22,6 @@
         </dependency>
         <dependency>
             <groupId>com.novel.splitter</groupId>
-            <artifactId>repository</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.novel.splitter</groupId>
             <artifactId>context-assembler</artifactId>
             <version>${project.version}</version>
         </dependency>

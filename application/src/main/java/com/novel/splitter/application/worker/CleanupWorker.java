@@ -1,10 +1,10 @@
 package com.novel.splitter.application.worker;
 
 import com.novel.splitter.application.config.RabbitConfig;
-import com.novel.splitter.domain.entity.JpaCleanupTaskEntity;
+import com.novel.splitter.domain.task.CleanupTask;
 import com.novel.splitter.domain.task.CleanupTaskMessage;
 import com.novel.splitter.embedding.api.VectorStore;
-import com.novel.splitter.repository.api.JpaCleanupTaskRepository;
+import com.novel.splitter.domain.repository.CleanupTaskRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -22,7 +22,7 @@ import java.util.Optional;
 public class CleanupWorker {
 
     private final VectorStore vectorStore;
-    private final JpaCleanupTaskRepository cleanupTaskRepository;
+    private final CleanupTaskRepository cleanupTaskRepository;
 
     @Value("${splitter.storage.root-path}")
     private String novelStoragePath;
@@ -31,13 +31,13 @@ public class CleanupWorker {
     public void handleCleanupTask(CleanupTaskMessage message) {
         log.info("Received cleanup task for: {} {}", message.getTargetType(), message.getTargetId());
         
-        Optional<JpaCleanupTaskEntity> taskOpt = cleanupTaskRepository.findById(message.getCleanupTaskId());
+        Optional<CleanupTask> taskOpt = cleanupTaskRepository.findById(message.getCleanupTaskId());
         if (taskOpt.isEmpty()) {
             log.warn("Cleanup task {} not found in database, skipping", message.getCleanupTaskId());
             return;
         }
         
-        JpaCleanupTaskEntity task = taskOpt.get();
+        CleanupTask task = taskOpt.get();
         if (!"PENDING".equals(task.getStatus()) && !"FAILED".equals(task.getStatus())) {
             log.info("Cleanup task {} is already in status {}, skipping", task.getId(), task.getStatus());
             return;

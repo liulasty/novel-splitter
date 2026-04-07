@@ -1,8 +1,8 @@
 package com.novel.splitter.application.service.novel;
 
-import com.novel.splitter.domain.entity.JpaNovelEntity;
+import com.novel.splitter.domain.model.Novel;
 import com.novel.splitter.domain.enums.NovelStatus;
-import com.novel.splitter.repository.api.JpaNovelRepository;
+import com.novel.splitter.domain.repository.NovelRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -18,7 +18,7 @@ import java.util.UUID;
 @Slf4j
 public class NovelServiceImpl implements NovelService {
 
-    private final JpaNovelRepository jpaNovelRepository;
+    private final NovelRepository novelRepository;
     private final NovelStorageService novelStorageService;
 
     @Override
@@ -26,23 +26,21 @@ public class NovelServiceImpl implements NovelService {
     public String createNovel(MultipartFile file, String title, String author, String description) throws IOException {
         String fileName = novelStorageService.saveNovel(file);
         
-        // Here novelId could be a UUID or the filename without extension. 
-        // For consistency with earlier code, we can use a UUID.
         String novelId = UUID.randomUUID().toString();
         
-        JpaNovelEntity entity = JpaNovelEntity.builder()
+        Novel novel = Novel.builder()
                 .id(novelId)
                 .title(title != null ? title : fileName.replace(".txt", ""))
                 .author(author)
                 .description(description)
-                .filePath(fileName) // Store the filename/path in storage
+                .filePath(fileName)
                 .status(NovelStatus.PENDING)
                 .createdAt(System.currentTimeMillis())
                 .updatedAt(System.currentTimeMillis())
                 .isDeleted(false)
                 .build();
                 
-        jpaNovelRepository.save(entity);
+        novelRepository.save(novel);
         log.info("Saved novel entity to database, novelId: {}", novelId);
         
         return novelId;
@@ -51,24 +49,22 @@ public class NovelServiceImpl implements NovelService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateNovelStatus(String novelId, NovelStatus status) {
-        JpaNovelEntity novel = jpaNovelRepository.findById(novelId)
+        Novel novel = novelRepository.findById(novelId)
                 .orElseThrow(() -> new IllegalArgumentException("Novel not found: " + novelId));
                 
-        // Can add state machine validation here if necessary
-        novel.setStatus(status);
-        novel.setUpdatedAt(System.currentTimeMillis());
-        jpaNovelRepository.save(novel);
+        novel.updateStatus(status);
+        novelRepository.save(novel);
         log.info("Updated novel {} status to {}", novelId, status);
     }
 
     @Override
-    public JpaNovelEntity getNovelById(String novelId) {
-        return jpaNovelRepository.findById(novelId)
+    public Novel getNovelById(String novelId) {
+        return novelRepository.findById(novelId)
                 .orElseThrow(() -> new IllegalArgumentException("Novel not found: " + novelId));
     }
 
     @Override
-    public List<JpaNovelEntity> listNovels() {
-        return jpaNovelRepository.findAll();
+    public List<Novel> listNovels() {
+        return novelRepository.findAll();
     }
 }

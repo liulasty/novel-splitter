@@ -1,7 +1,7 @@
 package com.novel.splitter.application.service.settings;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.novel.splitter.domain.model.dto.SystemSettingsDto;
+import com.novel.splitter.application.model.dto.SystemSettingsDto;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

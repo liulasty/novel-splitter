@@ -4,7 +4,7 @@ import com.novel.splitter.application.config.RabbitConfig;
 import com.novel.splitter.application.service.novel.NovelFacadeServiceImpl;
 import com.novel.splitter.application.service.novel.NovelStorageService;
 import com.novel.splitter.application.service.task.TaskService;
-import com.novel.splitter.domain.model.dto.IngestRequest;
+import com.novel.splitter.application.model.dto.IngestRequest;
 import com.novel.splitter.domain.enums.TaskType;
 import com.novel.splitter.domain.task.SplitTaskMessage;
 import org.junit.jupiter.api.Test;

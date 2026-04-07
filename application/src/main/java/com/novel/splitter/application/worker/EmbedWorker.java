@@ -2,13 +2,12 @@ package com.novel.splitter.application.worker;
 
 import com.novel.splitter.application.config.RabbitConfig;
 import com.novel.splitter.application.service.novel.NovelService;
-import com.novel.splitter.domain.entity.JpaSceneEntity;
 import com.novel.splitter.domain.enums.NovelStatus;
 import com.novel.splitter.domain.task.SplitTask;
 import com.novel.splitter.domain.task.EmbedTaskMessage;
 import com.novel.splitter.pipeline.orchestrator.EmbedNovelUseCase;
 import com.novel.splitter.application.service.task.TaskService;
-import com.novel.splitter.repository.api.JpaSceneRepository;
+import com.novel.splitter.domain.repository.SceneRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -26,7 +25,7 @@ public class EmbedWorker {
 
     private final EmbedNovelUseCase embedNovelUseCase;
     private final TaskService taskService;
-    private final JpaSceneRepository jpaSceneRepository;
+    private final SceneRepository sceneRepository;
     private final NovelService novelService;
 
     @org.springframework.beans.factory.annotation.Value("${splitter.ingestion.batch-size:100}")
@@ -58,7 +57,7 @@ public class EmbedWorker {
             long totalScenes = 0;
             
             while (true) {
-                Page<JpaSceneEntity> scenePage = jpaSceneRepository.findByNovelId(novelId, PageRequest.of(page, batchSize));
+                Page<com.novel.splitter.domain.model.Scene> scenePage = sceneRepository.findByNovelId(novelId, PageRequest.of(page, batchSize));
                 if (page == 0) {
                     totalScenes = scenePage.getTotalElements();
                     task.setTotalScenes((int) totalScenes);
@@ -69,7 +68,7 @@ public class EmbedWorker {
                 }
                 
                 List<Long> sceneIds = scenePage.getContent().stream()
-                        .map(JpaSceneEntity::getId)
+                        .map(scene -> Long.valueOf(scene.getId()))
                         .collect(Collectors.toList());
                         
                 if (sceneIds.isEmpty()) {

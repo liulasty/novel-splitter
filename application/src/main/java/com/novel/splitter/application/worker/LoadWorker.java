@@ -4,14 +4,13 @@ import com.novel.splitter.application.config.AppConfig;
 import com.novel.splitter.application.config.RabbitConfig;
 import com.novel.splitter.domain.task.SplitTask;
 import com.novel.splitter.domain.task.SplitTaskMessage;
-import com.novel.splitter.pipeline.etl.NovelCacheService;
+import com.novel.splitter.domain.repository.NovelCacheRepository;
 import com.novel.splitter.pipeline.orchestrator.LoadNovelUseCase;
 import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.application.service.novel.NovelService;
 import com.novel.splitter.application.service.novel.ChapterService;
-import com.novel.splitter.domain.entity.JpaChapterEntity;
-import com.novel.splitter.domain.entity.JpaNovelEntity;
 import com.novel.splitter.domain.enums.NovelStatus;
+import com.novel.splitter.domain.model.Chapter;
 import com.novel.splitter.domain.model.Novel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,7 +30,7 @@ public class LoadWorker {
 
     private final LoadNovelUseCase loadNovelUseCase;
     private final TaskService taskService;
-    private final NovelCacheService novelCacheService;
+    private final NovelCacheRepository novelCacheRepository;
     private final RabbitTemplate rabbitTemplate;
     private final AppConfig appConfig;
     private final NovelService novelService;
@@ -61,15 +60,15 @@ public class LoadWorker {
                 taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, progress, info);
             });
 
-            novelCacheService.save(taskId, novel);
+            novelCacheRepository.save(taskId, novel);
 
             if (message.getNovelId() != null) {
-                JpaNovelEntity novelEntity = novelService.getNovelById(message.getNovelId());
-                List<JpaChapterEntity> chapterEntities = novel.getChapters().stream()
-                        .map(chapter -> JpaChapterEntity.builder()
-                                .novel(novelEntity)
+                Novel novelEntity = novelService.getNovelById(message.getNovelId());
+                List<Chapter> chapterEntities = novel.getChapters().stream()
+                        .map(chapter -> Chapter.builder()
+                                .novelId(novelEntity.getId())
                                 .title(chapter.getTitle())
-                                .indexNum(chapter.getIndex())
+                                .index(chapter.getIndex())
                                 .wordCount(0) // Could be calculated if needed
                                 .build())
                         .collect(Collectors.toList());
