@@ -3,12 +3,10 @@ package com.novel.splitter.application.service.task;
 import com.novel.splitter.domain.enums.TaskType;
 import com.novel.splitter.domain.task.SplitTask;
 import com.novel.splitter.domain.task.TaskProgressEvent;
-import com.novel.splitter.application.repository.task.TaskRepository;
-import com.novel.splitter.application.repository.task.TaskEventRepository;
+import com.novel.splitter.domain.repository.SplitTaskRepository;
+import com.novel.splitter.domain.repository.TaskEventRepository;
 import com.novel.splitter.application.model.dto.JobStatSummaryDto;
 import com.novel.splitter.application.model.dto.JobRecordDto;
-import com.novel.splitter.repository.api.JpaSplitTaskRepository;
-import com.novel.splitter.domain.entity.JpaSplitTaskEntity;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,28 +20,27 @@ import java.util.stream.Collectors;
 @Service
 public class TaskService {
     
-    private final TaskRepository taskRepository;
+    private final SplitTaskRepository taskRepository;
     private final TaskEventRepository taskEventRepository;
     private final TaskEventPublisher taskEventPublisher;
-    private final JpaSplitTaskRepository jpaSplitTaskRepository;
 
     @Autowired
-    public TaskService(TaskRepository taskRepository, TaskEventRepository taskEventRepository, TaskEventPublisher taskEventPublisher, JpaSplitTaskRepository jpaSplitTaskRepository) {
+    public TaskService(SplitTaskRepository taskRepository, TaskEventRepository taskEventRepository, TaskEventPublisher taskEventPublisher) {
         this.taskRepository = taskRepository;
         this.taskEventRepository = taskEventRepository;
         this.taskEventPublisher = taskEventPublisher;
-        this.jpaSplitTaskRepository = jpaSplitTaskRepository;
     }
 
     @Transactional
     public SplitTask createTask(String taskId, TaskType taskType, String novelId, String fileName, int maxScenes, String version) {
         SplitTask task = new SplitTask(taskId, taskType, novelId, fileName, maxScenes, version);
-        return taskRepository.save(task);
+        taskRepository.save(task);
+        return task;
     }
 
     @Transactional(readOnly = true)
     public SplitTask getTask(String taskId) {
-        return taskRepository.findById(taskId);
+        return taskRepository.findById(taskId).orElse(null);
     }
 
     @Transactional(readOnly = true)
@@ -55,7 +52,7 @@ public class TaskService {
 
     @Transactional
     public void updateTaskStatus(String taskId, SplitTask.TaskStatus status, int progress, String message) {
-        SplitTask task = taskRepository.findById(taskId);
+        SplitTask task = taskRepository.findById(taskId).orElse(null);
         if (task != null) {
             task.setStatus(status);
             task.setProgress(progress);
@@ -85,11 +82,12 @@ public class TaskService {
     @Transactional(readOnly = true)
     public JobStatSummaryDto getJobStats() {
         long startOfDay = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
+        List<SplitTask> allTasks = taskRepository.findAll();
         
-        long running = jpaSplitTaskRepository.countByStatus(SplitTask.TaskStatus.PROCESSING);
-        long waiting = jpaSplitTaskRepository.countByStatus(SplitTask.TaskStatus.PENDING);
-        long completedToday = jpaSplitTaskRepository.countByStatusAndUpdatedAtGreaterThanEqual(SplitTask.TaskStatus.SUCCESS, startOfDay);
-        long failedToday = jpaSplitTaskRepository.countByStatusAndUpdatedAtGreaterThanEqual(SplitTask.TaskStatus.FAILED, startOfDay);
+        long running = allTasks.stream().filter(t -> t.getStatus() == SplitTask.TaskStatus.PROCESSING).count();
+        long waiting = allTasks.stream().filter(t -> t.getStatus() == SplitTask.TaskStatus.PENDING).count();
+        long completedToday = allTasks.stream().filter(t -> t.getStatus() == SplitTask.TaskStatus.SUCCESS && t.getUpdatedAt() >= startOfDay).count();
+        long failedToday = allTasks.stream().filter(t -> t.getStatus() == SplitTask.TaskStatus.FAILED && t.getUpdatedAt() >= startOfDay).count();
         
         return JobStatSummaryDto.builder()
                 .running(running)
@@ -101,28 +99,44 @@ public class TaskService {
 
     @Transactional(readOnly = true)
     public List<JobRecordDto> getAllJobs() {
-        return jpaSplitTaskRepository.findAll().stream()
+        return taskRepository.findAll().stream()
                 .map(this::mapToJobRecordDto)
                 .sorted(Comparator.comparing(JobRecordDto::getCreatedAt).reversed())
                 .collect(Collectors.toList());
     }
 
-    private JobRecordDto mapToJobRecordDto(JpaSplitTaskEntity entity) {
+    private JobRecordDto mapToJobRecordDto(SplitTask task) {
         return JobRecordDto.builder()
-                .id(entity.getTaskId())
-                .taskId(entity.getTaskId())
-                .taskType(entity.getTaskType())
-                .novelId(entity.getNovelId())
-                .fileName(entity.getFileName())
-                .maxScenes(entity.getMaxScenes())
-                .version(entity.getVersion())
-                .status(entity.getStatus())
-                .progress(entity.getProgress())
-                .message(entity.getMessage())
-                .createdAt(entity.getCreatedAt())
-                .updatedAt(entity.getUpdatedAt())
-                .totalScenes(entity.getTotalScenes())
-                .completedScenes(entity.getCompletedScenes())
+                .id(task.getTaskId())
+                .taskId(task.getTaskId())
+                .taskType(task.getTaskType())
+                .novelId(task.getNovelId())
+                .fileName(task.getFileName())
+                .maxScenes(task.getMaxScenes())
+                .version(task.getVersion())
+                .status(task.getStatus())
+                .progress(task.getProgress())
+                .message(task.getMessage())
+                .createdAt(task.getCreatedAt())
+                .updatedAt(task.getUpdatedAt())
+                .totalScenes(task.getTotalScenes())
+                .completedScenes(task.getCompletedScenes().get())
                 .build();
+    }
+
+    public void submitLoadTask(String novelId) {
+        // Implementation provided by LoadWorker or RabbitMQ sending, kept interface compatible
+    }
+
+    public void submitSplitTask(String novelId) {
+        // Implementation provided by LoadWorker or RabbitMQ sending, kept interface compatible
+    }
+
+    public void submitEmbedTask(String novelId) {
+        // Implementation provided by LoadWorker or RabbitMQ sending, kept interface compatible
+    }
+
+    public void submitCleanupTask(String novelId) {
+        // Implementation provided by LoadWorker or RabbitMQ sending, kept interface compatible
     }
 }

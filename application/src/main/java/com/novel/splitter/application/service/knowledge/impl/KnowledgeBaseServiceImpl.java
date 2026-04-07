@@ -2,16 +2,16 @@ package com.novel.splitter.application.service.knowledge.impl;
 
 import com.novel.splitter.application.config.RabbitConfig;
 import com.novel.splitter.application.service.knowledge.KnowledgeBaseService;
-import com.novel.splitter.domain.entity.JpaCleanupTaskEntity;
+import com.novel.splitter.domain.task.CleanupTask;
 import com.novel.splitter.domain.model.Scene;
 import com.novel.splitter.domain.task.CleanupTaskMessage;
 import com.novel.splitter.embedding.api.VectorStore;
-import com.novel.splitter.repository.api.JpaCleanupTaskRepository;
-import com.novel.splitter.repository.api.SceneRepository;
+import com.novel.splitter.domain.repository.CleanupTaskRepository;
+import com.novel.splitter.domain.repository.SceneRepository;
 import com.novel.splitter.domain.model.dto.VectorPreviewRecordDto;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import com.novel.splitter.repository.api.JpaSceneRepository;
+import com.novel.splitter.infrastructure.persistence.repository.JpaSceneRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -29,9 +29,9 @@ import java.util.List;
 public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
 
     private final SceneRepository sceneRepository;
-    private final JpaSceneRepository jpaSceneRepository;
+    private final JpaSceneRepository jpaSceneRepository; // For lightweight custom queries, acceptable or wrap in Domain Repo
     private final VectorStore vectorStore;
-    private final JpaCleanupTaskRepository cleanupTaskRepository;
+    private final CleanupTaskRepository cleanupTaskRepository;
     private final RabbitTemplate rabbitTemplate;
     
     @org.springframework.beans.factory.annotation.Value("${splitter.storage.root-path}")
@@ -54,7 +54,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         log.info("Logical deleting version: {}/{}", normalizedNovelName, version);
         sceneRepository.deleteVersion(normalizedNovelName, version);
         
-        JpaCleanupTaskEntity task = JpaCleanupTaskEntity.builder()
+        CleanupTask task = CleanupTask.builder()
                 .targetId(normalizedNovelName)
                 .targetType("VERSION")
                 .version(version)
@@ -80,7 +80,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         log.info("Logical deleting knowledge base for: {}", normalizedNovelName);
         sceneRepository.deleteNovel(normalizedNovelName);
         
-        JpaCleanupTaskEntity task = JpaCleanupTaskEntity.builder()
+        CleanupTask task = CleanupTask.builder()
                 .targetId(normalizedNovelName)
                 .targetType("NOVEL")
                 .status("PENDING")
