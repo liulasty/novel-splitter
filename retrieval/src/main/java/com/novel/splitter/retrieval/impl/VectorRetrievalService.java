@@ -1,7 +1,7 @@
 package com.novel.splitter.retrieval.impl;
 
 import com.novel.splitter.domain.model.Scene;
-import com.novel.splitter.domain.model.dto.RetrievalQuery;
+import com.novel.splitter.retrieval.dto.RetrievalQuery;
 import com.novel.splitter.domain.model.embedding.VectorRecord;
 import com.novel.splitter.embedding.api.EmbeddingService;
 import com.novel.splitter.embedding.api.VectorStore;

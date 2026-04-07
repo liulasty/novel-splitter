@@ -2,13 +2,14 @@ package com.novel.splitter.application.service.knowledge.impl;
 
 import com.novel.splitter.application.config.RabbitConfig;
 import com.novel.splitter.application.service.knowledge.KnowledgeBaseService;
+import com.novel.splitter.application.model.dto.SceneDto;
+import com.novel.splitter.application.mapper.DtoMapper;
 import com.novel.splitter.domain.task.CleanupTask;
-import com.novel.splitter.domain.model.Scene;
 import com.novel.splitter.domain.task.CleanupTaskMessage;
 import com.novel.splitter.embedding.api.VectorStore;
 import com.novel.splitter.domain.repository.CleanupTaskRepository;
 import com.novel.splitter.domain.repository.SceneRepository;
-import com.novel.splitter.domain.model.dto.VectorPreviewRecordDto;
+import com.novel.splitter.application.model.dto.VectorPreviewRecordDto;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import com.novel.splitter.infrastructure.persistence.repository.JpaSceneRepository;
@@ -43,8 +44,8 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
     }
 
     @Override
-    public List<Scene> getScenesByNovel(String novelName) {
-        return sceneRepository.findByNovel(normalizeNovelName(novelName));
+    public List<SceneDto> getScenesByNovel(String novelName) {
+        return DtoMapper.INSTANCE.toSceneDtos(sceneRepository.findByNovel(normalizeNovelName(novelName)));
     }
 
     @Override

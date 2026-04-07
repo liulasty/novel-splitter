@@ -1,0 +1,43 @@
+package com.novel.splitter.application.mapper;
+
+import com.novel.splitter.application.model.dto.AnswerDto;
+import com.novel.splitter.application.model.dto.ChapterDto;
+import com.novel.splitter.application.model.dto.SceneDto;
+import com.novel.splitter.application.model.dto.VectorRecordDto;
+import com.novel.splitter.application.model.dto.SplitTaskDto;
+import com.novel.splitter.application.model.dto.TaskProgressEventDto;
+import com.novel.splitter.domain.model.Answer;
+import com.novel.splitter.domain.model.Chapter;
+import com.novel.splitter.domain.model.Scene;
+import com.novel.splitter.domain.model.embedding.VectorRecord;
+import com.novel.splitter.domain.task.SplitTask;
+import com.novel.splitter.domain.task.TaskProgressEvent;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.factory.Mappers;
+
+import java.util.List;
+
+@Mapper(componentModel = "spring")
+public interface DtoMapper {
+    DtoMapper INSTANCE = Mappers.getMapper(DtoMapper.class);
+
+    ChapterDto toChapterDto(Chapter chapter);
+    List<ChapterDto> toChapterDtos(List<Chapter> chapters);
+
+    SceneDto toSceneDto(Scene scene);
+    List<SceneDto> toSceneDtos(List<Scene> scenes);
+
+    AnswerDto toAnswerDto(Answer answer);
+    AnswerDto.CitationDto toCitationDto(Answer.Citation citation);
+
+    VectorRecordDto toVectorRecordDto(VectorRecord vectorRecord);
+    List<VectorRecordDto> toVectorRecordDtos(List<VectorRecord> vectorRecords);
+
+    @Mapping(target = "completedScenes", expression = "java(task.getCompletedScenes().get())")
+    SplitTaskDto toSplitTaskDto(SplitTask task);
+    List<SplitTaskDto> toSplitTaskDtos(List<SplitTask> tasks);
+
+    TaskProgressEventDto toTaskProgressEventDto(TaskProgressEvent event);
+    List<TaskProgressEventDto> toTaskProgressEventDtos(List<TaskProgressEvent> events);
+}

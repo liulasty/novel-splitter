@@ -1,4 +1,4 @@
-package com.novel.splitter.domain.model.dto;
+package com.novel.splitter.application.model.dto;
 
 public interface VectorPreviewRecordDto {
     Long getId();

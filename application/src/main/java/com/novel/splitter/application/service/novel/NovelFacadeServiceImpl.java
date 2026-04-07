@@ -5,10 +5,10 @@ import com.novel.splitter.application.service.download.DownloadService;
 import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.domain.enums.TaskType;
 import com.novel.splitter.domain.task.EmbedTaskMessage;
-import com.novel.splitter.domain.model.dto.DownloadAndIngestRequest;
-import com.novel.splitter.domain.model.dto.IngestRequest;
+import com.novel.splitter.application.model.dto.DownloadAndIngestRequest;
+import com.novel.splitter.application.model.dto.IngestRequest;
 import com.novel.splitter.domain.task.SplitTaskMessage;
-import com.novel.splitter.domain.model.dto.NovelStatRecordDto;
+import com.novel.splitter.application.model.dto.NovelStatRecordDto;
 import com.novel.splitter.domain.task.SplitTask;
 import com.novel.splitter.repository.api.JpaSceneRepository;
 import lombok.RequiredArgsConstructor;
@@ -228,7 +228,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
     }
 
     @Override
-    public List<com.novel.splitter.domain.model.Chapter> getChapters(String novelId) {
+    public List<com.novel.splitter.application.model.dto.ChapterDto> getChapters(String novelId) {
         com.novel.splitter.domain.model.Novel novel = novelService.getNovelById(novelId);
         if (novel == null) {
             throw new IllegalArgumentException("Novel not found: " + novelId);
@@ -237,11 +237,11 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
             novel.getStatus() == NovelStatus.SPLITTING) {
             throw new IllegalStateException("小说正在切分中，请稍后再试");
         }
-        return chapterService.getChaptersByNovelId(novelId);
+        return com.novel.splitter.application.mapper.DtoMapper.INSTANCE.toChapterDtos(chapterService.getChaptersByNovelId(novelId));
     }
 
     @Override
-    public List<com.novel.splitter.domain.model.Scene> getScenesByChapter(String novelId, Long chapterId) {
+    public List<com.novel.splitter.application.model.dto.SceneDto> getScenesByChapter(String novelId, Long chapterId) {
         com.novel.splitter.domain.model.Novel novel = novelService.getNovelById(novelId);
         if (novel == null) {
             throw new IllegalArgumentException("Novel not found: " + novelId);
@@ -255,7 +255,10 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
                 cb.equal(root.get("novel").get("id"), novelId),
                 cb.equal(root.get("chapter").get("id"), chapterId)
             );
-        }).stream().map(com.novel.splitter.infrastructure.persistence.mapper.SceneMapper.INSTANCE::toDomain).collect(Collectors.toList());
+        }).stream()
+          .map(com.novel.splitter.infrastructure.persistence.mapper.SceneMapper.INSTANCE::toDomain)
+          .map(com.novel.splitter.application.mapper.DtoMapper.INSTANCE::toSceneDto)
+          .collect(Collectors.toList());
     }
 
     private String normalizeNovelId(String fileName) {

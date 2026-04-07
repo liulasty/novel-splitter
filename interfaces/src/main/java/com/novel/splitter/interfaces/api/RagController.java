@@ -1,9 +1,10 @@
 package com.novel.splitter.interfaces.api;
 
 import com.novel.splitter.retrieval.api.RagFacade;
-import com.novel.splitter.domain.model.Answer;
-import com.novel.splitter.domain.model.dto.RagDebugResponse;
-import com.novel.splitter.domain.model.dto.RagRequest;
+import com.novel.splitter.application.model.dto.AnswerDto;
+import com.novel.splitter.application.mapper.DtoMapper;
+import com.novel.splitter.retrieval.dto.RagDebugResponse;
+import com.novel.splitter.retrieval.dto.RagRequest;
 import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -33,8 +34,8 @@ public class RagController {
      */
     @Operation(summary = "RAG问答请求", description = "通过检索增强生成机制，基于小说知识库回答用户问题")
     @PostMapping
-    public Answer ask(@Valid @RequestBody RagRequest request) {
-        return ragService.ask(request);
+    public AnswerDto ask(@Valid @RequestBody RagRequest request) {
+        return DtoMapper.INSTANCE.toAnswerDto(ragService.ask(request));
     }
 
     /**

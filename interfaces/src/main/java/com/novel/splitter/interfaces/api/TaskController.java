@@ -2,8 +2,9 @@ package com.novel.splitter.interfaces.api;
 
 import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.application.service.task.TaskSseService;
-import com.novel.splitter.domain.task.SplitTask;
-import com.novel.splitter.domain.task.TaskProgressEvent;
+import com.novel.splitter.application.model.dto.SplitTaskDto;
+import com.novel.splitter.application.model.dto.TaskProgressEventDto;
+import com.novel.splitter.application.mapper.DtoMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,14 +31,14 @@ public class TaskController {
 
     @GetMapping
     @Operation(summary = "获取所有切分任务列表")
-    public List<SplitTask> getAllTasks() {
-        return taskService.getAllTasks();
+    public List<SplitTaskDto> getAllTasks() {
+        return DtoMapper.INSTANCE.toSplitTaskDtos(taskService.getAllTasks());
     }
 
     @GetMapping("/{taskId}")
     @Operation(summary = "获取单个切分任务状态")
-    public SplitTask getTask(@PathVariable String taskId) {
-        return taskService.getTask(taskId);
+    public SplitTaskDto getTask(@PathVariable String taskId) {
+        return DtoMapper.INSTANCE.toSplitTaskDto(taskService.getTask(taskId));
     }
 
     @DeleteMapping("/{taskId}")
@@ -55,9 +56,9 @@ public class TaskController {
 
     @GetMapping("/{taskId}/events")
     @Operation(summary = "获取单个切分任务的历史事件日志")
-    public List<TaskProgressEvent> getTaskEvents(
+    public List<TaskProgressEventDto> getTaskEvents(
             @PathVariable String taskId,
             @RequestParam(required = false) Long sinceTimestamp) {
-        return taskService.getTaskEvents(taskId, sinceTimestamp);
+        return DtoMapper.INSTANCE.toTaskProgressEventDtos(taskService.getTaskEvents(taskId, sinceTimestamp));
     }
 }

@@ -1,4 +1,4 @@
-package com.novel.splitter.domain.model.dto;
+package com.novel.splitter.application.model.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;

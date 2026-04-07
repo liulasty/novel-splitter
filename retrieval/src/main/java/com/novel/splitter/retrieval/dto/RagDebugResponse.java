@@ -1,4 +1,4 @@
-package com.novel.splitter.domain.model.dto;
+package com.novel.splitter.retrieval.dto;
 
 import com.novel.splitter.domain.model.ContextBlock;
 import com.novel.splitter.domain.model.Prompt;

@@ -1,7 +1,10 @@
 package com.novel.splitter.application.service.novel;
 
-import com.novel.splitter.domain.model.dto.DownloadAndIngestRequest;
-import com.novel.splitter.domain.model.dto.IngestRequest;
+import com.novel.splitter.application.model.dto.DownloadAndIngestRequest;
+import com.novel.splitter.application.model.dto.IngestRequest;
+import com.novel.splitter.application.model.dto.NovelStatRecordDto;
+import com.novel.splitter.application.model.dto.ChapterDto;
+import com.novel.splitter.application.model.dto.SceneDto;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -20,9 +23,9 @@ public interface NovelFacadeService {
 
     Map<String, String> downloadAndIngest(DownloadAndIngestRequest request) throws IOException;
 
-    List<com.novel.splitter.domain.model.dto.NovelStatRecordDto> getNovelStats();
+    List<NovelStatRecordDto> getNovelStats();
 
-    List<com.novel.splitter.domain.model.Chapter> getChapters(String novelId);
+    List<ChapterDto> getChapters(String novelId);
 
-    List<com.novel.splitter.domain.model.Scene> getScenesByChapter(String novelId, Long chapterId);
+    List<SceneDto> getScenesByChapter(String novelId, Long chapterId);
 }

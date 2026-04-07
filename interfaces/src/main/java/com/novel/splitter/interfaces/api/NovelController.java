@@ -1,7 +1,9 @@
 package com.novel.splitter.interfaces.api;
 
 import com.novel.splitter.application.service.novel.NovelFacadeService;
-import com.novel.splitter.domain.model.dto.IngestRequest;
+import com.novel.splitter.application.model.dto.IngestRequest;
+import com.novel.splitter.application.model.dto.ChapterDto;
+import com.novel.splitter.application.model.dto.SceneDto;
 import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -10,7 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import com.novel.splitter.domain.model.dto.NovelStatRecordDto;
+import com.novel.splitter.application.model.dto.NovelStatRecordDto;
 
 import java.io.IOException;
 import java.util.List;
@@ -63,13 +65,13 @@ public class NovelController {
      */
     @Operation(summary = "获取小说章节树", description = "获取小说的所有章节层级结构")
     @GetMapping("/{novelId}/chapters")
-    public List<com.novel.splitter.domain.model.Chapter> getChapters(@PathVariable String novelId) {
+    public List<ChapterDto> getChapters(@PathVariable String novelId) {
         return novelFacadeService.getChapters(novelId);
     }
 
     @Operation(summary = "获取章节片段", description = "获取某章节下的所有切分片段 (Scenes)")
     @GetMapping("/{novelId}/chapters/{chapterId}/scenes")
-    public List<com.novel.splitter.domain.model.Scene> getScenesByChapter(@PathVariable String novelId, @PathVariable Long chapterId) {
+    public List<SceneDto> getScenesByChapter(@PathVariable String novelId, @PathVariable Long chapterId) {
         return novelFacadeService.getScenesByChapter(novelId, chapterId);
     }
     @PostMapping("/{novelId}/split")

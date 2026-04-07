@@ -1,6 +1,6 @@
 package com.novel.splitter.application.service.settings;
 
-import com.novel.splitter.domain.model.dto.SystemSettingsDto;
+import com.novel.splitter.application.model.dto.SystemSettingsDto;
 
 public interface SystemSettingsService {
     

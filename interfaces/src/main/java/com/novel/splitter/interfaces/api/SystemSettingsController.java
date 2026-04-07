@@ -1,7 +1,7 @@
 package com.novel.splitter.interfaces.api;
 
 import com.novel.splitter.application.service.settings.SystemSettingsService;
-import com.novel.splitter.domain.model.dto.SystemSettingsDto;
+import com.novel.splitter.application.model.dto.SystemSettingsDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;

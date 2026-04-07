@@ -1,11 +1,11 @@
 package com.novel.splitter.interfaces.api;
 
 import com.novel.splitter.application.service.knowledge.KnowledgeBaseService;
-import com.novel.splitter.domain.model.Scene;
+import com.novel.splitter.application.model.dto.SceneDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import com.novel.splitter.domain.model.dto.VectorPreviewRecordDto;
+import com.novel.splitter.application.model.dto.VectorPreviewRecordDto;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.*;
@@ -28,7 +28,7 @@ public class KnowledgeBaseController {
 
     @Operation(summary = "获取指定小说的所有段落")
     @GetMapping("/{novelName}/scenes")
-    public List<Scene> getScenes(@PathVariable String novelName) {
+    public List<SceneDto> getScenes(@PathVariable String novelName) {
         return knowledgeBaseService.getScenesByNovel(novelName);
     }
 

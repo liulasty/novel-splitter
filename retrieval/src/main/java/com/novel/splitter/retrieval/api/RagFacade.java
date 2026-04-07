@@ -1,8 +1,8 @@
 package com.novel.splitter.retrieval.api;
 
 import com.novel.splitter.domain.model.Answer;
-import com.novel.splitter.domain.model.dto.RagDebugResponse;
-import com.novel.splitter.domain.model.dto.RagRequest;
+import com.novel.splitter.retrieval.dto.RagDebugResponse;
+import com.novel.splitter.retrieval.dto.RagRequest;
 
 /**
  * RAG 服务门面接口

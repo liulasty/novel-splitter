@@ -1,8 +1,9 @@
 package com.novel.splitter.interfaces.api;
 
 import com.novel.splitter.retrieval.api.RagFacade;
-import com.novel.splitter.domain.model.Answer;
-import com.novel.splitter.domain.model.dto.ChatRequest;
+import com.novel.splitter.application.model.dto.AnswerDto;
+import com.novel.splitter.application.mapper.DtoMapper;
+import com.novel.splitter.application.model.dto.ChatRequest;
 import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -31,8 +32,8 @@ public class ChatController {
      */
     @Operation(summary = "发送聊天请求", description = "根据用户输入的问题，从知识库中检索相关内容并生成回答")
     @PostMapping
-    public Answer chat(@Valid @RequestBody ChatRequest request) {
+    public AnswerDto chat(@Valid @RequestBody ChatRequest request) {
         log.info("接收到聊天请求: {}", request);
-        return ragService.ask(request.getQuestion(), request.getTopK(), request.getNovel(), request.getVersion());
+        return DtoMapper.INSTANCE.toAnswerDto(ragService.ask(request.getQuestion(), request.getTopK(), request.getNovel(), request.getVersion()));
     }
 }

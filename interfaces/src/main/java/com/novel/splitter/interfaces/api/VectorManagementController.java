@@ -2,7 +2,8 @@ package com.novel.splitter.interfaces.api;
 
 import com.novel.splitter.application.model.dto.VectorSearchRequest;
 import com.novel.splitter.application.service.vector.VectorManagementService;
-import com.novel.splitter.domain.model.embedding.VectorRecord;
+import com.novel.splitter.application.model.dto.VectorRecordDto;
+import com.novel.splitter.application.mapper.DtoMapper;
 import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -43,8 +44,8 @@ public class VectorManagementController {
      */
     @Operation(summary = "执行向量相似度搜索", description = "根据查询文本进行嵌入转换，并在向量数据库中搜索最相似的记录")
     @PostMapping("/search")
-    public List<VectorRecord> search(@Valid @RequestBody VectorSearchRequest request) {
-        return vectorManagementService.search(request);
+    public List<VectorRecordDto> search(@Valid @RequestBody VectorSearchRequest request) {
+        return DtoMapper.INSTANCE.toVectorRecordDtos(vectorManagementService.search(request));
     }
 
     /**

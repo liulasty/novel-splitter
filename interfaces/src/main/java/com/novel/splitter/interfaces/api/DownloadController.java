@@ -2,9 +2,9 @@ package com.novel.splitter.interfaces.api;
 
 import com.novel.splitter.application.service.download.DownloadService;
 import com.novel.splitter.application.service.novel.NovelFacadeService;
-import com.novel.splitter.domain.model.dto.DownloadAndIngestRequest;
-import com.novel.splitter.domain.model.dto.DownloadRequest;
-import com.novel.splitter.domain.model.dto.DownloadResponse;
+import com.novel.splitter.application.model.dto.DownloadAndIngestRequest;
+import com.novel.splitter.application.model.dto.DownloadRequest;
+import com.novel.splitter.application.model.dto.DownloadResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;

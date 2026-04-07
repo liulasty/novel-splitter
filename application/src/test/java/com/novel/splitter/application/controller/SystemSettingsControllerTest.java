@@ -2,7 +2,7 @@ package com.novel.splitter.application.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.novel.splitter.application.service.settings.SystemSettingsService;
-import com.novel.splitter.domain.model.dto.SystemSettingsDto;
+import com.novel.splitter.application.model.dto.SystemSettingsDto;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
