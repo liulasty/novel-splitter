@@ -40,7 +40,7 @@ public class SceneRepositoryJpaImpl implements SceneRepository {
 
         if (novelId != null && !novelId.isEmpty()) {
             novelEntity = jpaNovelRepository.findById(novelId).orElse(null);
-            List<JpaChapterEntity> chapterEntities = jpaChapterRepository.findByNovelIdOrderByIndexNumAsc(novelId);
+            List<JpaChapterEntity> chapterEntities = jpaChapterRepository.findByNovelIdAndVersionOrderByIndexNumAsc(novelId, version);
             if (chapterEntities != null) {
                 for (JpaChapterEntity c : chapterEntities) {
                     chapterMap.put(c.getIndexNum(), c);

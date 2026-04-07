@@ -65,8 +65,8 @@ public class NovelController {
      */
     @Operation(summary = "获取小说章节树", description = "获取小说的所有章节层级结构")
     @GetMapping("/{novelId}/chapters")
-    public List<ChapterDto> getChapters(@PathVariable String novelId) {
-        return novelFacadeService.getChapters(novelId);
+    public List<ChapterDto> getChapters(@PathVariable String novelId, @RequestParam(required = false) String version) {
+        return novelFacadeService.getChapters(novelId, version);
     }
 
     @Operation(summary = "获取章节片段", description = "获取某章节下的所有切分片段 (Scenes)")

@@ -23,6 +23,11 @@ public class Chapter {
     private String novelId;
 
     /**
+     * 章节版本
+     */
+    private String version;
+
+    /**
      * 章节序号，从 1 开始
      */
     private int index;

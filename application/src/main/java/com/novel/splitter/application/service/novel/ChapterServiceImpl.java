@@ -29,4 +29,9 @@ public class ChapterServiceImpl implements ChapterService {
     public List<Chapter> getChaptersByNovelId(String novelId) {
         return chapterRepository.findByNovelId(novelId);
     }
+
+    @Override
+    public List<Chapter> getChaptersByNovelIdAndVersion(String novelId, String version) {
+        return chapterRepository.findByNovelIdAndVersion(novelId, version);
+    }
 }

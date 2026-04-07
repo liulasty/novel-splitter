@@ -9,4 +9,5 @@ import java.util.List;
 @Repository
 public interface JpaChapterRepository extends JpaRepository<JpaChapterEntity, Long> {
     List<JpaChapterEntity> findByNovelIdOrderByIndexNumAsc(String novelId);
+    List<JpaChapterEntity> findByNovelIdAndVersionOrderByIndexNumAsc(String novelId, String version);
 }

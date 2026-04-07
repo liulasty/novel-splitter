@@ -27,5 +27,7 @@ public interface NovelFacadeService {
 
     List<ChapterDto> getChapters(String novelId);
 
+    List<ChapterDto> getChapters(String novelId, String version);
+
     List<SceneDto> getScenesByChapter(String novelId, Long chapterId);
 }

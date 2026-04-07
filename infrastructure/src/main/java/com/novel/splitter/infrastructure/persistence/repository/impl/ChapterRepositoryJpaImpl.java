@@ -46,4 +46,12 @@ public class ChapterRepositoryJpaImpl implements ChapterRepository {
                 .map(chapterMapper::toDomain)
                 .collect(Collectors.toList());
     }
+
+    @Override
+    public List<Chapter> findByNovelIdAndVersion(String novelId, String version) {
+        return jpaChapterRepository.findByNovelIdAndVersionOrderByIndexNumAsc(novelId, version)
+                .stream()
+                .map(chapterMapper::toDomain)
+                .collect(Collectors.toList());
+    }
 }

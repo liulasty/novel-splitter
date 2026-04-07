@@ -6,5 +6,6 @@ import java.util.List;
 
 public interface ChapterRepository {
     void saveAll(List<Chapter> chapters);
+    List<Chapter> findByNovelIdAndVersion(String novelId, String version);
     List<Chapter> findByNovelId(String novelId);
 }

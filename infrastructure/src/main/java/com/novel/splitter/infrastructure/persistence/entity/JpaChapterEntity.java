@@ -24,6 +24,10 @@ public class JpaChapterEntity {
     @JoinColumn(name = "novel_id", foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT), nullable = false)
     private JpaNovelEntity novel;
 
+    @Column(name = "version", nullable = false)
+    @Builder.Default
+    private String version = "v1";
+
     @Column(name = "title", nullable = false)
     private String title;
 

@@ -20,4 +20,13 @@ public interface ChapterService {
      * @return 章节列表
      */
     List<Chapter> getChaptersByNovelId(String novelId);
+
+    /**
+     * 获取指定小说及版本的章节，按序号升序
+     *
+     * @param novelId 小说ID
+     * @param version 章节版本
+     * @return 章节列表
+     */
+    List<Chapter> getChaptersByNovelIdAndVersion(String novelId, String version);
 }

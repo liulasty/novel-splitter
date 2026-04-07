@@ -228,12 +228,23 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
 
     @Override
     public List<com.novel.splitter.application.model.dto.ChapterDto> getChapters(String novelId) {
+        return getChapters(novelId, null);
+    }
+
+    @Override
+    public List<com.novel.splitter.application.model.dto.ChapterDto> getChapters(String novelId, String version) {
         com.novel.splitter.domain.model.Novel novel = novelService.getNovelById(novelId);
         if (novel == null) {
             throw new IllegalArgumentException("Novel not found: " + novelId);
         }
         novel.checkCanReadChapters();
-        return com.novel.splitter.application.mapper.DtoMapper.INSTANCE.toChapterDtos(chapterService.getChaptersByNovelId(novelId));
+        List<com.novel.splitter.domain.model.Chapter> chapters;
+        if (version == null || version.isEmpty()) {
+            chapters = chapterService.getChaptersByNovelId(novelId);
+        } else {
+            chapters = chapterService.getChaptersByNovelIdAndVersion(novelId, version);
+        }
+        return com.novel.splitter.application.mapper.DtoMapper.INSTANCE.toChapterDtos(chapters);
     }
 
     @Override

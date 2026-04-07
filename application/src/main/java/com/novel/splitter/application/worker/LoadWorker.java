@@ -69,6 +69,7 @@ public class LoadWorker {
                                 .novelId(novelEntity.getId())
                                 .title(chapter.getTitle())
                                 .index(chapter.getIndex())
+                                .version(task.getVersion())
                                 .wordCount(0) // Could be calculated if needed
                                 .build())
                         .collect(Collectors.toList());
