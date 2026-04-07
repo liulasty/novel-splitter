@@ -89,16 +89,15 @@ public class ChromaAdminServiceImpl implements ChromaAdminService {
             throw new RuntimeException("Failed to recreate collection", e);
         }
 
-        // Ideally this should be a method on SceneRepository, but assuming it exists or needs to be added
-        // sceneRepository.deleteAll();
-        log.info("Cleared local DB scenes via collection rebuild logic placeholder");
+        sceneRepository.deleteAll();
+        log.info("Cleared local DB scenes via collection rebuild logic");
 
         return Map.of("message", "Collection rebuilt successfully");
     }
 
     @Override
     public ChromaVersionDiagnosticDto getVersionDiagnostics(String novel, String version) {
-        long dbCount = sceneRepository.loadScenes(novel, version).size();
+        long dbCount = sceneRepository.countByNovelNameAndVersion(novel, version);
         long chromaCount = 0;
         List<String> metadataKeys = new ArrayList<>();
 

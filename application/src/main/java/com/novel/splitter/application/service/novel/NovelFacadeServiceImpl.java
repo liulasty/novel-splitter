@@ -10,7 +10,6 @@ import com.novel.splitter.application.model.dto.IngestRequest;
 import com.novel.splitter.domain.task.SplitTaskMessage;
 import com.novel.splitter.application.model.dto.NovelStatRecordDto;
 import com.novel.splitter.domain.task.SplitTask;
-import com.novel.splitter.repository.api.JpaSceneRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -46,11 +45,11 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
     private final TaskService taskService;
     private final RabbitTemplate rabbitTemplate;
     private final DownloadService downloadService;
-    private final JpaSceneRepository jpaSceneRepository;
+    private final com.novel.splitter.domain.repository.SceneRepository sceneRepository;
 
     @Override
     public List<NovelStatRecordDto> getNovelStats() {
-        List<Object[]> sceneCounts = jpaSceneRepository.countScenesByNovelAndVersion();
+        List<Object[]> sceneCounts = sceneRepository.countScenesByNovelAndVersion();
 
         // Map: novelName -> map of version -> count
         Map<String, Map<String, Long>> novelVersionCounts = new HashMap<>();
@@ -250,13 +249,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
             novel.getStatus() == NovelStatus.SPLITTING) {
             throw new IllegalStateException("小说正在切分中，请稍后再试");
         }
-        return jpaSceneRepository.findAll((root, query, cb) -> {
-            return cb.and(
-                cb.equal(root.get("novel").get("id"), novelId),
-                cb.equal(root.get("chapter").get("id"), chapterId)
-            );
-        }).stream()
-          .map(com.novel.splitter.infrastructure.persistence.mapper.SceneMapper.INSTANCE::toDomain)
+        return sceneRepository.findByNovelIdAndChapterId(novelId, chapterId).stream()
           .map(com.novel.splitter.application.mapper.DtoMapper.INSTANCE::toSceneDto)
           .collect(Collectors.toList());
     }

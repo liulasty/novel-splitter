@@ -14,6 +14,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -118,5 +121,53 @@ public class SceneRepositoryJpaImpl implements SceneRepository {
     public List<Scene> findByNovel(String novelName) {
         List<JpaSceneEntity> entities = jpaSceneRepository.findByNovelName(novelName);
         return entities.stream().map(sceneMapper::toDomain).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public void deleteAll() {
+        jpaSceneRepository.deleteAll();
+    }
+
+    @Override
+    public long countByNovelNameAndVersion(String novelName, String version) {
+        return jpaSceneRepository.countByNovelNameAndVersion(novelName, version);
+    }
+
+    @Override
+    public Page<Scene> findLightweightScenes(Pageable pageable) {
+        // Here we map the DTO returned by JpaSceneRepository to Domain Scene
+        // We'll construct dummy Scene objects to satisfy Domain contract or return partial models
+        return jpaSceneRepository.findLightweightScenes(pageable)
+                .map(dto -> {
+                    Scene scene = new Scene();
+                    scene.setId(dto.getId() != null ? String.valueOf(dto.getId()) : null);
+                    scene.setChapterIndex(dto.getChapterIndex() != null ? dto.getChapterIndex() : 0);
+                    // store type in chapterTitle as a hack for now, or just set it if domain adds type
+                    scene.setChapterTitle(dto.getType());
+                    scene.setWordCount(dto.getTokenCount() != null ? dto.getTokenCount() : 0);
+                    scene.setText(dto.getTextContent());
+                    return scene;
+                });
+    }
+
+    @Override
+    public Page<Scene> findByNovelId(String novelId, Pageable pageable) {
+        return jpaSceneRepository.findByNovelId(novelId, pageable).map(sceneMapper::toDomain);
+    }
+
+    @Override
+    public List<Scene> findByNovelIdAndChapterId(String novelId, Long chapterId) {
+        return jpaSceneRepository.findAll((root, query, cb) -> {
+            return cb.and(
+                cb.equal(root.get("novel").get("id"), novelId),
+                cb.equal(root.get("chapter").get("id"), chapterId)
+            );
+        }).stream().map(sceneMapper::toDomain).collect(Collectors.toList());
+    }
+
+    @Override
+    public List<Object[]> countScenesByNovelAndVersion() {
+        return jpaSceneRepository.countScenesByNovelAndVersion();
     }
 }

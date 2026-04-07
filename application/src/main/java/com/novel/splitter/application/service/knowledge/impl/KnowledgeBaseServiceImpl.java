@@ -12,7 +12,6 @@ import com.novel.splitter.domain.repository.SceneRepository;
 import com.novel.splitter.application.model.dto.VectorPreviewRecordDto;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import com.novel.splitter.infrastructure.persistence.repository.JpaSceneRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -30,7 +29,6 @@ import java.util.List;
 public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
 
     private final SceneRepository sceneRepository;
-    private final JpaSceneRepository jpaSceneRepository; // For lightweight custom queries, acceptable or wrap in Domain Repo
     private final VectorStore vectorStore;
     private final CleanupTaskRepository cleanupTaskRepository;
     private final RabbitTemplate rabbitTemplate;
@@ -40,7 +38,28 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
 
     @Override
     public Page<VectorPreviewRecordDto> getLightweightScenes(Pageable pageable) {
-        return jpaSceneRepository.findLightweightScenes(pageable);
+        return sceneRepository.findLightweightScenes(pageable).map(scene -> new VectorPreviewRecordDto() {
+            @Override
+            public Long getId() {
+                return scene.getId() != null ? Long.valueOf(scene.getId()) : null;
+            }
+            @Override
+            public Integer getChapterIndex() {
+                return scene.getChapterIndex();
+            }
+            @Override
+            public String getType() {
+                return scene.getChapterTitle(); // Using chapterTitle as type hack from JpaImpl
+            }
+            @Override
+            public Integer getTokenCount() {
+                return scene.getWordCount();
+            }
+            @Override
+            public String getTextContent() {
+                return scene.getText();
+            }
+        });
     }
 
     @Override

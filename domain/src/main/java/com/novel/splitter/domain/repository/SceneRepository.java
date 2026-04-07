@@ -1,6 +1,9 @@
 package com.novel.splitter.domain.repository;
 
 import com.novel.splitter.domain.model.Scene;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import java.util.List;
 
 /**
@@ -57,6 +60,11 @@ public interface SceneRepository {
     void deleteNovel(String novelName);
 
     /**
+     * 删除所有数据
+     */
+    void deleteAll();
+
+    /**
      * 获取指定小说的所有版本列表
      * @param novelName 小说名称
      * @return 版本列表
@@ -69,4 +77,36 @@ public interface SceneRepository {
      * @return Scene 列表
      */
     List<Scene> findByNovel(String novelName);
+
+    /**
+     * 统计指定小说和版本下的场景数量
+     * @param novelName 小说名称
+     * @param version 版本
+     * @return 数量
+     */
+    long countByNovelNameAndVersion(String novelName, String version);
+
+    /**
+     * 分页查询轻量级场景信息，供前端列表/预览使用
+     * 这里的返回类型应该是一个纯净的 DTO 或者是 Domain 模型投影，但为兼容当前项目结构先用 Object 数组或 Domain 投射
+     */
+    Page<Scene> findLightweightScenes(Pageable pageable);
+
+    /**
+     * 根据小说 ID 分页获取场景
+     * @param novelId 小说 ID
+     * @param pageable 分页参数
+     * @return 场景分页
+     */
+    Page<Scene> findByNovelId(String novelId, Pageable pageable);
+
+    /**
+     * 根据小说 ID 和章节 ID 获取所有场景
+     */
+    List<Scene> findByNovelIdAndChapterId(String novelId, Long chapterId);
+    /**
+     * 统计所有小说和版本下的场景数量，返回格式为 Object[] {novelName, version, count}
+     * @return 统计结果列表
+     */
+    List<Object[]> countScenesByNovelAndVersion();
 }
