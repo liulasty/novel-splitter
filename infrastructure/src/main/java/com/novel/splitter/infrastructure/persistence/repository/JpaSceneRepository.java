@@ -24,6 +24,8 @@ public interface JpaSceneRepository extends JpaRepository<JpaSceneEntity, Long>,
     List<JpaSceneEntity> findBySceneIdIn(List<String> sceneIds);
 
     List<JpaSceneEntity> findByNovelNameAndVersion(String novelName, String version);
+    
+    List<JpaSceneEntity> findByNovelIdAndEmbedStatus(String novelId, String embedStatus);
 
     Page<JpaSceneEntity> findByNovelId(String novelId, Pageable pageable);
 

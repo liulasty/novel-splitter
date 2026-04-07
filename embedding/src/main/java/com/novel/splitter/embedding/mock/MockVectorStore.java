@@ -54,21 +54,24 @@ public class MockVectorStore implements VectorStore {
     }
 
     @Override
-    public void save(Scene scene, float[] embedding) {
+    public String save(Scene scene, float[] embedding) {
         log.debug("Mock saving scene: {} (Vector dim: {})", scene.getId(), embedding.length);
         index.put(scene.getId(), embedding);
         if (scene.getMetadata() != null) {
             metadataMap.put(scene.getId(), scene.getMetadata());
         }
         ids.add(scene.getId());
+        return scene.getId();
     }
 
     @Override
-    public void saveBatch(List<Scene> scenes, List<float[]> embeddings) {
+    public List<String> saveBatch(List<Scene> scenes, List<float[]> embeddings) {
         log.info("Mock saving batch of {} scenes", scenes.size());
+        List<String> savedIds = new ArrayList<>(scenes.size());
         for (int i = 0; i < scenes.size(); i++) {
-            save(scenes.get(i), embeddings.get(i));
+            savedIds.add(save(scenes.get(i), embeddings.get(i)));
         }
+        return savedIds;
     }
 
     @Override

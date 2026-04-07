@@ -33,6 +33,11 @@ public class Scene {
     private int chapterIndex;
 
     /**
+     * 片段绝对序号（全局排序用）
+     */
+    private int chunkIndex;
+
+    /**
      * 起始段落索引（全局 RawParagraph index）
      */
     private int startParagraphIndex;
@@ -68,6 +73,16 @@ public class Scene {
      * 元数据
      */
     private SceneMetadata metadata;
+
+    /**
+     * 向量化状态 (PENDING, SUCCESS, FAILED)
+     */
+    private String embedStatus = "PENDING";
+
+    /**
+     * 底层向量数据库对应的 Document ID
+     */
+    private String vectorId;
 
     /**
      * 检索评分 (非持久化字段，运行时注入)

@@ -61,8 +61,9 @@ public class ChromaVectorStore implements VectorStore {
     }
 
     @Override
-    public void save(Scene scene, float[] embedding) {
-        saveBatch(Collections.singletonList(scene), Collections.singletonList(embedding));
+    public String save(Scene scene, float[] embedding) {
+        List<String> ids = saveBatch(Collections.singletonList(scene), Collections.singletonList(embedding));
+        return ids != null && !ids.isEmpty() ? ids.get(0) : null;
     }
 
     /**
@@ -70,12 +71,13 @@ public class ChromaVectorStore implements VectorStore {
      *
      * @param scenes     场景对象列表
      * @param embeddings 对应的向量列表
+     * @return 向量库中生成的 Document ID 列表，顺序与 scenes 一致
      */
     @Override
-    public void saveBatch(List<Scene> scenes, List<float[]> embeddings) {
+    public List<String> saveBatch(List<Scene> scenes, List<float[]> embeddings) {
         ensureCollectionExists();
 
-        if (scenes.isEmpty()) return;
+        if (scenes.isEmpty()) return Collections.emptyList();
 
         List<String> ids = scenes.stream().map(Scene::getId).collect(Collectors.toList());
         List<Map<String, Object>> metadatas = scenes.stream()
@@ -130,6 +132,7 @@ public class ChromaVectorStore implements VectorStore {
                 .toBodilessEntity();
         
         log.info("Saved {} vectors to ChromaDB collection '{}'", scenes.size(), collectionName);
+        return ids;
     }
 
     /**

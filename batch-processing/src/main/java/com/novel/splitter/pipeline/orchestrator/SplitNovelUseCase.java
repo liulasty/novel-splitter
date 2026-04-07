@@ -80,8 +80,12 @@ public class SplitNovelUseCase {
                 chunkedScenes.addAll(chunkingStrategy.split(s));
             }
             
+            // Set absolute chunk index for ordering
+            for (Scene s : chunkedScenes) {
+                s.setChunkIndex(scenesCount++);
+            }
+            
             scenes.addAll(chunkedScenes);
-            scenesCount += chunkedScenes.size();
             
             if (progressCallback != null && (i % 10 == 0 || i == totalChapters - 1)) {
                 int progress = IngestProgress.calc(IngestProgress.SCENE_START, IngestProgress.SCENE_END, i + 1, totalChapters);

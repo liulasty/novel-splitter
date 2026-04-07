@@ -130,25 +130,28 @@ public class InMemoryVectorStore implements VectorStore {
     }
 
     @Override
-    public void save(Scene scene, float[] embedding) {
+    public String save(Scene scene, float[] embedding) {
         if (scene == null || scene.getId() == null) {
             log.warn("Cannot save null scene or scene with null ID");
-            return;
+            return null;
         }
         vectorMap.put(scene.getId(), embedding);
         if (scene.getMetadata() != null) {
             metadataMap.put(scene.getId(), scene.getMetadata());
         }
+        return scene.getId();
     }
 
     @Override
-    public void saveBatch(List<Scene> scenes, List<float[]> embeddings) {
+    public List<String> saveBatch(List<Scene> scenes, List<float[]> embeddings) {
         if (scenes.size() != embeddings.size()) {
             throw new IllegalArgumentException("Scenes and embeddings size mismatch");
         }
+        List<String> ids = new ArrayList<>(scenes.size());
         for (int i = 0; i < scenes.size(); i++) {
-            save(scenes.get(i), embeddings.get(i));
+            ids.add(save(scenes.get(i), embeddings.get(i)));
         }
+        return ids;
     }
 
     @Override

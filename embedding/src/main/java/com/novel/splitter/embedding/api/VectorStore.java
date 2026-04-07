@@ -18,13 +18,15 @@ public interface VectorStore {
      *
      * @param scene     场景对象
      * @param embedding 对应的向量
+     * @return 向量库中生成的 Document ID
      */
-    void save(Scene scene, float[] embedding);
+    String save(Scene scene, float[] embedding);
 
     /**
      * 批量保存
+     * @return 向量库中生成的 Document ID 列表，顺序与 scenes 一致
      */
-    void saveBatch(List<Scene> scenes, List<float[]> embeddings);
+    List<String> saveBatch(List<Scene> scenes, List<float[]> embeddings);
 
     /**
      * 相似度检索 (Semantic Search)

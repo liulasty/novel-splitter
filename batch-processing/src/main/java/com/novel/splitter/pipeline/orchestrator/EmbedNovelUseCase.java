@@ -39,9 +39,25 @@ public class EmbedNovelUseCase {
             if (validScenes.isEmpty()) return;
 
             List<float[]> embeddings = embeddingService.embedBatch(texts);
-            vectorStore.saveBatch(validScenes, embeddings);
+            List<String> vectorIds = vectorStore.saveBatch(validScenes, embeddings);
+            
+            if (vectorIds != null && vectorIds.size() == validScenes.size()) {
+                for (int i = 0; i < validScenes.size(); i++) {
+                    Scene scene = validScenes.get(i);
+                    String vectorId = vectorIds.get(i);
+                    sceneRepository.updateEmbedStatus(Long.valueOf(scene.getId()), "SUCCESS", vectorId);
+                }
+            } else {
+                log.warn("Vector IDs returned do not match valid scenes count.");
+                for (Scene scene : validScenes) {
+                    sceneRepository.updateEmbedStatus(Long.valueOf(scene.getId()), "FAILED", null);
+                }
+            }
         } catch (Exception e) {
             log.error("Error processing embed batch (Scene IDs: {}-...)", sceneIds.get(0), e);
+            for (Long sceneId : sceneIds) {
+                sceneRepository.updateEmbedStatus(sceneId, "FAILED", null);
+            }
             throw new RuntimeException("Batch embed processing failed", e);
         }
     }

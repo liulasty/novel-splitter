@@ -159,11 +159,28 @@ public class SceneRepositoryJpaImpl implements SceneRepository {
     @Override
     public List<Scene> findByNovelIdAndChapterId(String novelId, Long chapterId) {
         return jpaSceneRepository.findAll((root, query, cb) -> {
+            query.orderBy(cb.asc(root.get("chunkIndex")));
             return cb.and(
                 cb.equal(root.get("novel").get("id"), novelId),
                 cb.equal(root.get("chapter").get("id"), chapterId)
             );
         }).stream().map(sceneMapper::toDomain).collect(Collectors.toList());
+    }
+
+    @Override
+    public List<Scene> findByNovelIdAndEmbedStatus(String novelId, String embedStatus) {
+        List<JpaSceneEntity> entities = jpaSceneRepository.findByNovelIdAndEmbedStatus(novelId, embedStatus);
+        return entities.stream().map(sceneMapper::toDomain).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public void updateEmbedStatus(Long sceneId, String embedStatus, String vectorId) {
+        jpaSceneRepository.findById(sceneId).ifPresent(entity -> {
+            entity.setEmbedStatus(embedStatus);
+            entity.setVectorId(vectorId);
+            jpaSceneRepository.save(entity);
+        });
     }
 
     @Override

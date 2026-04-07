@@ -44,6 +44,9 @@ public class JpaSceneEntity {
     @Column(name = "chapter_index")
     private int chapterIndex;
 
+    @Column(name = "chunk_index")
+    private int chunkIndex;
+
     @Column(name = "start_paragraph_index")
     private int startParagraphIndex;
 
@@ -65,6 +68,13 @@ public class JpaSceneEntity {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "metadata_json", columnDefinition = "jsonb")
     private String metadataJson;
+
+    @Column(name = "embed_status")
+    @Builder.Default
+    private String embedStatus = "PENDING";
+
+    @Column(name = "vector_id")
+    private String vectorId;
 
     @Column(name = "is_deleted", nullable = false)
     @Builder.Default

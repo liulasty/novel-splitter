@@ -105,8 +105,19 @@ public interface SceneRepository {
      */
     List<Scene> findByNovelIdAndChapterId(String novelId, Long chapterId);
     /**
-     * 统计所有小说和版本下的场景数量，返回格式为 Object[] {novelName, version, count}
-     * @return 统计结果列表
+     * 根据小说 ID 和向量化状态获取场景
+     * @param novelId 小说 ID
+     * @param embedStatus 向量化状态 (PENDING, SUCCESS, FAILED)
+     * @return 场景列表
      */
+    List<Scene> findByNovelIdAndEmbedStatus(String novelId, String embedStatus);
+
+    /**
+     * 更新场景的向量化状态和文档ID
+     * @param sceneId 场景内部自增 ID
+     * @param embedStatus 向量化状态
+     * @param vectorId 向量库 Document ID
+     */
+    void updateEmbedStatus(Long sceneId, String embedStatus, String vectorId);
     List<Object[]> countScenesByNovelAndVersion();
 }
