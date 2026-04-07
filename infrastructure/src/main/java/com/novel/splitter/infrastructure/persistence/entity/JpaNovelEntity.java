@@ -1,4 +1,4 @@
-package com.novel.splitter.domain.entity;
+package com.novel.splitter.infrastructure.persistence.entity;
 
 import com.novel.splitter.domain.enums.NovelStatus;
 import jakarta.persistence.*;

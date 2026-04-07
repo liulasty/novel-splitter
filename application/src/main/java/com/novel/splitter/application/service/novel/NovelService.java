@@ -1,6 +1,6 @@
 package com.novel.splitter.application.service.novel;
 
-import com.novel.splitter.domain.entity.JpaNovelEntity;
+import com.novel.splitter.domain.model.Novel;
 import com.novel.splitter.domain.enums.NovelStatus;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -35,10 +35,10 @@ public interface NovelService {
      * @param novelId 小说ID
      * @return 小说实体
      */
-    JpaNovelEntity getNovelById(String novelId);
+    Novel getNovelById(String novelId);
 
     /**
      * 获取所有小说
      */
-    List<JpaNovelEntity> listNovels();
+    List<Novel> listNovels();
 }

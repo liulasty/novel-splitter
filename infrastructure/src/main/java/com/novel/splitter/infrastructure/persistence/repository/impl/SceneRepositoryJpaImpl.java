@@ -1,16 +1,14 @@
-package com.novel.splitter.repository.impl;
+package com.novel.splitter.infrastructure.persistence.repository.impl;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.novel.splitter.domain.entity.JpaChapterEntity;
-import com.novel.splitter.domain.entity.JpaNovelEntity;
 import com.novel.splitter.domain.model.Scene;
-import com.novel.splitter.domain.model.SceneMetadata;
-import com.novel.splitter.repository.api.JpaChapterRepository;
-import com.novel.splitter.repository.api.JpaNovelRepository;
-import com.novel.splitter.repository.api.JpaSceneRepository;
-import com.novel.splitter.repository.api.SceneRepository;
-import com.novel.splitter.domain.entity.JpaSceneEntity;
+import com.novel.splitter.domain.repository.SceneRepository;
+import com.novel.splitter.infrastructure.persistence.entity.JpaChapterEntity;
+import com.novel.splitter.infrastructure.persistence.entity.JpaNovelEntity;
+import com.novel.splitter.infrastructure.persistence.entity.JpaSceneEntity;
+import com.novel.splitter.infrastructure.persistence.mapper.SceneMapper;
+import com.novel.splitter.infrastructure.persistence.repository.JpaChapterRepository;
+import com.novel.splitter.infrastructure.persistence.repository.JpaNovelRepository;
+import com.novel.splitter.infrastructure.persistence.repository.JpaSceneRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -25,12 +23,12 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class SceneRepositoryImpl implements SceneRepository {
+public class SceneRepositoryJpaImpl implements SceneRepository {
 
     private final JpaSceneRepository jpaSceneRepository;
     private final JpaNovelRepository jpaNovelRepository;
     private final JpaChapterRepository jpaChapterRepository;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final SceneMapper sceneMapper = SceneMapper.INSTANCE;
 
     @Override
     public List<Long> saveScenes(String novelId, String novelName, String version, List<Scene> scenes) {
@@ -50,18 +48,14 @@ public class SceneRepositoryImpl implements SceneRepository {
         final JpaNovelEntity finalNovelEntity = novelEntity;
         
         List<JpaSceneEntity> entities = scenes.stream().map(scene -> {
-            JpaSceneEntity entity = new JpaSceneEntity();
-            entity.setSceneId(scene.getId());
+            if (scene.getMetadata() != null) {
+                scene.getMetadata().setNovel(novelName);
+                scene.getMetadata().setVersion(version);
+            }
+            
+            JpaSceneEntity entity = sceneMapper.toEntity(scene);
             entity.setNovelName(novelName);
             entity.setVersion(version);
-            entity.setChapterTitle(scene.getChapterTitle());
-            entity.setChapterIndex(scene.getChapterIndex());
-            entity.setStartParagraphIndex(scene.getStartParagraphIndex());
-            entity.setEndParagraphIndex(scene.getEndParagraphIndex());
-            entity.setText(scene.getText());
-            entity.setWordCount(scene.getWordCount());
-            entity.setPrefixContext(scene.getPrefixContext());
-            entity.setCanSplit(scene.isCanSplit());
             
             if (finalNovelEntity != null) {
                 entity.setNovel(finalNovelEntity);
@@ -71,15 +65,6 @@ public class SceneRepositoryImpl implements SceneRepository {
                 entity.setChapter(chapterEntity);
             }
 
-            try {
-                if (scene.getMetadata() != null) {
-                    scene.getMetadata().setNovel(novelName);
-                    scene.getMetadata().setVersion(version);
-                    entity.setMetadataJson(objectMapper.writeValueAsString(scene.getMetadata()));
-                }
-            } catch (JsonProcessingException e) {
-                log.error("Failed to serialize metadata for scene: {}", scene.getId(), e);
-            }
             return entity;
         }).collect(Collectors.toList());
 
@@ -97,19 +82,19 @@ public class SceneRepositoryImpl implements SceneRepository {
     @Override
     public List<Scene> loadScenes(String novelName, String version) {
         List<JpaSceneEntity> entities = jpaSceneRepository.findByNovelNameAndVersion(novelName, version);
-        return entities.stream().map(this::toScene).collect(Collectors.toList());
+        return entities.stream().map(sceneMapper::toDomain).collect(Collectors.toList());
     }
 
     @Override
     public List<Scene> findByIds(List<Long> ids) {
         List<JpaSceneEntity> entities = jpaSceneRepository.findByIdIn(ids);
-        return entities.stream().map(this::toScene).collect(Collectors.toList());
+        return entities.stream().map(sceneMapper::toDomain).collect(Collectors.toList());
     }
 
     @Override
     public List<Scene> findBySceneIds(List<String> sceneIds) {
         List<JpaSceneEntity> entities = jpaSceneRepository.findBySceneIdIn(sceneIds);
-        return entities.stream().map(this::toScene).collect(Collectors.toList());
+        return entities.stream().map(sceneMapper::toDomain).collect(Collectors.toList());
     }
 
     @Override
@@ -132,29 +117,6 @@ public class SceneRepositoryImpl implements SceneRepository {
     @Override
     public List<Scene> findByNovel(String novelName) {
         List<JpaSceneEntity> entities = jpaSceneRepository.findByNovelName(novelName);
-        return entities.stream().map(this::toScene).collect(Collectors.toList());
-    }
-
-    private Scene toScene(JpaSceneEntity entity) {
-        Scene scene = new Scene();
-        scene.setId(entity.getSceneId());
-        scene.setChapterTitle(entity.getChapterTitle());
-        scene.setChapterIndex(entity.getChapterIndex());
-        scene.setStartParagraphIndex(entity.getStartParagraphIndex());
-        scene.setEndParagraphIndex(entity.getEndParagraphIndex());
-        scene.setText(entity.getText());
-        scene.setWordCount(entity.getWordCount());
-        scene.setPrefixContext(entity.getPrefixContext());
-        scene.setCanSplit(entity.isCanSplit());
-        
-        if (entity.getMetadataJson() != null) {
-            try {
-                SceneMetadata metadata = objectMapper.readValue(entity.getMetadataJson(), SceneMetadata.class);
-                scene.setMetadata(metadata);
-            } catch (JsonProcessingException e) {
-                log.error("Failed to deserialize metadata for scene: {}", entity.getSceneId(), e);
-            }
-        }
-        return scene;
+        return entities.stream().map(sceneMapper::toDomain).collect(Collectors.toList());
     }
 }

@@ -1,6 +1,6 @@
-package com.novel.splitter.repository.api;
+package com.novel.splitter.infrastructure.persistence.repository;
 
-import com.novel.splitter.domain.entity.JpaSceneEntity;
+import com.novel.splitter.infrastructure.persistence.entity.JpaSceneEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;

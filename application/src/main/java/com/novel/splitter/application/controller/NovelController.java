@@ -63,13 +63,13 @@ public class NovelController {
      */
     @Operation(summary = "获取小说章节树", description = "获取小说的所有章节层级结构")
     @GetMapping("/{novelId}/chapters")
-    public List<com.novel.splitter.domain.entity.JpaChapterEntity> getChapters(@PathVariable String novelId) {
+    public List<com.novel.splitter.domain.model.Chapter> getChapters(@PathVariable String novelId) {
         return novelFacadeService.getChapters(novelId);
     }
 
     @Operation(summary = "获取章节片段", description = "获取某章节下的所有切分片段 (Scenes)")
     @GetMapping("/{novelId}/chapters/{chapterId}/scenes")
-    public List<com.novel.splitter.domain.entity.JpaSceneEntity> getScenesByChapter(@PathVariable String novelId, @PathVariable Long chapterId) {
+    public List<com.novel.splitter.domain.model.Scene> getScenesByChapter(@PathVariable String novelId, @PathVariable Long chapterId) {
         return novelFacadeService.getScenesByChapter(novelId, chapterId);
     }
     @PostMapping("/{novelId}/split")

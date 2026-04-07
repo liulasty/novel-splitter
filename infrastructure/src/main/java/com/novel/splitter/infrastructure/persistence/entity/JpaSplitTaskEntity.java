@@ -1,4 +1,4 @@
-package com.novel.splitter.domain.entity;
+package com.novel.splitter.infrastructure.persistence.entity;
 
 import com.novel.splitter.domain.task.SplitTask.TaskStatus;
 import jakarta.persistence.*;

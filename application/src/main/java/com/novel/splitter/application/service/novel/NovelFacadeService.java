@@ -22,7 +22,7 @@ public interface NovelFacadeService {
 
     List<com.novel.splitter.domain.model.dto.NovelStatRecordDto> getNovelStats();
 
-    List<com.novel.splitter.domain.entity.JpaChapterEntity> getChapters(String novelId);
+    List<com.novel.splitter.domain.model.Chapter> getChapters(String novelId);
 
-    List<com.novel.splitter.domain.entity.JpaSceneEntity> getScenesByChapter(String novelId, Long chapterId);
+    List<com.novel.splitter.domain.model.Scene> getScenesByChapter(String novelId, Long chapterId);
 }

@@ -1,7 +1,7 @@
 package com.novel.splitter.application.service.novel;
 
-import com.novel.splitter.domain.entity.JpaChapterEntity;
-import com.novel.splitter.repository.api.JpaChapterRepository;
+import com.novel.splitter.domain.model.Chapter;
+import com.novel.splitter.domain.repository.ChapterRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -14,19 +14,19 @@ import java.util.List;
 @Slf4j
 public class ChapterServiceImpl implements ChapterService {
 
-    private final JpaChapterRepository jpaChapterRepository;
+    private final ChapterRepository chapterRepository;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void saveChapters(List<JpaChapterEntity> chapters) {
+    public void saveChapters(List<Chapter> chapters) {
         if (chapters != null && !chapters.isEmpty()) {
-            jpaChapterRepository.saveAll(chapters);
+            chapterRepository.saveAll(chapters);
             log.info("Saved {} chapters in batch.", chapters.size());
         }
     }
 
     @Override
-    public List<JpaChapterEntity> getChaptersByNovelId(String novelId) {
-        return jpaChapterRepository.findByNovelIdOrderByIndexNumAsc(novelId);
+    public List<Chapter> getChaptersByNovelId(String novelId) {
+        return chapterRepository.findByNovelId(novelId);
     }
 }

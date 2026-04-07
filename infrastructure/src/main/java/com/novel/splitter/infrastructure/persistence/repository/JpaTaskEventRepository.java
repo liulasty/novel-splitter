@@ -1,6 +1,6 @@
-package com.novel.splitter.repository.api;
+package com.novel.splitter.infrastructure.persistence.repository;
 
-import com.novel.splitter.domain.entity.JpaTaskEventEntity;
+import com.novel.splitter.infrastructure.persistence.entity.JpaTaskEventEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

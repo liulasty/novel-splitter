@@ -40,6 +40,7 @@
         <junit.version>5.10.1</junit.version>
         <jsoup.version>1.17.2</jsoup.version>
         <picocli.version>4.7.7</picocli.version>
+        <mapstruct.version>1.5.5.Final</mapstruct.version>
     </properties>
 
     <dependencyManagement>
@@ -132,6 +133,16 @@
                 <artifactId>picocli</artifactId>
                 <version>${picocli.version}</version>
             </dependency>
+            <dependency>
+                <groupId>org.mapstruct</groupId>
+                <artifactId>mapstruct</artifactId>
+                <version>${mapstruct.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.mapstruct</groupId>
+                <artifactId>mapstruct-processor</artifactId>
+                <version>${mapstruct.version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -158,8 +169,8 @@
     <!-- pom.xml 中可以这样写 -->
     <repositories>
         <repository>
-            <id>aliyun-public</id>
-            <url>https://maven.aliyun.com/repository/public</url>
+            <id>central</id>
+            <url>https://repo.maven.apache.org/maven2</url>
             <releases><enabled>true</enabled></releases>
             <snapshots><enabled>false</enabled></snapshots>
         </repository>
@@ -167,8 +178,8 @@
 
     <pluginRepositories>
         <pluginRepository>
-            <id>aliyun-public</id>
-            <url>https://maven.aliyun.com/repository/public</url>
+            <id>central</id>
+            <url>https://repo.maven.apache.org/maven2</url>
         </pluginRepository>
     </pluginRepositories>
 

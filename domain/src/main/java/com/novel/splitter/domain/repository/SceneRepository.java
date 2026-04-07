@@ -1,4 +1,4 @@
-package com.novel.splitter.repository.api;
+package com.novel.splitter.domain.repository;
 
 import com.novel.splitter.domain.model.Scene;
 import java.util.List;
