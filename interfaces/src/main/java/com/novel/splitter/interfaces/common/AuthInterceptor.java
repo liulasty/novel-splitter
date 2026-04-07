@@ -1,4 +1,4 @@
-package com.novel.splitter.application.common;
+package com.novel.splitter.interfaces.common;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;

@@ -1,4 +1,4 @@
-package com.novel.splitter.application.controller;
+package com.novel.splitter.interfaces.api;
 
 import com.novel.splitter.retrieval.api.RagFacade;
 import com.novel.splitter.domain.model.Answer;

@@ -1,4 +1,4 @@
-package com.novel.splitter.application.controller;
+package com.novel.splitter.interfaces.api;
 
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;

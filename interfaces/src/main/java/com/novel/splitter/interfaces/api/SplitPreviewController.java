@@ -1,4 +1,4 @@
-package com.novel.splitter.application.controller;
+package com.novel.splitter.interfaces.api;
 
 import com.novel.splitter.core.ContextAwareSegmentBuilder;
 import com.novel.splitter.core.MarkdownParagraphSplitter;

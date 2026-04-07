@@ -1,4 +1,4 @@
-package com.novel.splitter.application.common;
+package com.novel.splitter.interfaces.common;
 
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;

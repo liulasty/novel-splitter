@@ -1,6 +1,6 @@
-package com.novel.splitter.application.config;
+package com.novel.splitter.interfaces.config;
 
-import com.novel.splitter.application.common.AuthInterceptor;
+import com.novel.splitter.interfaces.common.AuthInterceptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;

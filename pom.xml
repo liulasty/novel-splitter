@@ -22,6 +22,7 @@
         <module>context-assembler</module>
         <module>llm-client</module>
         <module>application</module>
+        <module>interfaces</module>
     </modules>
 
     <properties>

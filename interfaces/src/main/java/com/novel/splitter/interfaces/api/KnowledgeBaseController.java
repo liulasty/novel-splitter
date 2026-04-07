@@ -1,4 +1,4 @@
-package com.novel.splitter.application.controller;
+package com.novel.splitter.interfaces.api;
 
 import com.novel.splitter.application.service.knowledge.KnowledgeBaseService;
 import com.novel.splitter.domain.model.Scene;

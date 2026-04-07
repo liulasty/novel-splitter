@@ -1,4 +1,4 @@
-package com.novel.splitter.application.common;
+package com.novel.splitter.interfaces.common;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
