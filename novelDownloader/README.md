@@ -1,8 +1,47 @@
-## novelDownloader
+# novelDownloader
 
-`novelDownloader` 模块是本系统数据接入的“排头兵”，主要负责从外部网络资源（如各类小说网站）自动化地获取原始文本数据。其核心职责是封装底层网络通信与 HTML 网页解析逻辑，为系统提供稳定、高效的小说抓取能力。该模块的主要功能包括：支持根据指定的 URL 发起 HTTP 请求，利用网络爬虫技术提取网页中的小说正文内容，并进行初步的格式清洗（如去除多余的 HTML 标签、广告和乱码）。为了实现这一目标，该模块在对外依赖上引入了强大的 `jsoup` 第三方库，利用其便捷的 DOM 解析能力来精准定位并提取目标文本。此外，它提供了统一的下载接口设计，使得系统可以针对不同的小说网站快速扩展对应的爬取规则与防反爬策略，极大地丰富了系统的输入数据源。
+## 模块概述
+作为项目的数据抓取工具，负责从指定的小说网站抓取目录结构及章节正文内容，并将解析后的文本持久化到本地存储系统中，供后续流水线处理。
 
-**典型使用场景与入口类说明：**
-* 核心接口为 `NovelDownloader`，它定义了根据目标 URL 或网站规则获取小说文本的标准方法。
-* 典型实现类如 `GeneralJsoupDownloader`，作为通用下载器处理标准网页的抓取任务。
-* 通常作为整个数据处理流水线（Pipeline）的最前置触发点，用户提交小说链接后，应用层首先调用此模块获取纯文本原文，随后再移交至加载与拆分环节。
+## 核心职责
+- **网页内容抓取与解析**：利用 Jsoup 解析目标网页的 HTML 结构，精准抽取小说标题、章节目录列表（URL）、以及每一章的核心正文内容。
+- **基于配置的动态适配**：通过 `application.yml` 中定义的 `downloader.sites` 节点，动态读取目标网站的域名、目录页选择器、内容选择器和翻页规则。
+- **并发与下载策略**：提供统一的 `NovelDownloader` 接口和 `AbstractDownloader` 模板类，管理并发抓取线程（如 ThreadPool）及失败重试机制。
+- **持久化管理**：将清洗后的无格式纯文本（或 Markdown）按既定规则交给 `infrastructure` 层的工具写入本地磁盘。
+
+## 技术栈
+- 核心语言：Java 21
+- 主要依赖：Jsoup, Commons Lang3
+
+## 模块依赖
+- 本模块依赖的内部子模块：`domain`, `infrastructure`
+- 依赖本模块的内部子模块：`application`
+
+## 核心组件
+| 组件名称 | 类型 | 核心职责 |
+|----------|------|----------|
+| `NovelDownloader` | 接口 | 暴露给上层的核心服务契约，定义了基于 URL 下载整本小说及监听下载进度的方法。 |
+| `DownloaderFactory` | 工厂类 | 根据输入的 URL 域名，自动匹配并实例化合适的下载器实现类。 |
+| `AbstractDownloader` | 抽象类 | 提供公共的下载控制流程（如 HTTP 客户端初始化、并发调度、限流重试）。 |
+| `GeneralJsoupDownloader` | 实现类 | 基于 Jsoup 和 CSS 选择器（如 `#content`, `.chapter-list a`）实现通用的小说内容抽取。 |
+
+## 使用示例
+```java
+// 从工厂获取对应的下载器
+NovelDownloader downloader = DownloaderFactory.getDownloader("https://www.example.com/book/123");
+
+// 启动下载，并保存至指定路径
+Path savedPath = downloader.downloadNovel(
+    "https://www.example.com/book/123",
+    Path.of("/data/novel-storage/example_novel.txt"),
+    progress -> System.out.println("当前下载进度：" + progress)
+);
+```
+
+## 扩展点
+- **扩展点 1**：对于反爬极其严格的站点，可继承 `AbstractDownloader` 实现基于 Playwright 或 Selenium 的无头浏览器下载器（Headless Browser Downloader）。
+- **扩展点 2**：在 `DownloaderFactory` 注册新的特定网站（如起点、晋江）的深度定制解析器。
+
+## 注意事项
+- **注意 1**：由于目标站点结构可能随时变更，`application.yml` 中的 CSS 选择器规则需保持灵活且可热加载。
+- **注意 2**：高并发抓取容易触发目标网站的 IP 封禁，必须在 `downloader` 配置中严格遵守 `thread-count` 和合理的 `timeout-ms`、延时策略。
