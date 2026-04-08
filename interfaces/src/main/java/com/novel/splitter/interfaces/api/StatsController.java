@@ -17,15 +17,15 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class StatsController {
 
-    @Operation(summary = "获取 Dashboard 统计信息")
+    @Operation(summary = "获取 Dashboard 统计信息 (目前由于没有 qa 历史表，返回空数据)")
     @GetMapping("/stats/dashboard")
     public Map<String, Object> getDashboardStats() {
-        // 由于没有设计 qa 历史表，返回模拟数据以满足 P1 阶段前端对接需求
+        // P2 任务：清理 mock 数据。由于没有设计 qa 历史表，目前前端已隐藏相关展示，后端返回空数据或默认值。
         return Map.of(
-                "qaCount", 1250,
-                "todayQaCount", 42,
-                "avgRetrievalTimeMs", 215,
-                "retrievalTimeTrend", "↓ 18%"
+                "qaCount", 0,
+                "todayQaCount", 0,
+                "avgRetrievalTimeMs", 0,
+                "retrievalTimeTrend", "--"
         );
     }
 

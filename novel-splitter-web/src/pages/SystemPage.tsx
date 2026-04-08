@@ -102,7 +102,8 @@ export default function SystemPage() {
                     </CardContent>
                 </Card>
 
-                <Card className="bg-blue-50/50 border-blue-100">
+                {/* P2 任务：由于后端尚未实现问答历史记录，暂时隐藏问答相关的模拟数据卡片 */}
+                {/* <Card className="bg-blue-50/50 border-blue-100">
                     <CardContent className="p-6">
                         <div className="text-xs font-semibold text-blue-500 uppercase tracking-wider mb-2">问答次数</div>
                         <div className="text-3xl font-bold text-blue-900">
@@ -120,7 +121,7 @@ export default function SystemPage() {
                         </div>
                         <div className="text-xs text-amber-600/70 mt-2">{dashboardStats?.retrievalTimeTrend ?? '--'}</div>
                     </CardContent>
-                </Card>
+                </Card> */}
             </div>
 
             <div className="grid gap-6 md:grid-cols-2">
