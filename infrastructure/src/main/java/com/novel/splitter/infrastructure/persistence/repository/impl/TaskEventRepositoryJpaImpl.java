@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -16,12 +17,12 @@ import java.util.stream.Collectors;
 public class TaskEventRepositoryJpaImpl implements TaskEventRepository {
 
     private final JpaTaskEventRepository jpaTaskEventRepository;
-    private final TaskEventMapper mapper = TaskEventMapper.INSTANCE;
+    private final TaskEventMapper mapper;
 
     @Override
     public void save(TaskProgressEvent event) {
         JpaTaskEventEntity entity = mapper.toEntity(event);
-        jpaTaskEventRepository.save(entity);
+        jpaTaskEventRepository.save(Objects.requireNonNull(entity, "entity must not be null"));
     }
 
     @Override

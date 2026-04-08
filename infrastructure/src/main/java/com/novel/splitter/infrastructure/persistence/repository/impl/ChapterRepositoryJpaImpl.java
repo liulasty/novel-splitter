@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -19,13 +20,13 @@ public class ChapterRepositoryJpaImpl implements ChapterRepository {
 
     private final JpaChapterRepository jpaChapterRepository;
     private final JpaNovelRepository jpaNovelRepository;
-    private final ChapterMapper chapterMapper = ChapterMapper.INSTANCE;
+    private final ChapterMapper chapterMapper;
 
     @Override
     public void saveAll(List<Chapter> chapters) {
         if (chapters.isEmpty()) return;
         
-        String novelId = chapters.get(0).getNovelId();
+        String novelId = Objects.requireNonNull(chapters.get(0).getNovelId(), "novelId must not be null");
         JpaNovelEntity novel = jpaNovelRepository.findById(novelId).orElse(null);
         
         List<JpaChapterEntity> entities = chapters.stream().map(c -> {
@@ -36,7 +37,7 @@ public class ChapterRepositoryJpaImpl implements ChapterRepository {
             return entity;
         }).collect(Collectors.toList());
         
-        jpaChapterRepository.saveAll(entities);
+        jpaChapterRepository.saveAll(Objects.requireNonNull(entities, "entities must not be null"));
     }
 
     @Override

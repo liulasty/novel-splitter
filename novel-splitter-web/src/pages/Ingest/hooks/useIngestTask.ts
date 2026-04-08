@@ -36,8 +36,8 @@ export function useIngestTask() {
     });
 
     // Task Poller
-    const { addActiveTask, polledTasks } = useTaskPoller(tasks);
-    const activeTasks = polledTasks || [];
+    const { addActiveTask, polledTasks, poller, manualRefresh } = useTaskPoller(tasks, currentNovelId);
+    const activeTasks = polledTasks;
 
     // Mutations
     const uploadMutation = useMutation({
@@ -181,6 +181,7 @@ export function useIngestTask() {
             isError,
             tasks,
             activeTasks,
+            poller,
             selectedTaskId,
             isUploading: uploadMutation.isPending,
             isSplitting: splitMutation.isPending,
@@ -201,6 +202,7 @@ export function useIngestTask() {
             handleSplit,
             handleEmbed,
             handleDownloadAndIngest,
+            manualRefresh,
             deleteTask: (id: string) => deleteTaskMutation.mutate(id),
         }
     };

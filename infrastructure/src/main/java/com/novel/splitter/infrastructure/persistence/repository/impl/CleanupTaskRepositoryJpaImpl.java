@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -16,12 +17,12 @@ import java.util.stream.Collectors;
 public class CleanupTaskRepositoryJpaImpl implements CleanupTaskRepository {
 
     private final JpaCleanupTaskRepository jpaCleanupTaskRepository;
-    private final CleanupTaskMapper mapper = CleanupTaskMapper.INSTANCE;
+    private final CleanupTaskMapper mapper;
 
     @Override
     public void save(CleanupTask task) {
         JpaCleanupTaskEntity entity = mapper.toEntity(task);
-        jpaCleanupTaskRepository.save(entity);
+        jpaCleanupTaskRepository.save(Objects.requireNonNull(entity, "entity must not be null"));
     }
 
     @Override
@@ -34,6 +35,6 @@ public class CleanupTaskRepositoryJpaImpl implements CleanupTaskRepository {
 
     @Override
     public java.util.Optional<CleanupTask> findById(Long id) {
-        return jpaCleanupTaskRepository.findById(id).map(mapper::toDomain);
+        return jpaCleanupTaskRepository.findById(Objects.requireNonNull(id, "id must not be null")).map(mapper::toDomain);
     }
 }

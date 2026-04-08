@@ -24,7 +24,7 @@ import java.util.stream.Collectors;
 public class NovelRepositoryJpaImpl implements NovelRepository {
 
     private final JpaNovelRepository jpaNovelRepository;
-    private final NovelMapper novelMapper = NovelMapper.INSTANCE;
+    private final NovelMapper novelMapper;
 
     @Override
     public void save(Novel novel) {

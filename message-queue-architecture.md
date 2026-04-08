@@ -79,6 +79,8 @@ sequenceDiagram
 提供可观测性，目前采用轮询机制。
 *   各个 Worker (Load, Split, Embed) 在处理过程中，通过 `TaskService` 将进度和状态实时更新并持久化到数据库。
 *   前端通过定时（如每 2~3 秒）轮询 Web API 接口读取最新任务状态。考虑到长耗时任务特性，此频率的轮询体验与 SSE 差异不大，且大大降低了系统复杂度。
+*   轮询接口统一为 `GET /api/tasks/poll`，支持 `ids`/`taskIds` 双参数兼容（最多 20 个）与 `novelId` 兜底恢复。
+*   轮询调度为智能策略：`PROCESSING=2s`，仅 `PENDING=3s`，页面隐藏降频 `10s`，隐藏超过 `5min` 暂停，连续失败指数退避并可手动刷新。
 
 ### 3.3 阶段 3：资源清理 (Maintenance Phase)
 保证最终一致性。
@@ -127,12 +129,12 @@ sequenceDiagram
 ```
 
 ### 4.3 TaskProgressEvent
-**用途**: 前端 SSE 推送的实时状态广播事件。
+**用途**: 任务处理链内部进度事件（当前前端不再依赖 SSE，统一使用 Polling）。
 ```json
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "TaskProgressEvent",
-  "description": "用于前端 SSE 推送的实时状态广播事件",
+  "description": "用于任务处理链内部进度记录与状态同步",
   "type": "object",
   "required": ["taskId", "status", "timestamp"],
   "properties": {
@@ -146,6 +148,19 @@ sequenceDiagram
     },
     "timestamp": { "type": "integer", "description": "事件发生的毫秒级时间戳" }
   }
+}
+```
+
+### 4.5 PollingResponse (当前前端查询契约)
+**用途**: 前端轮询任务状态最小字段集响应。
+```json
+{
+  "taskId": "task-123",
+  "status": "PROCESSING",
+  "progress": 42,
+  "message": "正在向量化 42/100",
+  "updatedAt": 1712573000123,
+  "serverTime": 1712573002456
 }
 ```
 

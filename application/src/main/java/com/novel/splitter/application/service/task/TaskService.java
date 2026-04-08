@@ -9,7 +9,6 @@ import com.novel.splitter.application.model.dto.JobStatSummaryDto;
 import com.novel.splitter.application.model.dto.JobRecordDto;
 import com.novel.splitter.application.model.dto.PollResponse;
 import com.novel.splitter.application.port.out.TaskCachePort;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,6 +16,8 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Stream;
 import java.util.stream.Collectors;
 
 @Service
@@ -26,7 +27,6 @@ public class TaskService {
     private final TaskEventRepository taskEventRepository;
     private final TaskCachePort taskCachePort;
 
-    @Autowired
     public TaskService(SplitTaskRepository taskRepository, TaskEventRepository taskEventRepository, TaskCachePort taskCachePort) {
         this.taskRepository = taskRepository;
         this.taskEventRepository = taskEventRepository;
@@ -52,7 +52,50 @@ public class TaskService {
 
     @Transactional(readOnly = true)
     public SplitTask getTask(String taskId) {
-        return taskRepository.findById(taskId).orElse(null);
+        PollResponse cached = taskCachePort.get(taskId);
+        if (cached != null) {
+            SplitTask cachedTask = taskRepository.findById(taskId).orElse(null);
+            if (cachedTask != null) {
+                return cachedTask;
+            }
+        }
+        SplitTask task = taskRepository.findById(taskId).orElse(null);
+        if (task != null) {
+            taskCachePort.put(taskId, toPollResponse(task));
+        }
+        return task;
+    }
+
+    @Transactional(readOnly = true)
+    public List<SplitTask> getTasksByIds(List<String> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        return taskRepository.findByIds(ids);
+    }
+
+    @Transactional(readOnly = true)
+    public List<SplitTask> getRecentTasksByNovelId(String novelId, int limit) {
+        if (novelId == null || novelId.isBlank()) {
+            return List.of();
+        }
+        int normalizedLimit = Math.max(1, Math.min(limit, 50));
+        List<SplitTask> tasks = taskRepository.findRecentByNovelId(novelId, 50);
+        long cutoff = System.currentTimeMillis() - 24L * 60 * 60 * 1000;
+
+        List<SplitTask> nonTerminal = tasks.stream()
+                .filter(task -> task.getStatus() == SplitTask.TaskStatus.PENDING || task.getStatus() == SplitTask.TaskStatus.PROCESSING)
+                .sorted(Comparator.comparing(SplitTask::getUpdatedAt).reversed())
+                .toList();
+        List<SplitTask> recentTerminal = tasks.stream()
+                .filter(task -> task.getStatus() == SplitTask.TaskStatus.SUCCESS || task.getStatus() == SplitTask.TaskStatus.FAILED)
+                .filter(task -> task.getUpdatedAt() >= cutoff)
+                .sorted(Comparator.comparing(SplitTask::getUpdatedAt).reversed())
+                .toList();
+
+        return Stream.concat(nonTerminal.stream(), recentTerminal.stream())
+                .limit(normalizedLimit)
+                .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
@@ -89,14 +132,11 @@ public class TaskService {
             taskRepository.save(task);
 
             // Put task progress to cache for polling
-            taskCachePort.put(taskId, PollResponse.builder()
-                    .taskId(taskId)
-                    .status(status.name())
-                    .progress(progress)
-                    .message(message)
-                    .updatedAt(System.currentTimeMillis())
-                    .serverTime(System.currentTimeMillis())
-                    .build());
+            if (status == SplitTask.TaskStatus.SUCCESS || status == SplitTask.TaskStatus.FAILED) {
+                taskCachePort.evict(taskId);
+            } else {
+                taskCachePort.put(taskId, toPollResponse(task));
+            }
         }
     }
 
@@ -173,5 +213,17 @@ public class TaskService {
 
     public void submitCleanupTask(String novelId) {
         // Implementation provided by LoadWorker or RabbitMQ sending, kept interface compatible
+    }
+
+    private PollResponse toPollResponse(SplitTask task) {
+        Objects.requireNonNull(task, "task must not be null");
+        return PollResponse.builder()
+                .taskId(task.getTaskId())
+                .status(task.getStatus() != null ? task.getStatus().name() : SplitTask.TaskStatus.PENDING.name())
+                .progress(task.getProgress())
+                .message(task.getMessage())
+                .updatedAt(task.getUpdatedAt())
+                .serverTime(System.currentTimeMillis())
+                .build();
     }
 }

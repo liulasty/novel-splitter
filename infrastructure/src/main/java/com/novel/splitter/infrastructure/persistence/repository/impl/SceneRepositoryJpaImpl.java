@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -31,7 +32,7 @@ public class SceneRepositoryJpaImpl implements SceneRepository {
     private final JpaSceneRepository jpaSceneRepository;
     private final JpaNovelRepository jpaNovelRepository;
     private final JpaChapterRepository jpaChapterRepository;
-    private final SceneMapper sceneMapper = SceneMapper.INSTANCE;
+    private final SceneMapper sceneMapper;
 
     @Override
     public List<Long> saveScenes(String novelId, String novelName, String version, List<Scene> scenes) {
@@ -76,7 +77,7 @@ public class SceneRepositoryJpaImpl implements SceneRepository {
         for (int i = 0; i < entities.size(); i += batchSize) {
             int end = Math.min(i + batchSize, entities.size());
             List<JpaSceneEntity> batch = entities.subList(i, end);
-            List<JpaSceneEntity> savedBatch = jpaSceneRepository.saveAll(batch);
+            List<JpaSceneEntity> savedBatch = jpaSceneRepository.saveAll(Objects.requireNonNull(batch, "batch must not be null"));
             savedBatch.forEach(entity -> savedIds.add(entity.getId()));
         }
         return savedIds;

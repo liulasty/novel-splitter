@@ -19,6 +19,12 @@ interface UploadPanelProps {
         ingestStatus: string;
         isError: boolean;
         activeTasks: SplitTask[];
+        poller: {
+            errorCount: number;
+            isPaused: boolean;
+            stuckTaskIds: string[];
+            timeoutTaskIds: string[];
+        };
         isUploading: boolean;
         isSplitting: boolean;
         isEmbedding: boolean;
@@ -33,6 +39,7 @@ interface UploadPanelProps {
         handleSplit: () => void;
         handleEmbed: () => void;
         handleDownloadAndIngest: () => void;
+        manualRefresh: () => Promise<void>;
         setVersion: (version: string) => void;
         setStrategy: (strategy: string) => void;
         setMaxTokens: (tokens: number) => void;
@@ -41,7 +48,7 @@ interface UploadPanelProps {
 }
 
 export function UploadPanel({ state, actions }: UploadPanelProps) {
-    const { activeTab, selectedFile, novelName, downloadUrl, version, strategy, maxTokens, overlapTokens, currentNovelId, ingestStatus, isError, activeTasks, isUploading, isSplitting, isEmbedding, isDownloading } = state;
+    const { activeTab, selectedFile, novelName, downloadUrl, version, strategy, maxTokens, overlapTokens, currentNovelId, ingestStatus, isError, activeTasks, poller, isUploading, isSplitting, isEmbedding, isDownloading } = state;
     const [previewOpen, setPreviewOpen] = useState(false);
 
     return (
@@ -239,7 +246,7 @@ export function UploadPanel({ state, actions }: UploadPanelProps) {
             )}
 
             {/* Polling Status */}
-            <TaskPollerStatus tasks={activeTasks} />
+            <TaskPollerStatus tasks={activeTasks} poller={poller} onManualRefresh={actions.manualRefresh} />
 
             {/* Split Preview Modal */}
             <SplitPreviewModal isOpen={previewOpen} onClose={() => setPreviewOpen(false)} novelId={currentNovelId} />

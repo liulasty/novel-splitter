@@ -3,20 +3,38 @@ import type { SplitTask } from '@/api/taskApi';
 
 interface TaskPollerStatusProps {
   tasks: SplitTask[];
+  poller: {
+    errorCount: number;
+    isPaused: boolean;
+    stuckTaskIds: string[];
+    timeoutTaskIds: string[];
+  };
+  onManualRefresh?: () => Promise<void>;
 }
 
-export function TaskPollerStatus({ tasks }: TaskPollerStatusProps) {
+export function TaskPollerStatus({ tasks, poller, onManualRefresh }: TaskPollerStatusProps) {
   if (!tasks || tasks.length === 0) return null;
 
   return (
     <div className="mt-4 space-y-2">
+      {poller.isPaused && (
+        <div className="flex items-center justify-between p-3 bg-amber-50 border border-amber-200 rounded-xl">
+          <span className="text-xs text-amber-700">
+            轮询因连续失败已暂停（{poller.errorCount} 次），请手动刷新。
+          </span>
+          {onManualRefresh && (
+            <button
+              onClick={() => void onManualRefresh()}
+              className="px-2 py-1 text-xs rounded bg-amber-600 text-white hover:bg-amber-700"
+            >
+              手动刷新
+            </button>
+          )}
+        </div>
+      )}
       {tasks.map(task => {
-        const now = Date.now();
-        const createdAt = task.createdAt || now;
-        const updatedAt = task.updatedAt || createdAt;
-        
-        const isStuck = (now - updatedAt) > 5 * 60 * 1000;
-        const isTimeout = (now - createdAt) > 15 * 60 * 1000;
+        const isStuck = poller.stuckTaskIds.includes(task.taskId);
+        const isTimeout = poller.timeoutTaskIds.includes(task.taskId);
 
         return (
           <div key={task.taskId} className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-xl shadow-sm">
