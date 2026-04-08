@@ -17,27 +17,52 @@ import java.util.List;
  * 2. 增强的对话识别 (支持混合结构)。
  * 3. 动作描写吸附 (Adsorption)。
  * 4. 集成 OnnxEmbeddingService 计算余弦相似度。
+ * 在 NLP 和 RAG 系统中，用于将段落组合成具有上下文连贯性的语义段落（Segment）。
  * </p>
  */
 @Slf4j
 public class ContextAwareSegmentBuilder extends SemanticSegmentBuilder {
 
+    /**
+     * 单个语义段落的最大长度限制，防止生成的片段过长。
+     */
     private static final int MAX_SEGMENT_LENGTH = 800;
     
     private final SpeakerModel speakerModel;
     private final ParagraphRelevanceScorer relevanceScorer;
     private final EmbeddingService embeddingService;
 
+    /**
+     * 默认构造函数。
+     * <p>
+     * 不使用向量嵌入服务，仅依赖基于规则的合并逻辑。
+     * </p>
+     */
     public ContextAwareSegmentBuilder() {
         this(null);
     }
 
+    /**
+     * 带嵌入服务的构造函数。
+     *
+     * @param embeddingService 文本向量化服务，用于计算段落间的余弦相似度
+     */
     public ContextAwareSegmentBuilder(EmbeddingService embeddingService) {
         this.speakerModel = new SpeakerModel();
         this.relevanceScorer = new ParagraphRelevanceScorer(speakerModel);
         this.embeddingService = embeddingService;
     }
 
+    /**
+     * 构建语义段落列表。
+     * <p>
+     * 遍历原始段落列表，根据段落类型、锚点属性以及语义相似度（或规则），
+     * 将相关的段落合并为一个 {@link SemanticSegment}。
+     * </p>
+     *
+     * @param paragraphs 原始段落列表
+     * @return 构建好的语义段落列表
+     */
     @Override
     public List<SemanticSegment> build(List<RawParagraph> paragraphs) {
         List<SemanticSegment> segments = new ArrayList<>();
@@ -45,16 +70,21 @@ public class ContextAwareSegmentBuilder extends SemanticSegmentBuilder {
             return segments;
         }
 
+        // 用于暂存待合并的段落
         List<RawParagraph> buffer = new ArrayList<>();
+        // 当前缓冲区中段落的类型
         String currentType = null;
+        // 当前缓冲区中累计的文本长度
         int currentLength = 0;
 
         for (RawParagraph p : paragraphs) {
+            // 跳过空段落
             if (p.isEmpty()) continue;
 
             String type = detectType(p);
             boolean isAnchor = p.isAnchor();
             
+            // 标记当前段落是否应该触发切分（即不合并到缓冲区，而是开始新的语义段）
             boolean shouldSplit = false;
 
             if (isAnchor) {
@@ -71,6 +101,7 @@ public class ContextAwareSegmentBuilder extends SemanticSegmentBuilder {
             } else {
                 // 普通文本逻辑
                 if (currentType != null) {
+                    // 评估语义合并的可行性
                     Boolean semanticMerge = evaluateSemanticMerge(buffer, p);
                     
                     if (semanticMerge != null) {
@@ -90,24 +121,29 @@ public class ContextAwareSegmentBuilder extends SemanticSegmentBuilder {
                 }
             }
 
-            // 强制长度限制 (代码块/锚点除外)
+            // 强制长度限制 (代码块/锚点除外)，防止单个 Segment 超出最大限制
             if (currentLength > MAX_SEGMENT_LENGTH && !isAnchor) {
                 shouldSplit = true;
             }
 
+            // 如果需要切分且缓冲区不为空，则将缓冲区内容生成为一个新的语义段落
             if (!buffer.isEmpty() && shouldSplit) {
                 segments.add(createSegment(buffer, currentType));
                 buffer.clear();
                 currentLength = 0;
+                // 更新当前类型为新段落的类型
                 currentType = isAnchor ? p.getType().name() : type;
             } else if (buffer.isEmpty()) {
+                 // 缓冲区为空时，直接初始化当前类型
                  currentType = isAnchor ? p.getType().name() : type;
             }
 
+            // 将当前段落加入缓冲区，并更新累计长度
             buffer.add(p);
             currentLength += p.getContent().length();
         }
 
+        // 处理遍历结束后缓冲区中剩余的段落
         if (!buffer.isEmpty()) {
             segments.add(createSegment(buffer, currentType));
         }
@@ -115,6 +151,17 @@ public class ContextAwareSegmentBuilder extends SemanticSegmentBuilder {
         return segments;
     }
 
+    /**
+     * 评估基于语义的合并决定。
+     * <p>
+     * 通过计算当前段落与缓冲区最后一个段落的向量余弦相似度，
+     * 判断是否应该将它们合并。
+     * </p>
+     *
+     * @param buffer 当前正在构建的段落缓冲区
+     * @param current 当前需要判断的段落
+     * @return 如果相似度高返回 true (合并)；相似度低返回 false (切分)；无法判断则返回 null
+     */
     private Boolean evaluateSemanticMerge(List<RawParagraph> buffer, RawParagraph current) {
         if (buffer.isEmpty() || embeddingService == null) return null;
         RawParagraph last = buffer.get(buffer.size() - 1);
@@ -127,6 +174,7 @@ public class ContextAwareSegmentBuilder extends SemanticSegmentBuilder {
                 return null;
             }
 
+            // 获取文本的向量表示
             float[] v1 = embeddingService.embedBatch(java.util.Collections.singletonList(content1)).get(0);
             float[] v2 = embeddingService.embedBatch(java.util.Collections.singletonList(content2)).get(0);
             
@@ -135,27 +183,45 @@ public class ContextAwareSegmentBuilder extends SemanticSegmentBuilder {
                 return null;
             }
 
+            // 计算余弦相似度
             double similarity = cosineSimilarity(v1, v2);
 
             if (similarity > 0.85) {
-                return true; // merge
+                return true; // 相似度高，建议合并
             } else if (similarity < 0.65) {
-                return false; // cut
+                return false; // 相似度低，建议切分
             }
         } catch (Exception e) {
             log.warn("Error evaluating semantic merge, falling back to rule-based: {}", e.getMessage());
-            // Explicit fallback
+            // 发生异常时回退到基于规则的评估
             return null;
         }
+        // 相似度在 [0.65, 0.85] 之间，无法明确判断，返回 null 以触发基于规则的评估
         return null;
     }
 
+    /**
+     * 使用基于规则的方法判断是否可以合并。
+     *
+     * @param buffer 当前段落缓冲区
+     * @param current 当前段落
+     * @param prevType 缓冲区前一个段落的类型
+     * @param currType 当前段落的类型
+     * @return 如果可以合并则返回 true，否则返回 false
+     */
     private boolean canMerge(List<RawParagraph> buffer, RawParagraph current, String prevType, String currType) {
         if (buffer.isEmpty()) return false;
         RawParagraph last = buffer.get(buffer.size() - 1);
         return relevanceScorer.shouldMerge(last, current, prevType, currType);
     }
 
+    /**
+     * 计算两个向量的余弦相似度。
+     *
+     * @param v1 向量1
+     * @param v2 向量2
+     * @return 两个向量的余弦相似度值，范围在 [-1.0, 1.0] 之间
+     */
     private double cosineSimilarity(float[] v1, float[] v2) {
         if (v1 == null || v2 == null || v1.length != v2.length) return 0;
         double dotProduct = 0;
@@ -170,6 +236,15 @@ public class ContextAwareSegmentBuilder extends SemanticSegmentBuilder {
         return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
     }
 
+    /**
+     * 探测并返回段落的类型。
+     * <p>
+     * 优先判断是否为锚点，其次根据对话模型判断是否为对话，否则默认为旁白叙述。
+     * </p>
+     *
+     * @param p 需要探测的原始段落
+     * @return 段落的类型字符串表示
+     */
     private String detectType(RawParagraph p) {
         if (p.isAnchor()) {
             return p.getType().name();
@@ -181,6 +256,13 @@ public class ContextAwareSegmentBuilder extends SemanticSegmentBuilder {
         return SemanticSegmentBuilder.TYPE_NARRATION;
     }
     
+    /**
+     * 将给定的段落列表构建为一个 {@link SemanticSegment} 实例。
+     *
+     * @param paragraphs 包含在语义段落中的原始段落列表
+     * @param type 语义段落的类型
+     * @return 构建好的语义段落对象
+     */
     protected SemanticSegment createSegment(List<RawParagraph> paragraphs, String type) {
         return SemanticSegment.builder()
                 .paragraphs(new ArrayList<>(paragraphs))
