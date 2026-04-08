@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -72,8 +73,12 @@ public class NovelController {
 
     @Operation(summary = "获取章节片段", description = "获取某章节下的所有切分片段 (Scenes)")
     @GetMapping("/{novelId}/chapters/{chapterId}/scenes")
-    public List<SceneDto> getScenesByChapter(@PathVariable String novelId, @PathVariable Long chapterId) {
-        return novelFacadeService.getScenesByChapter(novelId, chapterId);
+    public Page<SceneDto> getScenesByChapter(
+            @PathVariable String novelId,
+            @PathVariable Long chapterId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "200") int size) {
+        return novelFacadeService.getScenesByChapter(novelId, chapterId, page, size);
     }
     @PostMapping("/{novelId}/split")
     public TaskSubmitResponseDto splitNovel(@PathVariable String novelId, @Valid @RequestBody IngestRequest request) throws IOException {

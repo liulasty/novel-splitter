@@ -101,9 +101,9 @@ public interface SceneRepository {
     Page<Scene> findByNovelId(String novelId, Pageable pageable);
 
     /**
-     * 根据小说 ID 和章节 ID 获取所有场景
+     * 根据小说 ID 和章节 ID 分页获取场景，避免一次性加载过大结果集
      */
-    List<Scene> findByNovelIdAndChapterId(String novelId, Long chapterId);
+    Page<Scene> findByNovelIdAndChapterId(String novelId, Long chapterId, Pageable pageable);
     /**
      * 统计所有小说和版本下的场景数量，返回格式为 Object[] {novelName, version, count}
      * @return 统计结果列表

@@ -44,6 +44,10 @@ export interface ScenePreviewDto {
   tokens: number;
 }
 
+interface PageResponse<T> {
+  content: T[];
+}
+
 export interface TaskSubmitResponse {
   taskId: string;
   message: string;
@@ -97,9 +101,12 @@ export const novelApi = {
     return response;
   },
 
-  getScenes: async (novelId: string, chapterId: string): Promise<ScenePreviewDto[]> => {
-    const response = await apiClient.get<ApiEnvelope<ScenePreviewDto[]>, ScenePreviewDto[]>(`/novels/${novelId}/chapters/${chapterId}/scenes`);
-    return response;
+  getScenes: async (novelId: string, chapterId: string, page = 0, size = 200): Promise<ScenePreviewDto[]> => {
+    const response = await apiClient.get<ApiEnvelope<PageResponse<ScenePreviewDto>>, PageResponse<ScenePreviewDto>>(
+      `/novels/${novelId}/chapters/${chapterId}/scenes`,
+      { params: { page, size } }
+    );
+    return response.content ?? [];
   },
 
   deleteNovel: async (novelId: string): Promise<{ message: string }> => {

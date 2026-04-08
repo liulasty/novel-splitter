@@ -158,11 +158,9 @@ public class SceneRepositoryJpaImpl implements SceneRepository {
     }
 
     @Override
-    public List<Scene> findByNovelIdAndChapterId(String novelId, Long chapterId) {
-        return jpaSceneRepository.findByNovelIdAndChapterId(novelId, chapterId)
-                .stream()
-                .map(sceneMapper::toDomain)
-                .collect(Collectors.toList());
+    public Page<Scene> findByNovelIdAndChapterId(String novelId, Long chapterId, Pageable pageable) {
+        return jpaSceneRepository.findByNovelIdAndChapterId(novelId, chapterId, pageable)
+                .map(sceneMapper::toDomain);
     }
 
     @Override

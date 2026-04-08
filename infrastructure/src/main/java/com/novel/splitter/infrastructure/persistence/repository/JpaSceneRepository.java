@@ -38,7 +38,7 @@ public interface JpaSceneRepository extends JpaRepository<JpaSceneEntity, Long>,
     List<JpaSceneEntity> findByNovelName(String novelName);
 
     @EntityGraph(attributePaths = {"novel", "chapter"})
-    List<JpaSceneEntity> findByNovelIdAndChapterId(String novelId, Long chapterId);
+    Page<JpaSceneEntity> findByNovelIdAndChapterId(String novelId, Long chapterId, Pageable pageable);
 
     @Modifying
     @Query("UPDATE JpaSceneEntity s SET s.isDeleted = true WHERE s.novelName = ?1 AND s.version = ?2")

@@ -28,6 +28,191 @@
 
 ---
 
+## 🔧 最近稳定性修复（2026-04）
+
+针对大文本导入与章节预览场景，已完成以下工程级修复：
+
+1. **章节场景查询强制分页，避免大章节 OOM**
+   - `GET /api/novels/{novelId}/chapters/{chapterId}/scenes` 增加 `page`、`size` 参数。
+   - 后端 DAO 从全量 `List` 查询改为 `Pageable` 分页查询，并在服务层增加安全边界（`page >= 0`，`size` 最大 500）。
+   - 前端预览接口改为按页请求并读取分页 `content`，避免一次性拉取全部 Scene。
+
+2. **上传流程重构：文件 IO 与数据库事务解耦**
+   - 原 `createNovel` 存在“事务内执行磁盘 IO”的风险，已改为“先写文件，再用显式事务落库”。
+   - 数据库写入失败时，执行文件补偿删除，避免文件与数据库状态不一致。
+
+3. **批量写入性能优化配置补齐**
+   - 已在 `application.yml` 增加：
+     - `spring.jpa.properties.hibernate.jdbc.batch_size: 500`
+     - `spring.jpa.properties.hibernate.order_inserts: true`
+   - 配合分批 `saveAll`，显著提升大规模 Scene 入库性能。
+
+4. **前端 API Envelope 校验增强**
+   - `isApiEnvelope` 增加数组拦截与 `code` 有限数值校验，减少协议异常被误判为合法响应的风险。
+
+---
+
+## 📋 工程级分析报告（代码审计版）
+
+> 本报告基于当前仓库代码结构、依赖与配置进行推断；无法从代码直接证明的点，统一标记为“缺失信息”。
+
+### 1) 项目整体架构分析
+
+- **架构模式**：前后端分离 + 后端多模块单体（非微服务）。
+  - 依据：根 `pom.xml` 为聚合工程（`domain/infrastructure/application/interfaces/...`），前端独立 `novel-splitter-web`。
+- **分层设计**：`Controller -> Facade/Service -> DomainRepository -> JpaRepository` 主链路清晰。
+  - 依据：`interfaces/api/NovelController`、`application/service/novel/NovelFacadeServiceImpl`、`domain/repository/SceneRepository`、`infrastructure/persistence/repository/*`。
+- **模块边界**：DDD 端口-适配器思路成立（`domain` 定义仓储接口，`infrastructure` 提供实现）。
+  - 依据：`domain/repository/*.java` 与 `infrastructure/.../repository/impl/*.java`。
+- **伪分层/上帝类风险**：`NovelFacadeServiceImpl` 聚合上传、切分、嵌入、下载、统计、章节场景查询，已出现编排膨胀趋势。
+  - 依据：`application/service/novel/NovelFacadeServiceImpl` 方法密度与职责跨度。
+
+### 2) Spring Boot 后端分析
+
+- **技术栈识别**
+  - Spring Boot `3.2.1`，Java `21`（依据：根 `pom.xml`）。
+  - ORM：Spring Data JPA + PostgreSQL（依据：`infrastructure/pom.xml`、`interfaces/pom.xml`）。
+  - 中间件：RabbitMQ（依据：`application/pom.xml` `spring-boot-starter-amqp`）。
+  - 缓存：存在 `TaskCachePort` 抽象，但默认实现是 `NoOpTaskCache`（依据：`application/port/out/NoOpTaskCache.java`）。
+- **依赖合理性**
+  - 正向：启用 `maven-enforcer-plugin` 约束依赖收敛（依据：根 `pom.xml`）。
+  - 风险：未引入 Spring Security，鉴权依赖手写拦截器（依据：`interfaces/pom.xml` + `AuthInterceptor`）。
+- **配置结构**
+  - `application.yml` 分层清晰（datasource/rabbitmq/llm/embedding/splitter）。
+  - 已补齐 JPA 批处理关键项：`hibernate.jdbc.batch_size=500`、`order_inserts=true`。
+- **事务与异常治理**
+  - 全局异常与统一返回封装完善（依据：`GlobalExceptionHandler`、`GlobalResponseAdvice`、`ApiResponse`）。
+  - `createNovel` 已重构为“IO 与 DB 事务解耦 + 失败补偿删除”。
+- **反模式检查**
+  - Controller 过重：当前不明显，多为薄控制器。
+  - Service 膨胀：`NovelFacadeServiceImpl` 明显。
+  - Mapper 业务逻辑：未见主要业务下沉 Mapper，基本是对象映射。
+
+### 3) React 前端分析
+
+- **技术栈**：React `19` + Vite `7` + TanStack Query + Axios + Zustand + Tailwind。
+  - 依据：`novel-splitter-web/package.json`。
+- **状态管理**
+  - 服务端状态主要由 React Query 管理，方向正确。
+  - Zustand `useAppStore` 当前近乎空壳，需明确边界（跨页 UI 状态 or 业务状态）。
+- **路由设计**
+  - `createBrowserRouter` 平铺路由，未见前端路由级权限守卫。
+  - 依据：`novel-splitter-web/src/router/index.tsx`。
+- **API 封装**
+  - `apiClient` 有请求/响应拦截、统一 envelope 解包、异常提示，工程性较好。
+  - `isApiEnvelope` 已增强校验（数组拦截 + 有限数值校验）。
+- **组件拆分**
+  - 页面+hooks 结构清晰；但 `useIngestTask` 责任较多（UI 状态、多个 mutation、流程控制）。
+
+### 4) 前后端交互设计
+
+- **API 风格**：大体 RESTful，但存在版本路径并存（`/api/novels/*` 与 `/api/v1/download/*`）。
+- **DTO/VO 规范**：后端 DTO 与前端 TS 接口配套较完整。
+- **错误码体系**：统一为 `{code,message,data}`，但业务码体系粒度仍偏粗（多数沿用 HTTP 语义）。
+- **鉴权方式**：静态 Bearer Token（非 JWT/Session/OAuth）。
+  - 依据：`AuthInterceptor` + 前端 `api/client.ts`。
+
+### 5) 数据流与关键链路分析（重点）
+
+- **链路示例（上传并切分）**
+  - 页面：`Ingest` -> `novelApi.uploadNovel` / `novelApi.splitNovel`
+  - API：`POST /api/novels/upload`、`POST /api/novels/{novelId}/split`
+  - Controller：`NovelController`
+  - Service：`NovelFacadeServiceImpl` -> `NovelServiceImpl` / `TaskService`
+  - DAO：`NovelRepositoryJpaImpl` / `SplitTaskRepositoryJpaImpl`
+  - DB：`JpaNovelRepository` / `JpaSplitTaskRepository`
+- **耦合点**
+  - `NovelFacadeServiceImpl` 对 MQ、下载、任务、章节场景查询多点耦合。
+  - 前后端强依赖统一 envelope 协议。
+- **潜在瓶颈**
+  - 任务轮询读压（默认 NoOp cache）。
+  - 下载入口同步阻塞。
+  - 聚合统计中存在 `findAll()` 风险路径。
+- **优化点**
+  - 引入真实缓存（Redis/Caffeine）。
+  - 下载流程任务化。
+  - 统计类接口分页/聚合下推数据库。
+
+### 6) 性能与扩展性分析
+
+- **高并发能力**：中等。异步 MQ 链路是优势，但轮询与统计仍偏 DB 压力型。
+- **典型瓶颈核查**
+  - N+1：存在 LAZY 关联风险信号；场景查询已通过分页与 `EntityGraph` 降低风险。
+  - 大事务：`createNovel` 已修复为 IO 与事务分离。
+  - 阻塞调用：下载接口仍是同步下载后再提交异步入库，需继续异步化。
+- **水平扩展**：具备基础条件（无 Session 粘性依赖），但鉴权/缓存/限流治理仍不足。
+
+### 7) 安全性分析
+
+- **SQL 注入**：主要依赖 JPA Repository，未见手写拼接 SQL 风险点。
+- **XSS**：前端 token 使用 `localStorage`，若发生 XSS 会放大令牌泄露风险。
+- **CSRF**：非 Cookie Session 模型下风险相对低，但缺少完整安全框架护栏。
+- **鉴权绕过风险**：静态 token 模型无过期、无角色、无审计粒度。
+- **敏感信息泄露**
+  - 配置支持环境变量注入是正向。
+  - `DEBUG` 日志与错误打印需持续审查，避免落敏感字段。
+
+### 8) 工程质量评估
+
+- **代码规范**：命名与层次整体规范，接口语义明确。
+- **可维护性**：模块化良好，但编排类职责集中需要持续拆分。
+- **可测试性**：分层结构利于单测；跨模块流程更依赖集成测试。
+- **CI/CD 友好性**：多模块 Maven + Enforcer 较友好；需避免构建产物进入版本库。
+
+### 9) 问题清单（按严重程度）
+
+- [严重] 鉴权模型过弱（静态全局 Token）
+  - 影响：Token 泄漏可导致全接口失守，无法做细粒度授权审计。
+  - 原因：`AuthInterceptor` 等值比对，未接入标准安全体系。
+  - 修改建议：引入 Spring Security + JWT/OAuth2，补充角色与过期机制。
+
+- [严重] 任务轮询热点缺少有效缓存实现
+  - 影响：并发轮询时数据库读压上升。
+  - 原因：`TaskCachePort` 默认 `NoOpTaskCache`。
+  - 修改建议：接入 Redis/Caffeine，并对轮询接口做限频与降级。
+
+- [高] 同步下载入口存在阻塞风险
+  - 影响：慢链路占用请求线程，降低吞吐。
+  - 原因：`DownloadController` 直接同步下载。
+  - 修改建议：下载改为异步任务，统一走任务队列与状态机。
+
+- [高] 跨域策略放开风险（部分接口 `@CrossOrigin("*")`）
+  - 影响：攻击面扩大，叠加 token 模式风险更高。
+  - 原因：控制器级通配跨域。
+  - 修改建议：统一在网关或全局配置做白名单化管理。
+
+- [中] API 版本风格不统一
+  - 影响：长期接口治理与文档维护复杂。
+  - 原因：`/api/*` 与 `/api/v1/*` 混用。
+  - 修改建议：统一版本策略并提供迁移窗口。
+
+### 10) 优化路线图（可执行）
+
+- **阶段1（1~3天）**
+  - 收敛跨域策略为白名单。
+  - 强制生产环境关闭 `ddl-auto=update`。
+  - 给轮询接口加限频和阈值保护。
+  - 审计并脱敏关键日志字段。
+
+- **阶段2（1~2周）**
+  - 接入 Spring Security（JWT 过期/刷新/角色）。
+  - 落地 Redis/Caffeine 任务缓存与命中率监控。
+  - 下载链路异步化改造。
+  - 将 `NovelFacadeServiceImpl` 拆分为多个 Orchestrator。
+
+- **阶段3（架构升级）**
+  - 轮询升级为 SSE/WebSocket 推送。
+  - 引入 Flyway/Liquibase + 索引治理 + 慢查询闭环。
+  - 建立统一网关鉴权、限流、审计策略。
+
+### 缺失信息（无法从代码直接判定）
+
+- 未见完整生产网关/WAF 配置，无法确认外围安全兜底策略。
+- 缺少数据库执行计划与慢查询统计，无法量化 N+1 与索引命中问题规模。
+- 缺少完整 CI 流水线定义文件，无法评价制品发布与质量门禁细节。
+
+---
+
 ## 🏗 系统架构与核心模块现状分析
 
 本项目采用前后端分离的多模块 (Multi-module) 架构，后端基于 Spring Boot，按照领域驱动设计（DDD）思想被拆分为 12 个逻辑模块，前端为 1 个独立的 React 模块。

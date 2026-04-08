@@ -15,6 +15,8 @@ import com.novel.splitter.domain.task.SplitTask;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -250,15 +252,16 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
     }
 
     @Override
-    public List<com.novel.splitter.application.model.dto.SceneDto> getScenesByChapter(String novelId, Long chapterId) {
+    public Page<com.novel.splitter.application.model.dto.SceneDto> getScenesByChapter(String novelId, Long chapterId, int page, int size) {
         com.novel.splitter.domain.model.Novel novel = novelService.getNovelById(novelId);
         if (novel == null) {
             throw new IllegalArgumentException("Novel not found: " + novelId);
         }
         novel.checkCanReadChapters();
-        return sceneRepository.findByNovelIdAndChapterId(novelId, chapterId).stream()
-          .map(com.novel.splitter.application.mapper.DtoMapper.INSTANCE::toSceneDto)
-          .collect(Collectors.toList());
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.min(Math.max(size, 1), 500);
+        return sceneRepository.findByNovelIdAndChapterId(novelId, chapterId, PageRequest.of(safePage, safeSize))
+                .map(com.novel.splitter.application.mapper.DtoMapper.INSTANCE::toSceneDto);
     }
 
     private String normalizeNovelId(String fileName) {
