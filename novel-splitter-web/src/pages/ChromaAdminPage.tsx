@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Loader2, Server, Database, Activity, Clock, ShieldCheck, ListTree, DatabaseZap, Search, Stethoscope, AlertTriangle, DownloadCloud } from "lucide-react";
+import { Loader2, Server, Database, Activity, Clock, ShieldCheck, Stethoscope, AlertTriangle, DownloadCloud } from "lucide-react";
 import { chromaAdminApi } from "@/api/chromaAdminApi";
 import { novelApi } from "@/api/novelApi";
-import { knowledgeApi } from "@/api/knowledgeApi";
+
 import { cn } from "@/lib/utils";
 import { toast } from 'sonner';
 

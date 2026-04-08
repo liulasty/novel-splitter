@@ -1,7 +1,6 @@
 package com.novel.splitter.interfaces.api;
 
 import com.novel.splitter.application.service.task.TaskService;
-import com.novel.splitter.application.service.task.TaskSseService;
 import com.novel.splitter.application.model.dto.SplitTaskDto;
 import com.novel.splitter.application.model.dto.TaskProgressEventDto;
 import com.novel.splitter.application.mapper.DtoMapper;
@@ -10,7 +9,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 
@@ -21,12 +19,10 @@ import java.util.List;
 public class TaskController {
 
     private final TaskService taskService;
-    private final TaskSseService taskSseService;
 
     @Autowired
-    public TaskController(TaskService taskService, TaskSseService taskSseService) {
+    public TaskController(TaskService taskService) {
         this.taskService = taskService;
-        this.taskSseService = taskSseService;
     }
 
     @GetMapping
@@ -46,12 +42,6 @@ public class TaskController {
     @Operation(summary = "删除单个切分任务记录")
     public void deleteTask(@PathVariable String taskId) {
         taskService.deleteTask(taskId);
-    }
-
-    @GetMapping("/{taskId}/stream")
-    @Operation(summary = "建立 SSE 连接获取任务实时日志")
-    public SseEmitter streamTaskProgress(@PathVariable String taskId) {
-        return taskSseService.connect(taskId);
     }
 
     @GetMapping("/{taskId}/events")

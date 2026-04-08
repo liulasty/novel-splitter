@@ -3,7 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Loader2, Book, Trash2, AlertCircle } from "lucide-react";
 import { knowledgeApi } from "@/api/knowledgeApi";
-import { novelApi, NovelStatRecordDto } from "@/api/novelApi";
+import { novelApi } from "@/api/novelApi";
+import type { NovelStatRecordDto } from "@/api/novelApi";
 import { toast } from 'sonner';
 import { VersionTag } from "./VersionTag";
 

@@ -7,6 +7,8 @@ import com.novel.splitter.domain.repository.SplitTaskRepository;
 import com.novel.splitter.domain.repository.TaskEventRepository;
 import com.novel.splitter.application.model.dto.JobStatSummaryDto;
 import com.novel.splitter.application.model.dto.JobRecordDto;
+import com.novel.splitter.application.model.dto.PollResponse;
+import com.novel.splitter.application.port.out.TaskCachePort;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,19 +24,29 @@ public class TaskService {
     
     private final SplitTaskRepository taskRepository;
     private final TaskEventRepository taskEventRepository;
-    private final TaskEventPublisher taskEventPublisher;
+    private final TaskCachePort taskCachePort;
 
     @Autowired
-    public TaskService(SplitTaskRepository taskRepository, TaskEventRepository taskEventRepository, TaskEventPublisher taskEventPublisher) {
+    public TaskService(SplitTaskRepository taskRepository, TaskEventRepository taskEventRepository, TaskCachePort taskCachePort) {
         this.taskRepository = taskRepository;
         this.taskEventRepository = taskEventRepository;
-        this.taskEventPublisher = taskEventPublisher;
+        this.taskCachePort = taskCachePort;
     }
 
     @Transactional
     public SplitTask createTask(String taskId, TaskType taskType, String novelId, String fileName, int maxScenes, String version) {
         SplitTask task = new SplitTask(taskId, taskType, novelId, fileName, maxScenes, version);
         taskRepository.save(task);
+        
+        taskCachePort.put(taskId, PollResponse.builder()
+                .taskId(taskId)
+                .status(task.getStatus().name())
+                .progress(task.getProgress())
+                .message(task.getMessage())
+                .updatedAt(task.getUpdatedAt())
+                .serverTime(System.currentTimeMillis())
+                .build());
+                
         return task;
     }
 
@@ -75,15 +87,23 @@ public class TaskService {
                     break;
             }
             taskRepository.save(task);
-            
-            // Publish lightweight event to MQ for SSE broadcast
-            taskEventPublisher.publish(taskId, progress, message, status.name());
+
+            // Put task progress to cache for polling
+            taskCachePort.put(taskId, PollResponse.builder()
+                    .taskId(taskId)
+                    .status(status.name())
+                    .progress(progress)
+                    .message(message)
+                    .updatedAt(System.currentTimeMillis())
+                    .serverTime(System.currentTimeMillis())
+                    .build());
         }
     }
 
     @Transactional
     public void deleteTask(String taskId) {
         taskRepository.deleteById(taskId);
+        taskCachePort.evict(taskId);
     }
 
     @Transactional(readOnly = true)

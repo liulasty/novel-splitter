@@ -22,7 +22,7 @@ export function useTaskDetail(taskId: string | null) {
   const [error, setError] = useState<string | null>(null);
   
   // 记录轮询相关状态，避免闭包陷阱
-  const pollTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentIntervalRef = useRef(INITIAL_POLL_INTERVAL);
   const lastProgressRef = useRef<number>(-1);
   const isMountedRef = useRef(true);

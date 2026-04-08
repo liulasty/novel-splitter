@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { GitBranch, X, Loader2, Database, AlignLeft } from "lucide-react";
-import { NovelStatRecordDto } from "@/api/novelApi";
+import type { NovelStatRecordDto } from "@/api/novelApi";
 
 export function VersionTag({
     version,

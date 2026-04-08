@@ -1,7 +1,8 @@
-import { Clock, Loader2, CheckCircle, AlertCircle, Activity, PlayCircle, XCircle } from "lucide-react";
+import { Clock, Loader2, CheckCircle, AlertCircle, PlayCircle, XCircle } from "lucide-react";
 import { TaskItem } from "@/components/TaskItem";
 import { TaskDetailDrawer } from "@/components/TaskDetailDrawer";
-import { taskApi, SplitTask } from "@/api/taskApi";
+import { taskApi } from "@/api/taskApi";
+import type { SplitTask } from "@/api/taskApi";
 import { useQuery } from "@tanstack/react-query";
 
 const STATUS_CONFIG = {

@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { novelApi } from "@/api/novelApi";
 import { taskApi } from "@/api/taskApi";
 import { downloadApi } from "@/api/downloadApi";
+import { useTaskPoller } from './useTaskPoller';
 
 export function useIngestTask() {
     const queryClient = useQueryClient();
@@ -32,13 +33,11 @@ export function useIngestTask() {
     const { data: tasks = [] } = useQuery({
         queryKey: ['tasks'],
         queryFn: taskApi.getAllTasks,
-        refetchInterval: (query) => {
-            const list = query.state.data;
-            if (!list || list.length === 0) return 10000;
-            const hasActive = list.some((t: any) => t.status === 'PENDING' || t.status === 'PROCESSING');
-            return hasActive ? 2000 : 10000;
-        },
     });
+
+    // Task Poller
+    const { addActiveTask, polledTasks } = useTaskPoller(tasks);
+    const activeTasks = polledTasks || [];
 
     // Mutations
     const uploadMutation = useMutation({
@@ -66,6 +65,7 @@ export function useIngestTask() {
             setIngestStatus(msg);
             setIsError(false);
             toast.success(msg);
+            if (data.taskId) addActiveTask(data.taskId);
         },
         onError: (error: any) => {
             const msg = `切分失败：${error.response?.data?.error || error.message}`;
@@ -82,6 +82,7 @@ export function useIngestTask() {
             setIngestStatus(msg);
             setIsError(false);
             toast.success(msg);
+            if (data.taskId) addActiveTask(data.taskId);
         },
         onError: (error: any) => {
             const msg = `入库失败：${error.response?.data?.error || error.message}`;
@@ -99,6 +100,7 @@ export function useIngestTask() {
             setIsError(false);
             toast.success(msg);
             setDownloadUrl("");
+            if (data.taskId) addActiveTask(data.taskId);
         },
         onError: (error: any) => {
             const msg = `下载入库失败：${error.response?.data?.error || error.message}`;
@@ -178,6 +180,7 @@ export function useIngestTask() {
             ingestStatus,
             isError,
             tasks,
+            activeTasks,
             selectedTaskId,
             isUploading: uploadMutation.isPending,
             isSplitting: splitMutation.isPending,

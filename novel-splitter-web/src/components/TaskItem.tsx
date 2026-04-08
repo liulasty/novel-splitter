@@ -1,7 +1,6 @@
-import { Trash2, RotateCw, FileText, Scissors, Database, ScrollText } from "lucide-react";
+import { Trash2, ScrollText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { SplitTask } from "@/api/taskApi";
-import { useQueryClient } from "@tanstack/react-query";
 
 import type { LucideIcon } from "lucide-react";
 
@@ -23,7 +22,6 @@ export function TaskItem({
     onViewLogs: (taskId: string) => void,
     Icon: LucideIcon 
 }) {
-    const queryClient = useQueryClient();
     
     const currentProgress = task.progress;
     const currentMessage = task.message;

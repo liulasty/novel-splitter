@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Loader2, Save, RefreshCw, Cpu, BrainCircuit, Database, Scissors } from "lucide-react";
-import { settingsApi, SystemSettingsDto } from "@/api/settingsApi";
+import { settingsApi } from "@/api/settingsApi";
+import type { SystemSettingsDto } from "@/api/settingsApi";
 import { cn } from "@/lib/utils";
 import { toast } from 'sonner';
 

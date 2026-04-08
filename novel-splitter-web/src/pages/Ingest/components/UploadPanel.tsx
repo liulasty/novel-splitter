@@ -2,6 +2,8 @@ import { UploadCloud, FileText, Loader2, CheckCircle, AlertCircle, DownloadCloud
 import { cn } from "@/lib/utils";
 import { useState } from 'react';
 import { SplitPreviewModal } from './SplitPreviewModal';
+import { TaskPollerStatus } from './TaskPollerStatus';
+import type { SplitTask } from "@/api/taskApi";
 
 interface UploadPanelProps {
     state: {
@@ -16,6 +18,7 @@ interface UploadPanelProps {
         currentNovelId: string;
         ingestStatus: string;
         isError: boolean;
+        activeTasks: SplitTask[];
         isUploading: boolean;
         isSplitting: boolean;
         isEmbedding: boolean;
@@ -38,7 +41,7 @@ interface UploadPanelProps {
 }
 
 export function UploadPanel({ state, actions }: UploadPanelProps) {
-    const { activeTab, selectedFile, novelName, downloadUrl, version, strategy, maxTokens, overlapTokens, currentNovelId, ingestStatus, isError, isUploading, isSplitting, isEmbedding, isDownloading } = state;
+    const { activeTab, selectedFile, novelName, downloadUrl, version, strategy, maxTokens, overlapTokens, currentNovelId, ingestStatus, isError, activeTasks, isUploading, isSplitting, isEmbedding, isDownloading } = state;
     const [previewOpen, setPreviewOpen] = useState(false);
 
     return (
@@ -106,8 +109,8 @@ export function UploadPanel({ state, actions }: UploadPanelProps) {
                         <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">保存文件名</label>
                         <input
                             type="text"
-                            value={downloadName}
-                            onChange={(e) => actions.setDownloadName(e.target.value)}
+                            value={novelName}
+                            onChange={(e) => actions.setNovelName(e.target.value)}
                             placeholder="my_novel"
                             className="w-full h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-violet-400"
                         />
@@ -215,7 +218,7 @@ export function UploadPanel({ state, actions }: UploadPanelProps) {
                 ) : (
                     <button
                         onClick={actions.handleDownloadAndIngest}
-                        disabled={!downloadUrl || !downloadName || isDownloading}
+                        disabled={!downloadUrl || !novelName || isDownloading}
                         className="inline-flex items-center gap-2 px-5 py-2 rounded-full text-sm font-medium text-white bg-gradient-to-r from-violet-500 to-blue-500 hover:from-violet-600 hover:to-blue-600 hover:shadow-lg transition-all disabled:opacity-40 disabled:pointer-events-none"
                     >
                         {isDownloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <DownloadCloud className="w-4 h-4" />}
@@ -234,6 +237,9 @@ export function UploadPanel({ state, actions }: UploadPanelProps) {
                     {ingestStatus}
                 </div>
             )}
+
+            {/* Polling Status */}
+            <TaskPollerStatus tasks={activeTasks} />
 
             {/* Split Preview Modal */}
             <SplitPreviewModal isOpen={previewOpen} onClose={() => setPreviewOpen(false)} novelId={currentNovelId} />
