@@ -29,12 +29,9 @@ public class NovelRepositoryJpaImpl implements NovelRepository {
     @Override
     public void save(Novel novel) {
         String novelId = Objects.requireNonNull(novel.getId(), "novel.id must not be null");
-        JpaNovelEntity entity = Objects.requireNonNull(
-                jpaNovelRepository.findById(novelId).orElseGet(JpaNovelEntity::new),
-                "entity must not be null"
-        );
+        JpaNovelEntity entity = jpaNovelRepository.findById(novelId).orElseGet(JpaNovelEntity::new);
         novelMapper.toEntity(entity, novel);
-        jpaNovelRepository.save(entity);
+        jpaNovelRepository.save(Objects.requireNonNull(entity, "entity must not be null"));
     }
 
     @Override
