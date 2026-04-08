@@ -1,6 +1,7 @@
 package com.novel.splitter.application.service;
 
 import com.novel.splitter.application.config.RabbitConfig;
+import com.novel.splitter.application.model.dto.TaskSubmitResponseDto;
 import com.novel.splitter.application.service.novel.NovelFacadeServiceImpl;
 import com.novel.splitter.application.service.novel.NovelStorageService;
 import com.novel.splitter.application.service.task.TaskService;
@@ -16,7 +17,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 import java.nio.file.Path;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -45,7 +45,7 @@ class NovelFacadeServiceTest {
 
         when(novelStorageService.resolveExistingNovelPath("demo.txt")).thenReturn(Path.of("D:/novels/demo.txt"));
 
-        Map<String, String> result = novelFacadeService.ingest(request);
+        TaskSubmitResponseDto result = novelFacadeService.ingest(request);
 
         ArgumentCaptor<String> taskIdCaptor = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> novelIdCaptor = ArgumentCaptor.forClass(String.class);
@@ -64,8 +64,8 @@ class NovelFacadeServiceTest {
         assertEquals(Integer.MAX_VALUE, message.getMaxScenes());
         assertEquals("v1", message.getVersion());
 
-        assertTrue(result.containsKey("taskId"));
-        assertEquals("入库任务已提交到队列", result.get("message"));
+        assertTrue(result.getTaskId() != null && !result.getTaskId().isEmpty());
+        assertEquals("入库任务已提交到队列", result.getMessage());
         assertEquals("demo", novelIdCaptor.getValue());
         assertEquals(Integer.MAX_VALUE, maxScenesCaptor.getValue());
         assertEquals("v1", versionCaptor.getValue());

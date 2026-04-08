@@ -1,6 +1,8 @@
 package com.novel.splitter.application.service.novel;
 
 import com.novel.splitter.application.config.RabbitConfig;
+import com.novel.splitter.application.model.dto.NovelUploadResponseDto;
+import com.novel.splitter.application.model.dto.TaskSubmitResponseDto;
 import com.novel.splitter.application.service.download.DownloadService;
 import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.domain.enums.TaskType;
@@ -17,7 +19,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -139,13 +140,16 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
     }
 
     @Override
-    public Map<String, String> uploadNovel(MultipartFile file, String title, String author, String description) throws IOException {
+    public NovelUploadResponseDto uploadNovel(MultipartFile file, String title, String author, String description) throws IOException {
         String novelId = novelService.createNovel(file, title, author, description);
-        return Map.of("message", "文件上传成功", "novelId", novelId);
+        return NovelUploadResponseDto.builder()
+                .message("文件上传成功")
+                .novelId(novelId)
+                .build();
     }
 
     @Override
-    public Map<String, String> split(String novelId, IngestRequest request) throws IOException {
+    public TaskSubmitResponseDto split(String novelId, IngestRequest request) throws IOException {
         log.info("接收到切分请求: novelId={}, request={}", novelId, request);
         
         com.novel.splitter.domain.model.Novel novel = novelService.getNovelById(novelId);
@@ -163,11 +167,14 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "load", message);
         log.info("Sent taskId {} to load queue for split", taskId);
 
-        return Map.of("message", "切分任务已提交到队列", "taskId", taskId);
+        return TaskSubmitResponseDto.builder()
+                .message("切分任务已提交到队列")
+                .taskId(taskId)
+                .build();
     }
 
     @Override
-    public Map<String, String> embed(String novelId) throws IOException {
+    public TaskSubmitResponseDto embed(String novelId) throws IOException {
         log.info("接收到向量化请求: novelId={}", novelId);
         
         com.novel.splitter.domain.model.Novel novel = novelService.getNovelById(novelId);
@@ -185,15 +192,18 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "embed", message);
         log.info("Sent taskId {} to embed queue", taskId);
 
-        return Map.of("message", "向量化任务已提交到队列", "taskId", taskId);
+        return TaskSubmitResponseDto.builder()
+                .message("向量化任务已提交到队列")
+                .taskId(taskId)
+                .build();
     }
 
     @Override
-    public Map<String, String> ingest(IngestRequest request) throws IOException {
+    public TaskSubmitResponseDto ingest(IngestRequest request) throws IOException {
         // 保留原有的 ingest 作为向前兼容，或者直接复用
         log.info("接收到原 ingest 请求: {}", request);
 
-        Path novelPath = novelStorageService.resolveExistingNovelPath(request.getFileName());
+        novelStorageService.resolveExistingNovelPath(request.getFileName());
         String taskId = UUID.randomUUID().toString();
         String novelId = normalizeNovelId(request.getFileName());
         int maxScenes = request.getMaxScenes() > 0 ? request.getMaxScenes() : Integer.MAX_VALUE;
@@ -206,11 +216,14 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         log.info("Sent taskId {} to load queue", taskId);
 
         log.info("入库任务已发送到队列, taskId: {}", taskId);
-        return Map.of("message", "入库任务已提交到队列", "taskId", taskId);
+        return TaskSubmitResponseDto.builder()
+                .message("入库任务已提交到队列")
+                .taskId(taskId)
+                .build();
     }
 
     @Override
-    public Map<String, String> downloadAndIngest(DownloadAndIngestRequest request) throws IOException {
+    public TaskSubmitResponseDto downloadAndIngest(DownloadAndIngestRequest request) throws IOException {
         log.info("接收到下载并入库请求: url={}, name={}", request.getUrl(), request.getName());
         
         // 1. 同步下载，得到落盘文件名

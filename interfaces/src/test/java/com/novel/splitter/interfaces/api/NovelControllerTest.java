@@ -1,6 +1,7 @@
 package com.novel.splitter.interfaces.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.novel.splitter.application.model.dto.NovelUploadResponseDto;
 import com.novel.splitter.application.service.novel.NovelFacadeService;
 import com.novel.splitter.interfaces.common.GlobalExceptionHandler;
 import com.novel.splitter.interfaces.common.GlobalResponseAdvice;
@@ -65,11 +66,15 @@ class NovelControllerTest {
     void shouldUploadNovelByDelegatingToFacadeService() throws Exception {
         MockMultipartFile file = new MockMultipartFile("file", "demo.txt", MediaType.TEXT_PLAIN_VALUE, "content".getBytes());
         when(novelFacadeService.uploadNovel(any(), any(), any(), any()))
-                .thenReturn(Map.of("message", "文件上传成功: demo_1.txt", "fileName", "demo_1.txt"));
+                .thenReturn(NovelUploadResponseDto.builder()
+                        .message("文件上传成功")
+                        .novelId("demo_1")
+                        .build());
 
         mockMvc.perform(multipart("/api/novels/upload").file(file))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.fileName").value("demo_1.txt"));
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.novelId").value("demo_1"));
 
         verify(novelFacadeService).uploadNovel(any(), any(), any(), any());
     }

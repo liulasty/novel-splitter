@@ -1,4 +1,4 @@
-import { apiClient } from './client';
+import { apiClient, type ApiEnvelope } from './client';
 import type { SplitTask } from './taskApi';
 
 export const taskPollApi = {
@@ -11,13 +11,13 @@ export const taskPollApi = {
     const params = new URLSearchParams();
     uniqueIds.forEach(id => params.append('ids', id));
     // Since baseURL is /api, we call /tasks/poll
-    const response = await apiClient.get<SplitTask[]>('/tasks/poll', { params });
+    const response = await apiClient.get<ApiEnvelope<SplitTask[]>, SplitTask[]>('/tasks/poll', { params });
     return response;
   },
 
   pollByNovelId: async (novelId: string): Promise<SplitTask[]> => {
     if (!novelId) return [];
-    const response = await apiClient.get<SplitTask[]>('/tasks/poll', {
+    const response = await apiClient.get<ApiEnvelope<SplitTask[]>, SplitTask[]>('/tasks/poll', {
       params: { novelId },
     });
     return response;

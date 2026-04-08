@@ -1,4 +1,4 @@
-import { apiClient } from './client';
+import { apiClient, type ApiEnvelope } from './client';
 
 export interface ChromaHealth {
   "nanosecond heartbeat"?: number;
@@ -112,15 +112,15 @@ export const chromaAdminApi = {
 
   // Diagnostics & Rebuild
   getDiagnostics: async (novel: string, version: string): Promise<ChromaVersionDiagnosticDto> => {
-    const response = await apiClient.get<ChromaVersionDiagnosticDto>(`/admin/chroma/diagnostics?novel=${encodeURIComponent(novel)}&version=${encodeURIComponent(version)}`);
+    const response = await apiClient.get<ApiEnvelope<ChromaVersionDiagnosticDto>, ChromaVersionDiagnosticDto>(`/admin/chroma/diagnostics?novel=${encodeURIComponent(novel)}&version=${encodeURIComponent(version)}`);
     return response;
   },
   rebuildCollection: async (): Promise<{ message: string }> => {
-    const response = await apiClient.post<{ message: string }>('/admin/chroma/collections/rebuild');
+    const response = await apiClient.post<ApiEnvelope<{ message: string }>, { message: string }>('/admin/chroma/collections/rebuild');
     return response;
   },
   deleteVersion: async (novel: string, version: string): Promise<{ message: string }> => {
-    const response = await apiClient.delete<{ message: string }>(`/admin/chroma/collections/versions?novel=${encodeURIComponent(novel)}&version=${encodeURIComponent(version)}`);
+    const response = await apiClient.delete<ApiEnvelope<{ message: string }>, { message: string }>(`/admin/chroma/collections/versions?novel=${encodeURIComponent(novel)}&version=${encodeURIComponent(version)}`);
     return response;
   },
 };

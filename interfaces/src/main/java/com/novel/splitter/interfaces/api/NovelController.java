@@ -3,7 +3,9 @@ package com.novel.splitter.interfaces.api;
 import com.novel.splitter.application.service.novel.NovelFacadeService;
 import com.novel.splitter.application.model.dto.IngestRequest;
 import com.novel.splitter.application.model.dto.ChapterDto;
+import com.novel.splitter.application.model.dto.NovelUploadResponseDto;
 import com.novel.splitter.application.model.dto.SceneDto;
+import com.novel.splitter.application.model.dto.TaskSubmitResponseDto;
 import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -16,7 +18,6 @@ import com.novel.splitter.application.model.dto.NovelStatRecordDto;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Map;
 
 /**
  * 小说文件管理控制器
@@ -49,7 +50,7 @@ public class NovelController {
      */
     @Operation(summary = "上传小说文件", description = "上传本地小说文件到服务器存储目录，并自动生成唯一文件名")
     @PostMapping(value = "/upload", consumes = "multipart/form-data")
-    public Map<String, String> uploadNovel(
+    public NovelUploadResponseDto uploadNovel(
             @Parameter(description = "上传的文件对象", required = true) @RequestParam("file") MultipartFile file,
             @Parameter(description = "小说标题") @RequestParam(value = "title", required = false) String title,
             @Parameter(description = "小说作者") @RequestParam(value = "author", required = false) String author,
@@ -75,20 +76,20 @@ public class NovelController {
         return novelFacadeService.getScenesByChapter(novelId, chapterId);
     }
     @PostMapping("/{novelId}/split")
-    public Map<String, String> splitNovel(@PathVariable String novelId, @Valid @RequestBody IngestRequest request) throws IOException {
+    public TaskSubmitResponseDto splitNovel(@PathVariable String novelId, @Valid @RequestBody IngestRequest request) throws IOException {
         return novelFacadeService.split(novelId, request);
     }
 
     @Operation(summary = "启动小说向量化", description = "触发已切分小说的异步向量化入库流程")
     @PostMapping("/{novelId}/embed")
-    public Map<String, String> embedNovel(@PathVariable String novelId) throws IOException {
+    public TaskSubmitResponseDto embedNovel(@PathVariable String novelId) throws IOException {
         return novelFacadeService.embed(novelId);
     }
 
     @Deprecated
     @Operation(summary = "小说一键入库(已废弃)", description = "异步启动指定小说文件的解析、分块及向量化入库流程")
     @PostMapping("/ingest")
-    public Map<String, String> ingest(@Valid @RequestBody IngestRequest request) throws IOException {
+    public TaskSubmitResponseDto ingest(@Valid @RequestBody IngestRequest request) throws IOException {
         return novelFacadeService.ingest(request);
     }
 

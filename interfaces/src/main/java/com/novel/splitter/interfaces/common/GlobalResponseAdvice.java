@@ -21,7 +21,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  * 针对 String 类型做特殊处理以避免 ClassCastException。
  * </p>
  */
-@RestControllerAdvice(basePackages = "com.novel.splitter.application.controller")
+@RestControllerAdvice(basePackages = "com.novel.splitter.interfaces.api")
 public class GlobalResponseAdvice implements ResponseBodyAdvice<Object> {
 
     @Autowired

@@ -4,6 +4,7 @@ import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.slf4j.MDC;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -21,6 +22,10 @@ import java.util.Objects;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    private String traceId() {
+        return MDC.get(TraceIdInterceptor.TRACE_ID_KEY);
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Void>> handleMethodArgumentNotValidException(MethodArgumentNotValidException e) {
         String errorMsg = e.getBindingResult().getFieldErrors().stream()
@@ -28,7 +33,7 @@ public class GlobalExceptionHandler {
                 .filter(Objects::nonNull)
                 .findFirst()
                 .orElse("请求参数不合法");
-        log.warn("请求参数校验失败: {}", errorMsg);
+        log.warn("请求参数校验失败, traceId={}, message={}", traceId(), errorMsg);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error(HttpStatus.BAD_REQUEST.value(), errorMsg));
     }
@@ -40,7 +45,7 @@ public class GlobalExceptionHandler {
                 .filter(Objects::nonNull)
                 .findFirst()
                 .orElse("请求参数绑定失败");
-        log.warn("请求参数绑定失败: {}", errorMsg);
+        log.warn("请求参数绑定失败, traceId={}, message={}", traceId(), errorMsg);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error(HttpStatus.BAD_REQUEST.value(), errorMsg));
     }
@@ -52,7 +57,7 @@ public class GlobalExceptionHandler {
                 .filter(message -> message != null && !message.isBlank())
                 .findFirst()
                 .orElse("请求参数约束校验失败");
-        log.warn("请求参数约束校验失败: {}", errorMsg);
+        log.warn("请求参数约束校验失败, traceId={}, message={}", traceId(), errorMsg);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error(HttpStatus.BAD_REQUEST.value(), errorMsg));
     }
@@ -60,7 +65,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<ApiResponse<Void>> handleResponseStatusException(ResponseStatusException e) {
         String errorMsg = e.getReason() != null && !e.getReason().isBlank() ? e.getReason() : "请求处理失败";
-        log.warn("请求处理异常: {}", errorMsg);
+        log.warn("请求处理异常, traceId={}, message={}", traceId(), errorMsg);
         return ResponseEntity.status(e.getStatusCode())
                 .body(ApiResponse.error(e.getStatusCode().value(), errorMsg));
     }
@@ -68,14 +73,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiResponse<Void>> handleIllegalArgumentException(IllegalArgumentException e) {
         String errorMsg = e.getMessage() != null && !e.getMessage().isBlank() ? e.getMessage() : "请求参数不合法";
-        log.warn("非法参数异常: {}", errorMsg);
+        log.warn("非法参数异常, traceId={}, message={}", traceId(), errorMsg);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error(HttpStatus.BAD_REQUEST.value(), errorMsg));
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleAllExceptions(Exception e) {
-        log.error("系统发生未预期的异常", e);
+        log.error("系统发生未预期的异常, traceId={}", traceId(), e);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "服务器繁忙，请稍后再试"));
     }

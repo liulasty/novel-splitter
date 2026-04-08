@@ -1,8 +1,8 @@
 // Common interfaces
 export interface ApiResponse<T = any> {
-  message?: string;
-  error?: string;
-  data?: T;
+  code: number;
+  message: string;
+  data: T;
 }
 
 // Chat related interfaces
@@ -40,8 +40,7 @@ export interface DownloadAndIngestRequest {
 
 export interface NovelUploadResponse {
   message: string;
-  error?: string;
-  fileName?: string;
+  novelId: string;
 }
 
 // Scene related interfaces

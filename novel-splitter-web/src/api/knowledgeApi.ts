@@ -1,4 +1,4 @@
-import { apiClient } from './client';
+import { apiClient, type ApiEnvelope } from './client';
 import type { Scene } from '@/types/api';
 
 export interface VectorPreviewRecordDto {
@@ -26,17 +26,17 @@ export interface PageResponse<T> {
 
 export const knowledgeApi = {
   getVersions: async (novelName: string): Promise<string[]> => {
-    const response = await apiClient.get<string[]>(`/knowledge/${encodeURIComponent(novelName)}/versions`);
+    const response = await apiClient.get<ApiEnvelope<string[]>, string[]>(`/knowledge/${encodeURIComponent(novelName)}/versions`);
     return response;
   },
 
   getLightweightScenes: async (page: number = 0, size: number = 20): Promise<PageResponse<VectorPreviewRecordDto>> => {
-    const response = await apiClient.get<PageResponse<VectorPreviewRecordDto>>(`/knowledge/scenes/lightweight?page=${page}&size=${size}`);
+    const response = await apiClient.get<ApiEnvelope<PageResponse<VectorPreviewRecordDto>>, PageResponse<VectorPreviewRecordDto>>(`/knowledge/scenes/lightweight?page=${page}&size=${size}`);
     return response;
   },
 
   getScenes: async (novelName: string): Promise<Scene[]> => {
-    const response = await apiClient.get<Scene[]>(`/knowledge/${encodeURIComponent(novelName)}/scenes`);
+    const response = await apiClient.get<ApiEnvelope<Scene[]>, Scene[]>(`/knowledge/${encodeURIComponent(novelName)}/scenes`);
     return response;
   },
 

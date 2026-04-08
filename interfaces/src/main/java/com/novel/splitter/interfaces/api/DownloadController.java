@@ -5,6 +5,7 @@ import com.novel.splitter.application.service.novel.NovelFacadeService;
 import com.novel.splitter.application.model.dto.DownloadAndIngestRequest;
 import com.novel.splitter.application.model.dto.DownloadRequest;
 import com.novel.splitter.application.model.dto.DownloadResponse;
+import com.novel.splitter.application.model.dto.TaskSubmitResponseDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -14,7 +15,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.io.IOException;
-import java.util.Map;
 
 /**
  * 小说下载控制器
@@ -55,7 +55,7 @@ public class DownloadController {
      */
     @Operation(summary = "小说下载并入库处理", description = "同步下载小说文件后异步启动入库流程")
     @PostMapping("/ingest")
-    public Map<String, String> downloadAndIngest(@Valid @RequestBody DownloadAndIngestRequest request) throws IOException {
+    public TaskSubmitResponseDto downloadAndIngest(@Valid @RequestBody DownloadAndIngestRequest request) throws IOException {
         return novelFacadeService.downloadAndIngest(request);
     }
 }

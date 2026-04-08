@@ -1,4 +1,4 @@
-import { apiClient } from './client';
+import { apiClient, type ApiEnvelope } from './client';
 
 export interface SplitPreviewRequestDto {
   sourceText: string;
@@ -16,7 +16,7 @@ export interface ChunkPreviewDto {
 
 export const splitApi = {
   previewSplit: async (request: SplitPreviewRequestDto): Promise<ChunkPreviewDto[]> => {
-    const response = await apiClient.post<ChunkPreviewDto[]>('/split/preview', request);
+    const response = await apiClient.post<ApiEnvelope<ChunkPreviewDto[]>, ChunkPreviewDto[]>('/split/preview', request);
     return response;
   }
 };

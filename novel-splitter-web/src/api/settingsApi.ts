@@ -1,4 +1,4 @@
-import { apiClient } from './client';
+import { apiClient, type ApiEnvelope } from './client';
 
 export interface SystemSettingsDto {
   embedding?: Record<string, any>;
@@ -10,12 +10,12 @@ export interface SystemSettingsDto {
 
 export const settingsApi = {
   getSettings: async (): Promise<SystemSettingsDto> => {
-    const response = await apiClient.get<SystemSettingsDto>('/settings');
+    const response = await apiClient.get<ApiEnvelope<SystemSettingsDto>, SystemSettingsDto>('/settings');
     return response;
   },
 
   updateSettings: async (settings: SystemSettingsDto): Promise<{ message: string }> => {
-    const response = await apiClient.put<{ message: string }>('/settings', settings);
+    const response = await apiClient.put<ApiEnvelope<{ message: string }>, { message: string }>('/settings', settings);
     return response;
   }
 };

@@ -1,6 +1,24 @@
 import axios from 'axios';
 import { toast } from 'sonner';
 
+export interface ApiEnvelope<T> {
+  code: number;
+  message: string;
+  data: T;
+}
+
+const isApiEnvelope = (value: unknown): value is ApiEnvelope<unknown> => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate.code === 'number' &&
+    typeof candidate.message === 'string' &&
+    Object.prototype.hasOwnProperty.call(candidate, 'data')
+  );
+};
+
 // 扩展 AxiosRequestConfig 支持自定义属性，并修改拦截器返回值类型
 declare module 'axios' {
   export interface AxiosRequestConfig {
@@ -69,21 +87,24 @@ apiClient.interceptors.response.use(
     }
     
     // 业务层面解包 (HTTP 200)
-    // 后端返回的永远是 { code, message, data }
-    if (resData.code !== undefined) {
+    // 后端约定返回统一结构：{ code, message, data }
+    if (isApiEnvelope(resData)) {
       if (resData.code === 200) {
-        // 业务成功，无感解包
         return resData.data;
-      } else {
-        // 业务逻辑错误 (code !== 200)
-        const errorMessage = resData.message || '业务处理失败';
-        toast.error(errorMessage);
-        return Promise.reject(new Error(errorMessage));
       }
+
+      const errorMessage =
+        typeof resData.message === 'string' && resData.message.length > 0
+          ? resData.message
+          : '业务处理失败';
+      toast.error(errorMessage);
+      return Promise.reject(new Error(errorMessage));
     }
-    
-    // 对于没有 code 的普通对象，原样返回
-    return resData;
+
+    // 协议不匹配时视为后端契约异常，避免静默吞掉问题
+    const protocolError = '接口响应格式不符合约定，请检查后端统一返回结构';
+    toast.error(protocolError);
+    return Promise.reject(new Error(protocolError));
   },
   (error) => {
     if (enableApiLog) {

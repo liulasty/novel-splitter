@@ -1,4 +1,4 @@
-import { apiClient } from './client';
+import { apiClient, type ApiEnvelope } from './client';
 
 export interface SplitTask {
   taskId: string;
@@ -42,28 +42,28 @@ export interface JobRecordDto {
 
 export const taskApi = {
   getAllTasks: async (): Promise<SplitTask[]> => {
-    const response = await apiClient.get<SplitTask[]>('/tasks');
+    const response = await apiClient.get<ApiEnvelope<SplitTask[]>, SplitTask[]>('/tasks');
     return response;
   },
 
   getJobStats: async (): Promise<JobStatSummaryDto> => {
-    const response = await apiClient.get<JobStatSummaryDto>('/jobs/stats');
+    const response = await apiClient.get<ApiEnvelope<JobStatSummaryDto>, JobStatSummaryDto>('/jobs/stats');
     return response;
   },
 
   getJobs: async (): Promise<JobRecordDto[]> => {
-    const response = await apiClient.get<JobRecordDto[]>('/jobs');
+    const response = await apiClient.get<ApiEnvelope<JobRecordDto[]>, JobRecordDto[]>('/jobs');
     return response;
   },
 
   getTask: async (taskId: string): Promise<SplitTask> => {
-    const response = await apiClient.get<SplitTask>(`/tasks/${taskId}`);
+    const response = await apiClient.get<ApiEnvelope<SplitTask>, SplitTask>(`/tasks/${taskId}`);
     return response;
   },
 
   getTaskEvents: async (taskId: string, sinceTimestamp?: number): Promise<TaskProgressEvent[]> => {
     const params = sinceTimestamp ? { sinceTimestamp } : undefined;
-    const response = await apiClient.get<TaskProgressEvent[]>(`/tasks/${taskId}/events`, { params });
+    const response = await apiClient.get<ApiEnvelope<TaskProgressEvent[]>, TaskProgressEvent[]>(`/tasks/${taskId}/events`, { params });
     return response;
   },
 
