@@ -21,6 +21,8 @@ public interface NovelFacadeService {
 
     Map<String, String> embed(String novelId) throws IOException;
 
+    Map<String, String> ingest(IngestRequest request) throws IOException;
+
     Map<String, String> downloadAndIngest(DownloadAndIngestRequest request) throws IOException;
 
     List<NovelStatRecordDto> getNovelStats();

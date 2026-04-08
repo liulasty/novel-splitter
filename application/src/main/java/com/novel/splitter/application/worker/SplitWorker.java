@@ -3,8 +3,8 @@ package com.novel.splitter.application.worker;
 import com.novel.splitter.application.config.RabbitConfig;
 import com.novel.splitter.domain.task.SplitTask;
 import com.novel.splitter.domain.task.SplitTaskMessage;
-import com.novel.splitter.domain.task.EmbedTaskMessage;
 import com.novel.splitter.domain.repository.NovelCacheRepository;
+import com.novel.splitter.domain.enums.TaskType;
 import com.novel.splitter.pipeline.orchestrator.SplitNovelUseCase;
 import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.application.service.novel.NovelService;
@@ -16,7 +16,6 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
 import java.util.List;
 
 @Component
@@ -43,7 +42,14 @@ public class SplitWorker {
             SplitTask task = taskService.getTask(taskId);
             if (task == null) {
                 log.warn("任务 {} 在内存中不存在，可能由于服务重启，正在尝试自动重建...", taskId);
-                task = taskService.createTask(taskId, message.getNovelId(), message.getFilePath(), message.getMaxScenes(), message.getVersion());
+                task = taskService.createTask(
+                        taskId,
+                        TaskType.SPLIT,
+                        message.getNovelId(),
+                        message.getNovelId(),
+                        message.getMaxScenes(),
+                        message.getVersion()
+                );
             }
 
             Novel novel = novelCacheRepository.load(taskId);

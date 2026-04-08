@@ -4,6 +4,7 @@ import com.novel.splitter.domain.model.Chapter;
 import com.novel.splitter.domain.model.Novel;
 import com.novel.splitter.domain.model.RawParagraph;
 import com.novel.splitter.domain.model.ChapterData;
+import com.novel.splitter.domain.repository.NovelCacheRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 

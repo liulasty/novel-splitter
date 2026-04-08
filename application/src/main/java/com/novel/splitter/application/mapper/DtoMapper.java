@@ -13,9 +13,9 @@ import com.novel.splitter.domain.model.embedding.VectorRecord;
 import com.novel.splitter.domain.task.SplitTask;
 import com.novel.splitter.domain.task.TaskProgressEvent;
 import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
 import org.mapstruct.factory.Mappers;
 
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.List;
 
 @Mapper(componentModel = "spring")
@@ -34,10 +34,13 @@ public interface DtoMapper {
     VectorRecordDto toVectorRecordDto(VectorRecord vectorRecord);
     List<VectorRecordDto> toVectorRecordDtos(List<VectorRecord> vectorRecords);
 
-    @Mapping(target = "completedScenes", expression = "java(task.getCompletedScenes().get())")
     SplitTaskDto toSplitTaskDto(SplitTask task);
     List<SplitTaskDto> toSplitTaskDtos(List<SplitTask> tasks);
 
     TaskProgressEventDto toTaskProgressEventDto(TaskProgressEvent event);
     List<TaskProgressEventDto> toTaskProgressEventDtos(List<TaskProgressEvent> events);
+
+    default int map(AtomicInteger value) {
+        return value == null ? 0 : value.get();
+    }
 }

@@ -20,7 +20,7 @@ public class NovelCacheRepositoryImpl implements NovelCacheRepository {
 
     private final Path cacheDir;
 
-    public NovelCacheRepository(@Value("${splitter.storage.root-path:data/novel-storage}") String storageRoot) {
+    public NovelCacheRepositoryImpl(@Value("${splitter.storage.root-path:data/novel-storage}") String storageRoot) {
         this.cacheDir = Paths.get(storageRoot, "cache", "tasks");
         try {
             Files.createDirectories(cacheDir);
