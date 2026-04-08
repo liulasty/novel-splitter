@@ -6,7 +6,11 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * 检索查询对象
+ * 检索查询参数对象 (DTO)
+ * <p>
+ * 封装了底层向量数据库进行混合检索（相似度搜索 + 元数据过滤）所需的所有条件。
+ * 包含了查询文本、范围限制以及其他特定的过滤标签。
+ * </p>
  */
 @Data
 @Builder
@@ -14,25 +18,46 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class RetrievalQuery {
 
-    /** 用户自然语言问题 */
+    /** 
+     * 用户的自然语言问题 
+     * // 将被转换为向量，用于在向量空间中与小说片段进行相似度计算 
+     */
     private String question;
 
-    /** 小说名称 */
+    /** 
+     * 目标小说名称 
+     * // 作为精确匹配的元数据过滤器，确保只在指定小说中进行检索 
+     */
     private String novel;
     
-    /** 版本号 */
+    /** 
+     * 数据版本号 
+     * // 用于匹配特定版本的数据，避免跨版本数据污染 
+     */
     private String version;
 
-    /** 起始章节号 (包含) */
+    /** 
+     * 检索范围的起始章节号 (包含该章节) 
+     * // 用于将检索范围限制在小说的特定进度之后，结合 chapterTo 使用 
+     */
     private Integer chapterFrom;
 
-    /** 结束章节号 (包含) */
+    /** 
+     * 检索范围的结束章节号 (包含该章节) 
+     * // 用于将检索范围限制在小说的特定进度之前，防止剧透或超出阅读范围 
+     */
     private Integer chapterTo;
 
-    /** 角色/功能 (e.g., "narration", "dialogue") */
+    /** 
+     * 文本角色或功能分类 
+     * // 例如："narration"（旁白）、"dialogue"（对话），用于针对特定类型的文本进行过滤 
+     */
     private String role;
 
-    /** 返回结果数量 (Top-K) - 辅助字段，不在核心定义列表中，但保留以兼容现有逻辑 */
+    /** 
+     * 返回的最相关结果数量 (Top-K) 
+     * // 辅助字段，指定本次检索需要召回的匹配片段数量，默认值为 5 
+     */
     @Builder.Default
     private int topK = 5;
 }
