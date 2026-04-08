@@ -3,6 +3,16 @@ target/
 **/target/
 *.class
 *.jar
+build/
+out/
+
+# Frontend build artifacts
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+dist-ssr/
+**/dist-ssr/
 
 # IDE / editor
 .idea/

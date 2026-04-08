@@ -1,6 +1,6 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Loader2, Server, Database, Activity, Clock, CheckCircle2, XCircle, ArrowRight } from "lucide-react";
+import { useQuery } from '@tanstack/react-query';
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Loader2, Clock, CheckCircle2, XCircle, ArrowRight } from "lucide-react";
 import { vectorApi } from "@/api/vectorApi";
 import { chromaApi } from "@/api/chromaApi";
 import { novelApi } from "@/api/novelApi";
@@ -8,17 +8,10 @@ import { taskApi } from "@/api/taskApi";
 import { cn } from "@/lib/utils";
 
 export default function SystemPage() {
-    const queryClient = useQueryClient();
-
     // Stats Query
     const { data: vectorStats, isLoading: isVectorStatsLoading } = useQuery({
         queryKey: ['vectorStats'],
         queryFn: vectorApi.getStats,
-    });
-
-    const { data: dashboardStats, isLoading: isDashboardStatsLoading } = useQuery({
-        queryKey: ['dashboardStats'],
-        queryFn: novelApi.getDashboardStats,
     });
 
     const { data: modelHealth, isLoading: isModelHealthLoading } = useQuery({
@@ -39,31 +32,14 @@ export default function SystemPage() {
     });
 
     // Chroma Queries
-    const { data: health } = useQuery({
-        queryKey: ['chromaHealth'],
-        queryFn: chromaApi.getHealthcheck,
-        refetchInterval: 30000,
-    });
-
-    const { data: version } = useQuery({
-        queryKey: ['chromaVersion'],
-        queryFn: chromaApi.getVersion,
-    });
-
-    const { data: heartbeat } = useQuery({
-        queryKey: ['chromaHeartbeat'],
-        queryFn: chromaApi.getHeartbeat,
-        refetchInterval: 30000,
-    });
-
-    const { data: collections, isLoading: isCollectionsLoading } = useQuery({
+    useQuery({
         queryKey: ['chromaCollections'],
         queryFn: chromaApi.getCollections,
         // ✅ 关键：自动解析 JSON 字符串为数组
         select: (res) => {
             try {
                 return JSON.parse(res.data);
-            } catch (e) {
+            } catch {
                 return []; // 解析失败返回空数组，防止报错
             }
         },

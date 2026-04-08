@@ -16,12 +16,6 @@ const TABS = [
   { id: 'prompt', label: '最终提示词 (Prompt)' }
 ];
 
-interface VersionSampleRecord {
-  id: string;
-  metadata: Record<string, unknown> | null;
-  document: string | null;
-}
-
 export default function RagDebugPage() {
   const [novels, setNovels] = useState<string[]>([]);
   const [versions, setVersions] = useState<string[]>([]);
@@ -37,7 +31,6 @@ export default function RagDebugPage() {
   const [chromaCollection, setChromaCollection] = useState<ChromaCollection | null>(null);
   const [collectionCount, setCollectionCount] = useState<number | null>(null);
   const [versionRecordCount, setVersionRecordCount] = useState<number | null>(null);
-  const [versionSampleRecord, setVersionSampleRecord] = useState<VersionSampleRecord | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,7 +65,6 @@ export default function RagDebugPage() {
     setChromaCollection(null);
     setCollectionCount(null);
     setVersionRecordCount(null);
-    setVersionSampleRecord(null);
     
     try {
       const request: ChatRequest = {
@@ -104,14 +96,8 @@ export default function RagDebugPage() {
                 });
                 
                 if (records && records.ids && records.ids.length > 0) {
-                  setVersionSampleRecord({
-                    id: records.ids[0],
-                    metadata: records.metadatas ? (records.metadatas[0] as Record<string, unknown>) : null,
-                    document: records.documents ? records.documents[0] : null
-                  });
                   setVersionRecordCount(records.ids.length);
                 } else {
-                  setVersionSampleRecord(null);
                   setVersionRecordCount(0);
                 }
               }

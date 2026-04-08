@@ -16,7 +16,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.util.Objects;
 
 /**
  * 管理 ONNX 模型生命周期和会话的组件。
@@ -75,11 +75,9 @@ public class OnnxModelHolder {
                 modelPathToUse = modelFile.getAbsolutePath();
             } else {
                 log.info("Using bundled ONNX model from classpath");
-                // 提取类路径下的内置模型文件到系统的临时目录中，供 ONNX 引擎读取
-                Path tempDir = Paths.get(System.getProperty("java.io.tmpdir"), "novel-splitter-embedding");
-                if (!Files.exists(tempDir)) {
-                    Files.createDirectories(tempDir);
-                }
+                // 提取类路径下的内置模型文件到本次启动独立的临时目录，避免 Windows 文件映射锁导致覆盖失败
+                Path tempDir = Files.createTempDirectory("novel-splitter-embedding-");
+                log.info("Extracting bundled ONNX resources to temp dir: {}", tempDir);
                 
                 File modelFile = extractResource(MODEL_RESOURCE_DIR + MODEL_FILE, tempDir.resolve(MODEL_FILE));
                 extractResource(MODEL_RESOURCE_DIR + MODEL_DATA_FILE, tempDir.resolve(MODEL_DATA_FILE));
@@ -127,7 +125,8 @@ public class OnnxModelHolder {
      * @throws IOException 文件读取或写入过程中的 IO 异常
      */
     private File extractResource(String resourcePath, Path targetPath) throws IOException {
-        ClassPathResource resource = new ClassPathResource(resourcePath);
+        String safeResourcePath = Objects.requireNonNull(resourcePath, "resourcePath must not be null");
+        ClassPathResource resource = new ClassPathResource(safeResourcePath);
         if (!resource.exists()) {
              log.warn("Resource not found: {}", resourcePath);
              return null;

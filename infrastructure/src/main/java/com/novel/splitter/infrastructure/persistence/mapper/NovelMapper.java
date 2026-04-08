@@ -13,10 +13,10 @@ public interface NovelMapper {
     // Map JPA Entity to Domain Model
     @Mapping(target = "chapters", ignore = true)
     @Mapping(target = "paragraphs", ignore = true)
-    @Mapping(target = "isDeleted", source = "isDeleted")
+    @Mapping(target = "isDeleted", expression = "java(entity.isDeleted())")
     Novel toDomain(JpaNovelEntity entity);
 
     // Map Domain Model to JPA Entity
-    @Mapping(target = "isDeleted", source = "isDeleted")
+    @Mapping(target = "isDeleted", expression = "java(domain.isDeleted())")
     JpaNovelEntity toEntity(Novel domain);
 }
