@@ -1,8 +1,10 @@
-package com.novel.splitter.application.controller;
+package com.novel.splitter.interfaces.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.novel.splitter.application.service.settings.SystemSettingsService;
 import com.novel.splitter.application.model.dto.SystemSettingsDto;
+import com.novel.splitter.application.service.settings.SystemSettingsService;
+import com.novel.splitter.interfaces.common.GlobalExceptionHandler;
+import com.novel.splitter.interfaces.common.GlobalResponseAdvice;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -10,6 +12,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -24,10 +27,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @ExtendWith(MockitoExtension.class)
-public class SystemSettingsControllerTest {
+class SystemSettingsControllerTest {
 
     private MockMvc mockMvc;
-
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Mock
@@ -38,7 +40,11 @@ public class SystemSettingsControllerTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(systemSettingsController).build();
+        GlobalResponseAdvice globalResponseAdvice = new GlobalResponseAdvice();
+        ReflectionTestUtils.setField(globalResponseAdvice, "objectMapper", objectMapper);
+        mockMvc = MockMvcBuilders.standaloneSetup(systemSettingsController)
+                .setControllerAdvice(new GlobalExceptionHandler(), globalResponseAdvice)
+                .build();
     }
 
     @Test

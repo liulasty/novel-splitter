@@ -1,22 +1,22 @@
 package com.novel.splitter.infrastructure.persistence.repository;
 
 import com.novel.splitter.infrastructure.persistence.entity.JpaSceneEntity;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.stream.Stream;
 
-import org.springframework.data.domain.Page;
-import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
-
 @Repository
 public interface JpaSceneRepository extends JpaRepository<JpaSceneEntity, Long>, JpaSpecificationExecutor<JpaSceneEntity> {
     
     @Query("SELECT s.id as id, s.chapterIndex as chapterIndex, 'SCENE' as type, s.wordCount as tokenCount, SUBSTRING(s.text, 1, 150) as textContent FROM JpaSceneEntity s")
-    Page<com.novel.splitter.domain.model.dto.VectorPreviewRecordDto> findLightweightScenes(Pageable pageable);
+    Page<SceneLightweightProjection> findLightweightScenes(Pageable pageable);
 
     // Custom query method for SubTask 2.2: "按 ID 列表查询的方法"
     List<JpaSceneEntity> findByIdIn(List<Long> ids);
@@ -49,4 +49,12 @@ public interface JpaSceneRepository extends JpaRepository<JpaSceneEntity, Long>,
 
     @Query("SELECT s.novelName, s.version, COUNT(s) FROM JpaSceneEntity s GROUP BY s.novelName, s.version")
     List<Object[]> countScenesByNovelAndVersion();
+
+    interface SceneLightweightProjection {
+        Long getId();
+        Integer getChapterIndex();
+        String getType();
+        Integer getTokenCount();
+        String getTextContent();
+    }
 }

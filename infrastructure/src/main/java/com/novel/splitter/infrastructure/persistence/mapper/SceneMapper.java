@@ -17,6 +17,7 @@ public interface SceneMapper {
 
     @Mapping(target = "id", source = "sceneId")
     @Mapping(target = "metadata", source = "metadataJson", qualifiedByName = "jsonToMetadata")
+    @Mapping(target = "score", ignore = true)
     Scene toDomain(JpaSceneEntity entity);
 
     @Mapping(target = "sceneId", source = "id")

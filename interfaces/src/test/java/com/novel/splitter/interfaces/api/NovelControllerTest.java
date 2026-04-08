@@ -1,21 +1,20 @@
-package com.novel.splitter.application.controller;
+package com.novel.splitter.interfaces.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.novel.splitter.application.common.AuthInterceptor;
-import com.novel.splitter.application.common.GlobalExceptionHandler;
-import com.novel.splitter.application.common.GlobalResponseAdvice;
 import com.novel.splitter.application.service.novel.NovelFacadeService;
+import com.novel.splitter.interfaces.common.GlobalExceptionHandler;
+import com.novel.splitter.interfaces.common.GlobalResponseAdvice;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.http.MediaType;
-import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.util.List;
 import java.util.Map;
@@ -33,26 +32,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class NovelControllerTest {
 
     private MockMvc mockMvc;
-
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Mock
     private NovelFacadeService novelFacadeService;
 
-    @Mock
-    private AuthInterceptor authInterceptor;
-
     @InjectMocks
     private NovelController novelController;
 
     @BeforeEach
-    void setUp() throws Exception {
-        when(authInterceptor.preHandle(any(), any(), any())).thenReturn(true);
+    void setUp() {
         GlobalResponseAdvice globalResponseAdvice = new GlobalResponseAdvice();
         ReflectionTestUtils.setField(globalResponseAdvice, "objectMapper", objectMapper);
         mockMvc = MockMvcBuilders.standaloneSetup(novelController)
                 .setControllerAdvice(new GlobalExceptionHandler(), globalResponseAdvice)
-                .addInterceptors(authInterceptor)
                 .build();
     }
 
@@ -62,9 +55,8 @@ class NovelControllerTest {
 
         mockMvc.perform(get("/api/novels"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.data[0]").value("a.txt"))
-                .andExpect(jsonPath("$.data[1]").value("b.txt"));
+                .andExpect(jsonPath("$[0]").value("a.txt"))
+                .andExpect(jsonPath("$[1]").value("b.txt"));
 
         verify(novelFacadeService).listNovels();
     }
@@ -72,14 +64,14 @@ class NovelControllerTest {
     @Test
     void shouldUploadNovelByDelegatingToFacadeService() throws Exception {
         MockMultipartFile file = new MockMultipartFile("file", "demo.txt", MediaType.TEXT_PLAIN_VALUE, "content".getBytes());
-        when(novelFacadeService.uploadNovel(any())).thenReturn(Map.of("message", "文件上传成功: demo_1.txt", "fileName", "demo_1.txt"));
+        when(novelFacadeService.uploadNovel(any(), any(), any(), any()))
+                .thenReturn(Map.of("message", "文件上传成功: demo_1.txt", "fileName", "demo_1.txt"));
 
         mockMvc.perform(multipart("/api/novels/upload").file(file))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.data.fileName").value("demo_1.txt"));
+                .andExpect(jsonPath("$.fileName").value("demo_1.txt"));
 
-        verify(novelFacadeService).uploadNovel(any());
+        verify(novelFacadeService).uploadNovel(any(), any(), any(), any());
     }
 
     @Test

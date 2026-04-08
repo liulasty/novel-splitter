@@ -1,4 +1,4 @@
-package com.novel.splitter.application.common;
+package com.novel.splitter.interfaces.common;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -52,7 +52,6 @@ class GlobalExceptionHandlerTest {
 
     @RestController
     static class TestController {
-
         @GetMapping("/test/illegal-argument")
         public void throwIllegalArgumentException() {
             throw new IllegalArgumentException("非法参数");
@@ -64,7 +63,6 @@ class GlobalExceptionHandlerTest {
     }
 
     static class TestRequest {
-
         @NotBlank(message = "名称不能为空")
         private String name;
 
