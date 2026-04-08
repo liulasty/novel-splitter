@@ -11,9 +11,13 @@ const isApiEnvelope = (value: unknown): value is ApiEnvelope<unknown> => {
   if (typeof value !== 'object' || value === null) {
     return false;
   }
+  if (Array.isArray(value)) {
+    return false;
+  }
   const candidate = value as Record<string, unknown>;
   return (
     typeof candidate.code === 'number' &&
+    Number.isFinite(candidate.code) &&
     typeof candidate.message === 'string' &&
     Object.prototype.hasOwnProperty.call(candidate, 'data')
   );

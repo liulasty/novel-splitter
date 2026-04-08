@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -20,14 +21,26 @@ public class NovelServiceImpl implements NovelService {
 
     private final NovelRepository novelRepository;
     private final NovelStorageService novelStorageService;
+    private final TransactionTemplate transactionTemplate;
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public String createNovel(MultipartFile file, String title, String author, String description) throws IOException {
         String fileName = novelStorageService.saveNovel(file);
-        
+        try {
+            String novelId = transactionTemplate.execute(status -> saveNovelRecord(fileName, title, author, description));
+            if (novelId == null) {
+                throw new IllegalStateException("Failed to save novel record");
+            }
+            return novelId;
+        } catch (RuntimeException ex) {
+            novelStorageService.deleteNovelIfExists(fileName);
+            throw ex;
+        }
+    }
+
+    private String saveNovelRecord(String fileName, String title, String author, String description) {
         String novelId = UUID.randomUUID().toString();
-        
+
         Novel novel = Novel.builder()
                 .id(novelId)
                 .title(title != null ? title : fileName.replace(".txt", ""))
@@ -39,10 +52,10 @@ public class NovelServiceImpl implements NovelService {
                 .updatedAt(System.currentTimeMillis())
                 .isDeleted(false)
                 .build();
-                
+
         novelRepository.save(novel);
         log.info("Saved novel entity to database, novelId: {}", novelId);
-        
+
         return novelId;
     }
 

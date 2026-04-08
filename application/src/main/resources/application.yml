@@ -25,6 +25,9 @@ spring:
     show-sql: false
     properties:
       hibernate:
+        jdbc:
+          batch_size: 500
+        order_inserts: true
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
   rabbitmq:

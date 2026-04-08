@@ -4,6 +4,7 @@ import com.novel.splitter.infrastructure.persistence.entity.JpaSceneEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -35,6 +36,9 @@ public interface JpaSceneRepository extends JpaRepository<JpaSceneEntity, Long>,
     long countByNovelNameAndVersion(String novelName, String version);
 
     List<JpaSceneEntity> findByNovelName(String novelName);
+
+    @EntityGraph(attributePaths = {"novel", "chapter"})
+    List<JpaSceneEntity> findByNovelIdAndChapterId(String novelId, Long chapterId);
 
     @Modifying
     @Query("UPDATE JpaSceneEntity s SET s.isDeleted = true WHERE s.novelName = ?1 AND s.version = ?2")

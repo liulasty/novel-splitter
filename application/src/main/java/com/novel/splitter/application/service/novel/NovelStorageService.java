@@ -58,6 +58,18 @@ public class NovelStorageService {
         return novelPath;
     }
 
+    public void deleteNovelIfExists(String fileName) {
+        if (fileName == null || fileName.isBlank()) {
+            return;
+        }
+        try {
+            Path novelPath = getStoragePath().resolve(fileName);
+            Files.deleteIfExists(novelPath);
+        } catch (IOException ignored) {
+            // Best-effort compensation only.
+        }
+    }
+
     private Path getStoragePath() throws IOException {
         Path path = Paths.get(appConfig.getStorage().getRootPath());
         if (!Files.exists(path)) {
