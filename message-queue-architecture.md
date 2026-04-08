@@ -25,7 +25,7 @@ sequenceDiagram
     participant SplitW as SplitWorker
     participant EmbedW as EmbedWorker
     participant CleanupW as CleanupWorker
-    participant SSE as SseBridgeConsumer
+    participant Frontend as Frontend (轮询)
 
     %% 1. Ingestion Pipeline
     rect rgb(240, 248, 255)
@@ -44,16 +44,15 @@ sequenceDiagram
     EmbedQ->>EmbedW: 消费消息 (入库向量DB)
     end
 
-    %% 2. Real-time Feedback
+    %% 2. 状态查询 (Polling Feedback)
     rect rgb(255, 248, 240)
-    Note over TaskSvc, SSE: 阶段 2: 状态实时同步 (Real-time Feedback)
-    LoadW->>TaskSvc: 更新进度/状态
-    SplitW->>TaskSvc: 更新进度/状态
-    EmbedW->>TaskSvc: 更新进度/状态
-    TaskSvc->>Fanout: 广播 TaskProgressEvent
-    Note right of TaskSvc: Fanout广播 (无特定RK)
-    Fanout->>SSE: 路由到各实例专属匿名队列
-    SSE->>SSE: 推送 SSE 事件至前端
+    Note over WebAPI, TaskSvc: 阶段 2: 状态查询 (Polling Feedback)
+    LoadW->>TaskSvc: 更新进度/状态至 DB
+    SplitW->>TaskSvc: 更新进度/状态至 DB
+    EmbedW->>TaskSvc: 更新进度/状态至 DB
+    Frontend->>WebAPI: 轮询查询任务进度 (每 2~3 秒)
+    WebAPI->>TaskSvc: 读取 DB 最新状态
+    TaskSvc-->>Frontend: 返回任务进度
     end
 
     %% 3. Maintenance Phase
@@ -76,10 +75,10 @@ sequenceDiagram
 *   **智能切分 (Split Phase)**：`SplitWorker` 消费 `novel.task.split` 队列，执行章节识别和 Scene 组装。完成后发送消息到 `embed` 路由键。
 *   **向量化入库 (Embed Phase)**：`EmbedWorker` 消费 `novel.task.embed` 队列，调用 Embedding 模型并将向量批量写入 ChromaDB。
 
-### 3.2 阶段 2：状态实时同步 (Real-time Feedback)
-提供可观测性。
-*   各个 Worker 在处理过程中，通过 `TaskService` 发送进度更新。
-*   消息发布到 `novel.task.notify.exchange` (Fanout)，广播给所有连接的 `SseBridgeConsumer`，最终推送到前端 UI。
+### 3.2 阶段 2：状态查询 (Polling Feedback)
+提供可观测性，目前采用轮询机制。
+*   各个 Worker (Load, Split, Embed) 在处理过程中，通过 `TaskService` 将进度和状态实时更新并持久化到数据库。
+*   前端通过定时（如每 2~3 秒）轮询 Web API 接口读取最新任务状态。考虑到长耗时任务特性，此频率的轮询体验与 SSE 差异不大，且大大降低了系统复杂度。
 
 ### 3.3 阶段 3：资源清理 (Maintenance Phase)
 保证最终一致性。
