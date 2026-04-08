@@ -12,6 +12,8 @@ interface SplitPreviewModalProps {
 
 export function SplitPreviewModal({ isOpen, onClose, novelId }: SplitPreviewModalProps) {
     const [selectedChapterId, setSelectedChapterId] = useState<string | null>(null);
+    const [scenePage, setScenePage] = useState(0);
+    const scenePageSize = 200;
 
     const { data: chapters, isLoading: isChaptersLoading } = useQuery({
         queryKey: ['chapters', novelId],
@@ -19,11 +21,12 @@ export function SplitPreviewModal({ isOpen, onClose, novelId }: SplitPreviewModa
         enabled: isOpen && !!novelId,
     });
 
-    const { data: scenes, isLoading: isScenesLoading } = useQuery({
-        queryKey: ['scenes', novelId, selectedChapterId],
-        queryFn: () => novelApi.getScenes(novelId, selectedChapterId!),
+    const { data: scenesPageData, isLoading: isScenesLoading } = useQuery({
+        queryKey: ['scenes', novelId, selectedChapterId, scenePage],
+        queryFn: () => novelApi.getScenes(novelId, selectedChapterId!, scenePage, scenePageSize),
         enabled: isOpen && !!novelId && !!selectedChapterId,
     });
+    const scenes = scenesPageData?.content ?? [];
 
     if (!isOpen) return null;
 
@@ -63,7 +66,10 @@ export function SplitPreviewModal({ isOpen, onClose, novelId }: SplitPreviewModa
                                 chapters?.map((chapter) => (
                                     <button
                                         key={chapter.chapterId}
-                                        onClick={() => setSelectedChapterId(chapter.chapterId)}
+                                        onClick={() => {
+                                            setSelectedChapterId(chapter.chapterId);
+                                            setScenePage(0);
+                                        }}
                                         className={cn(
                                             "w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center justify-between group",
                                             selectedChapterId === chapter.chapterId 
@@ -86,7 +92,11 @@ export function SplitPreviewModal({ isOpen, onClose, novelId }: SplitPreviewModa
                     <div className="w-2/3 bg-slate-50 flex flex-col relative">
                         <div className="p-4 border-b border-gray-100 bg-white flex justify-between items-center">
                             <h3 className="text-sm font-semibold text-gray-700">切分片段 (Scenes)</h3>
-                            {scenes && <span className="text-xs text-gray-500">共 {scenes.length} 个片段</span>}
+                            {scenesPageData && (
+                                <span className="text-xs text-gray-500">
+                                    共 {scenesPageData.totalElements} 个片段 · 第 {scenesPageData.number + 1}/{Math.max(scenesPageData.totalPages, 1)} 页
+                                </span>
+                            )}
                         </div>
                         <div className="flex-1 overflow-y-auto p-6 space-y-4">
                             {!selectedChapterId ? (
@@ -120,6 +130,24 @@ export function SplitPreviewModal({ isOpen, onClose, novelId }: SplitPreviewModa
                         </div>
                     </div>
                 </div>
+                {!!selectedChapterId && !!scenesPageData && scenesPageData.totalPages > 1 && (
+                    <div className="flex items-center justify-end gap-2 px-6 py-3 border-t border-gray-100 bg-white">
+                        <button
+                            className="px-3 py-1.5 text-sm rounded border border-gray-200 disabled:opacity-50"
+                            disabled={scenesPageData.first}
+                            onClick={() => setScenePage((p) => Math.max(0, p - 1))}
+                        >
+                            上一页
+                        </button>
+                        <button
+                            className="px-3 py-1.5 text-sm rounded border border-gray-200 disabled:opacity-50"
+                            disabled={scenesPageData.last}
+                            onClick={() => setScenePage((p) => p + 1)}
+                        >
+                            下一页
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );

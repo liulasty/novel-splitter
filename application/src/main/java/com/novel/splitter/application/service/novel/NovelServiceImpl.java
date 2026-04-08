@@ -38,6 +38,15 @@ public class NovelServiceImpl implements NovelService {
         }
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public String createNovelFromStoredFile(String storedRelativePath, String title, String author, String description) {
+        if (storedRelativePath == null || storedRelativePath.isBlank()) {
+            throw new IllegalArgumentException("storedRelativePath must not be blank");
+        }
+        return saveNovelRecord(storedRelativePath, title, author, description);
+    }
+
     private String saveNovelRecord(String fileName, String title, String author, String description) {
         String novelId = UUID.randomUUID().toString();
 

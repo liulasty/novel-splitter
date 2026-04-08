@@ -3,6 +3,8 @@ package com.novel.splitter.application.model.dto;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 public class DownloadAndIngestRequest {
     @NotBlank(message = "URL不能为空")
@@ -13,4 +15,8 @@ public class DownloadAndIngestRequest {
     
     private int maxScenes = 0;
     private String version;
+    /**
+     * 可选处理阶段，默认执行全流程 [SPLIT, EMBED]
+     */
+    private List<String> stages;
 }

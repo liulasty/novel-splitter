@@ -6,8 +6,15 @@ import org.springframework.amqp.core.DirectExchange;
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
+import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
+import org.springframework.amqp.rabbit.connection.ConnectionFactory;
+import org.springframework.amqp.rabbit.retry.RejectAndDontRequeueRecoverer;
+import org.springframework.amqp.rabbit.config.RetryInterceptorBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.retry.interceptor.RetryOperationsInterceptor;
+
+import java.util.Map;
 
 @Configuration
 public class RabbitConfig {
@@ -18,6 +25,14 @@ public class RabbitConfig {
     public static final String SPLIT_TASK_QUEUE = "novel.task.split";
     public static final String EMBED_TASK_QUEUE = "novel.task.embed";
     public static final String CLEANUP_TASK_QUEUE = "novel.task.cleanup";
+    public static final String ENRICH_TASK_QUEUE = "novel.task.enrich";
+    public static final String DLX_EXCHANGE_NAME = "novel.task.dlx";
+
+    public static final String LOAD_TASK_DLQ = "novel.task.load.dlq";
+    public static final String SPLIT_TASK_DLQ = "novel.task.split.dlq";
+    public static final String EMBED_TASK_DLQ = "novel.task.embed.dlq";
+    public static final String CLEANUP_TASK_DLQ = "novel.task.cleanup.dlq";
+    public static final String ENRICH_TASK_DLQ = "novel.task.enrich.dlq";
 
     @Bean
     public DirectExchange taskExchange() {
@@ -25,23 +40,73 @@ public class RabbitConfig {
     }
 
     @Bean
+    public DirectExchange deadLetterExchange() {
+        return new DirectExchange(DLX_EXCHANGE_NAME);
+    }
+
+    @Bean
     public Queue loadTaskQueue() {
-        return new Queue(LOAD_TASK_QUEUE, true);
+        return new Queue(LOAD_TASK_QUEUE, true, false, false, Map.of(
+                "x-dead-letter-exchange", DLX_EXCHANGE_NAME,
+                "x-dead-letter-routing-key", "load.dlq"
+        ));
     }
 
     @Bean
     public Queue splitTaskQueue() {
-        return new Queue(SPLIT_TASK_QUEUE, true);
+        return new Queue(SPLIT_TASK_QUEUE, true, false, false, Map.of(
+                "x-dead-letter-exchange", DLX_EXCHANGE_NAME,
+                "x-dead-letter-routing-key", "split.dlq"
+        ));
     }
 
     @Bean
     public Queue embedTaskQueue() {
-        return new Queue(EMBED_TASK_QUEUE, true);
+        return new Queue(EMBED_TASK_QUEUE, true, false, false, Map.of(
+                "x-dead-letter-exchange", DLX_EXCHANGE_NAME,
+                "x-dead-letter-routing-key", "embed.dlq"
+        ));
     }
 
     @Bean
     public Queue cleanupTaskQueue() {
-        return new Queue(CLEANUP_TASK_QUEUE, true);
+        return new Queue(CLEANUP_TASK_QUEUE, true, false, false, Map.of(
+                "x-dead-letter-exchange", DLX_EXCHANGE_NAME,
+                "x-dead-letter-routing-key", "cleanup.dlq"
+        ));
+    }
+
+    @Bean
+    public Queue enrichTaskQueue() {
+        return new Queue(ENRICH_TASK_QUEUE, true, false, false, Map.of(
+                "x-dead-letter-exchange", DLX_EXCHANGE_NAME,
+                "x-dead-letter-routing-key", "enrich.dlq"
+        ));
+    }
+
+    @Bean
+    public Queue loadTaskDlq() {
+        return new Queue(LOAD_TASK_DLQ, true);
+    }
+
+    @Bean
+    public Queue splitTaskDlq() {
+        return new Queue(SPLIT_TASK_DLQ, true);
+    }
+
+    @Bean
+    public Queue embedTaskDlq() {
+        return new Queue(EMBED_TASK_DLQ, true);
+    }
+
+    @Bean
+    public Queue cleanupTaskDlq() {
+        return new Queue(CLEANUP_TASK_DLQ, true);
+    }
+
+    @Bean
+    public Queue enrichTaskDlq() {
+        return new Queue(ENRICH_TASK_DLQ, true);
     }
 
     @Bean
@@ -65,7 +130,58 @@ public class RabbitConfig {
     }
 
     @Bean
+    public Binding enrichBinding(Queue enrichTaskQueue, DirectExchange taskExchange) {
+        return BindingBuilder.bind(enrichTaskQueue).to(taskExchange).with("enrich");
+    }
+
+    @Bean
+    public Binding loadDlqBinding(Queue loadTaskDlq, DirectExchange deadLetterExchange) {
+        return BindingBuilder.bind(loadTaskDlq).to(deadLetterExchange).with("load.dlq");
+    }
+
+    @Bean
+    public Binding splitDlqBinding(Queue splitTaskDlq, DirectExchange deadLetterExchange) {
+        return BindingBuilder.bind(splitTaskDlq).to(deadLetterExchange).with("split.dlq");
+    }
+
+    @Bean
+    public Binding embedDlqBinding(Queue embedTaskDlq, DirectExchange deadLetterExchange) {
+        return BindingBuilder.bind(embedTaskDlq).to(deadLetterExchange).with("embed.dlq");
+    }
+
+    @Bean
+    public Binding cleanupDlqBinding(Queue cleanupTaskDlq, DirectExchange deadLetterExchange) {
+        return BindingBuilder.bind(cleanupTaskDlq).to(deadLetterExchange).with("cleanup.dlq");
+    }
+
+    @Bean
+    public Binding enrichDlqBinding(Queue enrichTaskDlq, DirectExchange deadLetterExchange) {
+        return BindingBuilder.bind(enrichTaskDlq).to(deadLetterExchange).with("enrich.dlq");
+    }
+
+    @Bean
     public MessageConverter jsonMessageConverter() {
         return new Jackson2JsonMessageConverter();
+    }
+
+    @Bean
+    public RetryOperationsInterceptor rabbitRetryInterceptor() {
+        return RetryInterceptorBuilder.stateless()
+                .maxAttempts(3)
+                .backOffOptions(1000, 2.0, 10000)
+                .recoverer(new RejectAndDontRequeueRecoverer())
+                .build();
+    }
+
+    @Bean
+    public SimpleRabbitListenerContainerFactory rabbitListenerContainerFactory(
+            ConnectionFactory connectionFactory,
+            RetryOperationsInterceptor rabbitRetryInterceptor
+    ) {
+        SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
+        factory.setConnectionFactory(connectionFactory);
+        factory.setDefaultRequeueRejected(false);
+        factory.setAdviceChain(rabbitRetryInterceptor);
+        return factory;
     }
 }

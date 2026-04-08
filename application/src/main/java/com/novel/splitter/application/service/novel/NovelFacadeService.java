@@ -2,6 +2,7 @@ package com.novel.splitter.application.service.novel;
 
 import com.novel.splitter.application.model.dto.DownloadAndIngestRequest;
 import com.novel.splitter.application.model.dto.IngestRequest;
+import com.novel.splitter.application.model.dto.NovelPipelineRequestDto;
 import com.novel.splitter.application.model.dto.NovelUploadResponseDto;
 import com.novel.splitter.application.model.dto.NovelStatRecordDto;
 import com.novel.splitter.application.model.dto.ChapterDto;
@@ -22,6 +23,8 @@ public interface NovelFacadeService {
     TaskSubmitResponseDto split(String novelId, IngestRequest request) throws IOException;
 
     TaskSubmitResponseDto embed(String novelId) throws IOException;
+
+    TaskSubmitResponseDto pipeline(String novelId, NovelPipelineRequestDto request) throws IOException;
 
     TaskSubmitResponseDto ingest(IngestRequest request) throws IOException;
 

@@ -21,6 +21,17 @@ public interface NovelService {
     String createNovel(MultipartFile file, String title, String author, String description) throws IOException;
 
     /**
+     * 基于已落盘的相对路径创建小说记录（不执行文件写入）
+     *
+     * @param storedRelativePath 存储根目录下的相对路径（例如 raw/demo.txt）
+     * @param title              小说标题
+     * @param author             小说作者
+     * @param description        描述
+     * @return novelId
+     */
+    String createNovelFromStoredFile(String storedRelativePath, String title, String author, String description);
+
+    /**
      * 更新小说状态机
      * 状态流转：PENDING -> SPLITTING -> SPLIT_COMPLETED -> EMBEDDING -> COMPLETED
      *

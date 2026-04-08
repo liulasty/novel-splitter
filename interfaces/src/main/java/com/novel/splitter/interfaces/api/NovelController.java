@@ -3,6 +3,7 @@ package com.novel.splitter.interfaces.api;
 import com.novel.splitter.application.service.novel.NovelFacadeService;
 import com.novel.splitter.application.model.dto.IngestRequest;
 import com.novel.splitter.application.model.dto.ChapterDto;
+import com.novel.splitter.application.model.dto.NovelPipelineRequestDto;
 import com.novel.splitter.application.model.dto.NovelUploadResponseDto;
 import com.novel.splitter.application.model.dto.SceneDto;
 import com.novel.splitter.application.model.dto.TaskSubmitResponseDto;
@@ -83,6 +84,12 @@ public class NovelController {
     @PostMapping("/{novelId}/split")
     public TaskSubmitResponseDto splitNovel(@PathVariable String novelId, @Valid @RequestBody IngestRequest request) throws IOException {
         return novelFacadeService.split(novelId, request);
+    }
+
+    @Operation(summary = "触发小说处理流水线", description = "通过 stages 指定处理阶段（SPLIT/EMBED），推荐用于统一触发入口")
+    @PostMapping("/{novelId}/pipeline")
+    public TaskSubmitResponseDto triggerPipeline(@PathVariable String novelId, @Valid @RequestBody NovelPipelineRequestDto request) throws IOException {
+        return novelFacadeService.pipeline(novelId, request);
     }
 
     @Operation(summary = "启动小说向量化", description = "触发已切分小说的异步向量化入库流程")

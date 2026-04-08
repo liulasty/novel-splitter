@@ -59,7 +59,12 @@ export function useIngestTask() {
     });
 
     const splitMutation = useMutation({
-        mutationFn: (novelId: string) => novelApi.splitNovel(novelId, { version, strategy, maxTokens, overlapTokens }),
+        mutationFn: (novelId: string) =>
+            novelApi.triggerPipeline(novelId, {
+                stages: ['SPLIT'],
+                version,
+                maxScenes: 0,
+            }),
         onSuccess: (data) => {
             const msg = `切分任务已提交：${data.message}`;
             setIngestStatus(msg);
@@ -76,7 +81,11 @@ export function useIngestTask() {
     });
 
     const embedMutation = useMutation({
-        mutationFn: (novelId: string) => novelApi.embedNovel(novelId),
+        mutationFn: (novelId: string) =>
+            novelApi.triggerPipeline(novelId, {
+                stages: ['EMBED'],
+                version,
+            }),
         onSuccess: (data) => {
             const msg = `向量化入库任务已提交：${data.message}`;
             setIngestStatus(msg);

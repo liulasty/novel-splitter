@@ -50,6 +50,11 @@
 4. **前端 API Envelope 校验增强**
    - `isApiEnvelope` 增加数组拦截与 `code` 有限数值校验，减少协议异常被误判为合法响应的风险。
 
+5. **处理入口语义收敛（pipeline 化）**
+   - 新增 `POST /api/novels/{novelId}/pipeline`，通过 `stages`（`SPLIT` / `EMBED`）统一触发处理链路。
+   - 前端 Ingest 页面已切换到 `pipeline` 入口触发切分与向量化。
+   - 历史 `POST /api/novels/ingest` 与 `POST /api/v1/download/ingest` 保留兼容，推荐迁移到 `novelId` 驱动的新语义接口。
+
 ---
 
 ## 📋 工程级分析报告（代码审计版）

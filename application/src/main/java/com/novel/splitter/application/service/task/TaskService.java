@@ -37,6 +37,7 @@ public class TaskService {
     public SplitTask createTask(String taskId, TaskType taskType, String novelId, String fileName, int maxScenes, String version) {
         SplitTask task = new SplitTask(taskId, taskType, novelId, fileName, maxScenes, version);
         taskRepository.save(task);
+        appendTaskEvent(task);
         
         taskCachePort.put(taskId, PollResponse.builder()
                 .taskId(taskId)
@@ -130,6 +131,7 @@ public class TaskService {
                     break;
             }
             taskRepository.save(task);
+            appendTaskEvent(task);
 
             // Put task progress to cache for polling
             if (status == SplitTask.TaskStatus.SUCCESS || status == SplitTask.TaskStatus.FAILED) {
@@ -225,5 +227,22 @@ public class TaskService {
                 .updatedAt(task.getUpdatedAt())
                 .serverTime(System.currentTimeMillis())
                 .build();
+    }
+
+    private void appendTaskEvent(SplitTask task) {
+        if (task == null) {
+            return;
+        }
+        try {
+            taskEventRepository.save(new TaskProgressEvent(
+                    task.getTaskId(),
+                    task.getProgress(),
+                    task.getMessage(),
+                    task.getStatus() != null ? task.getStatus().name() : SplitTask.TaskStatus.PENDING.name(),
+                    System.currentTimeMillis()
+            ));
+        } catch (RuntimeException ignored) {
+            // Do not fail main task lifecycle when event persistence fails.
+        }
     }
 }

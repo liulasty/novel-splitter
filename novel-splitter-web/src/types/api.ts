@@ -36,6 +36,7 @@ export interface DownloadAndIngestRequest {
   name: string;
   version: string;
   maxScenes: number; // 0 for all
+  stages?: Array<'SPLIT' | 'EMBED'>;
 }
 
 export interface NovelUploadResponse {

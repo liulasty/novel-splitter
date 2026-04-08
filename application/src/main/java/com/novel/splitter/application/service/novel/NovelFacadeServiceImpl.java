@@ -1,7 +1,9 @@
 package com.novel.splitter.application.service.novel;
 
 import com.novel.splitter.application.config.RabbitConfig;
+import com.novel.splitter.application.config.AppConfig;
 import com.novel.splitter.application.model.dto.NovelUploadResponseDto;
+import com.novel.splitter.application.model.dto.NovelPipelineRequestDto;
 import com.novel.splitter.application.model.dto.TaskSubmitResponseDto;
 import com.novel.splitter.application.service.download.DownloadService;
 import com.novel.splitter.application.service.task.TaskService;
@@ -22,6 +24,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.nio.file.Paths;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -33,6 +36,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 @Service
@@ -48,6 +52,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
     private final TaskService taskService;
     private final RabbitTemplate rabbitTemplate;
     private final DownloadService downloadService;
+    private final AppConfig appConfig;
     private final com.novel.splitter.domain.repository.SceneRepository sceneRepository;
 
     @Override
@@ -152,6 +157,10 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
 
     @Override
     public TaskSubmitResponseDto split(String novelId, IngestRequest request) throws IOException {
+        return split(novelId, request, false);
+    }
+
+    private TaskSubmitResponseDto split(String novelId, IngestRequest request, boolean triggerEmbed) throws IOException {
         log.info("接收到切分请求: novelId={}, request={}", novelId, request);
         
         com.novel.splitter.domain.model.Novel novel = novelService.getNovelById(novelId);
@@ -165,7 +174,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
 
         taskService.createTask(taskId, TaskType.SPLIT, novelId, novel.getFilePath(), maxScenes, version);
         
-        SplitTaskMessage message = new SplitTaskMessage(taskId, novelId, maxScenes, version);
+        SplitTaskMessage message = new SplitTaskMessage(taskId, novelId, maxScenes, version, triggerEmbed);
         rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "load", message);
         log.info("Sent taskId {} to load queue for split", taskId);
 
@@ -201,6 +210,38 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
     }
 
     @Override
+    public TaskSubmitResponseDto pipeline(String novelId, NovelPipelineRequestDto request) throws IOException {
+        if (request == null || request.getStages() == null || request.getStages().isEmpty()) {
+            throw new IllegalArgumentException("stages is required");
+        }
+        boolean hasSplit = request.getStages().stream()
+                .filter(stage -> stage != null && !stage.isBlank())
+                .map(stage -> stage.trim().toUpperCase(Locale.ROOT))
+                .anyMatch("SPLIT"::equals);
+        boolean hasEmbed = request.getStages().stream()
+                .filter(stage -> stage != null && !stage.isBlank())
+                .map(stage -> stage.trim().toUpperCase(Locale.ROOT))
+                .anyMatch("EMBED"::equals);
+
+        if (!hasSplit && !hasEmbed) {
+            throw new IllegalArgumentException("Unsupported stages. Allowed values: SPLIT, EMBED");
+        }
+
+        if (hasSplit) {
+            IngestRequest ingestRequest = new IngestRequest();
+            ingestRequest.setVersion(request.getVersion());
+            ingestRequest.setMaxScenes(request.getMaxScenes());
+            TaskSubmitResponseDto splitTask = split(novelId, ingestRequest, hasEmbed);
+            if (hasEmbed) {
+                splitTask.setMessage("全流程任务已提交：SPLIT -> EMBED");
+            }
+            return splitTask;
+        }
+
+        return embed(novelId);
+    }
+
+    @Override
     public TaskSubmitResponseDto ingest(IngestRequest request) throws IOException {
         // 保留原有的 ingest 作为向前兼容，或者直接复用
         log.info("接收到原 ingest 请求: {}", request);
@@ -230,15 +271,20 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         
         // 1. 同步下载，得到落盘文件名
         String savedFileName = downloadService.downloadNovel(request.getUrl(), request.getName());
-        String fileName = Paths.get(savedFileName).getFileName().toString();
-        
-        // 2. 复用已有 ingest 入口，异步进入 Worker 链路
-        IngestRequest ingestRequest = new IngestRequest();
-        ingestRequest.setFileName(fileName);
-        ingestRequest.setVersion(request.getVersion());
-        ingestRequest.setMaxScenes(request.getMaxScenes());
-        
-        return ingest(ingestRequest);
+        String relativePath = toStorageRelativePath(savedFileName);
+
+        // 2. 下载后先创建 Novel 资源，再统一走 novelId 驱动 pipeline
+        String novelId = novelService.createNovelFromStoredFile(relativePath, request.getName(), null, "downloaded from " + request.getUrl());
+
+        NovelPipelineRequestDto pipelineRequest = new NovelPipelineRequestDto();
+        pipelineRequest.setVersion(request.getVersion());
+        pipelineRequest.setMaxScenes(request.getMaxScenes());
+        if (request.getStages() == null || request.getStages().isEmpty()) {
+            pipelineRequest.setStages(List.of("SPLIT", "EMBED"));
+        } else {
+            pipelineRequest.setStages(request.getStages());
+        }
+        return pipeline(novelId, pipelineRequest);
     }
 
     @Override
@@ -276,5 +322,17 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
             return DEFAULT_VERSION;
         }
         return version.trim();
+    }
+
+    private String toStorageRelativePath(String absoluteOrRelativePath) {
+        if (absoluteOrRelativePath == null || absoluteOrRelativePath.isBlank()) {
+            throw new IllegalArgumentException("downloaded file path is empty");
+        }
+        Path storageRoot = Paths.get(appConfig.getStorage().getRootPath()).toAbsolutePath().normalize();
+        Path downloaded = Paths.get(absoluteOrRelativePath).toAbsolutePath().normalize();
+        if (!downloaded.startsWith(storageRoot)) {
+            throw new IllegalArgumentException("downloaded file is outside storage root: " + downloaded);
+        }
+        return storageRoot.relativize(downloaded).toString().replace('\\', '/');
     }
 }

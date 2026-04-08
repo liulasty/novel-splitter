@@ -53,7 +53,7 @@ public class DownloadController {
      * @param request 下载并入库请求参数
      * @return 启动入库任务的响应信息
      */
-    @Operation(summary = "小说下载并入库处理", description = "同步下载小说文件后异步启动入库流程")
+    @Operation(summary = "小说下载并入库处理", description = "同步下载小说文件后异步启动入库流程（兼容入口，建议迁移到 /api/novels/{novelId}/pipeline）")
     @PostMapping("/ingest")
     public TaskSubmitResponseDto downloadAndIngest(@Valid @RequestBody DownloadAndIngestRequest request) throws IOException {
         return novelFacadeService.downloadAndIngest(request);

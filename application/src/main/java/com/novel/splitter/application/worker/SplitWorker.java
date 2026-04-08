@@ -3,6 +3,7 @@ package com.novel.splitter.application.worker;
 import com.novel.splitter.application.config.RabbitConfig;
 import com.novel.splitter.domain.task.SplitTask;
 import com.novel.splitter.domain.task.SplitTaskMessage;
+import com.novel.splitter.domain.task.EnrichTaskMessage;
 import com.novel.splitter.domain.repository.NovelCacheRepository;
 import com.novel.splitter.domain.enums.TaskType;
 import com.novel.splitter.pipeline.orchestrator.SplitNovelUseCase;
@@ -32,6 +33,8 @@ public class SplitWorker {
 
     @org.springframework.beans.factory.annotation.Value("${splitter.ingestion.batch-size:10}")
     private int batchSize;
+    @org.springframework.beans.factory.annotation.Value("${splitter.enrich.enabled:false}")
+    private boolean enrichEnabled;
 
     @RabbitListener(queues = RabbitConfig.SPLIT_TASK_QUEUE)
     public void processSplitTask(SplitTaskMessage message) {
@@ -76,9 +79,32 @@ public class SplitWorker {
             
             if (message.getNovelId() != null) {
                 novelService.updateNovelStatus(message.getNovelId(), NovelStatus.SPLIT_COMPLETED);
-                // [FUTURE] 预留: 发送消息到 ENRICH_TASK_QUEUE 进行 AI 语义增强
-                // rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "enrich", new EnrichTaskMessage(taskId, message.getNovelId(), ...));
-                log.info("=== [AI Enrichment Placeholder] === Would trigger AI enrichment MQ task here for novel {}", message.getNovelId());
+                if (message.isTriggerEmbed()) {
+                    String embedTaskId = java.util.UUID.randomUUID().toString();
+                    taskService.createTask(
+                            embedTaskId,
+                            TaskType.EMBED,
+                            message.getNovelId(),
+                            message.getNovelId(),
+                            Integer.MAX_VALUE,
+                            message.getVersion()
+                    );
+                    rabbitTemplate.convertAndSend(
+                            RabbitConfig.EXCHANGE_NAME,
+                            "embed",
+                            new com.novel.splitter.domain.task.EmbedTaskMessage(embedTaskId, message.getNovelId(), message.getVersion())
+                    );
+                    log.info("任务 {} 已自动串联 EMBED 阶段，embedTaskId={}", taskId, embedTaskId);
+                }
+                // 预留: 发送消息到 ENRICH_TASK_QUEUE 进行 AI 语义增强
+                if (enrichEnabled) {
+                    rabbitTemplate.convertAndSend(
+                            RabbitConfig.EXCHANGE_NAME,
+                            "enrich",
+                            new EnrichTaskMessage(taskId, message.getNovelId(), message.getVersion(), sceneIds)
+                    );
+                    log.info("任务 {} 已发送 ENRICH 语义增强任务", taskId);
+                }
             }
             
             log.info("任务 {} Split 阶段完成，共处理 {} 个场景", taskId, sceneIds.size());

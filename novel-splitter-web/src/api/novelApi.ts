@@ -44,13 +44,25 @@ export interface ScenePreviewDto {
   tokens: number;
 }
 
-interface PageResponse<T> {
+export interface PageResponse<T> {
   content: T[];
+  totalElements: number;
+  totalPages: number;
+  number: number;
+  size: number;
+  first: boolean;
+  last: boolean;
 }
 
 export interface TaskSubmitResponse {
   taskId: string;
   message: string;
+}
+
+export interface NovelPipelineRequestDto {
+  stages: Array<'SPLIT' | 'EMBED'>;
+  version?: string;
+  maxScenes?: number;
 }
 
 export const novelApi = {
@@ -96,17 +108,22 @@ export const novelApi = {
     return response;
   },
 
+  triggerPipeline: async (novelId: string, request: NovelPipelineRequestDto): Promise<TaskSubmitResponse> => {
+    const response = await apiClient.post<ApiEnvelope<TaskSubmitResponse>, TaskSubmitResponse>(`/novels/${novelId}/pipeline`, request);
+    return response;
+  },
+
   getChapters: async (novelId: string): Promise<ChapterTreeDto[]> => {
     const response = await apiClient.get<ApiEnvelope<ChapterTreeDto[]>, ChapterTreeDto[]>(`/novels/${novelId}/chapters`);
     return response;
   },
 
-  getScenes: async (novelId: string, chapterId: string, page = 0, size = 200): Promise<ScenePreviewDto[]> => {
+  getScenes: async (novelId: string, chapterId: string, page = 0, size = 200): Promise<PageResponse<ScenePreviewDto>> => {
     const response = await apiClient.get<ApiEnvelope<PageResponse<ScenePreviewDto>>, PageResponse<ScenePreviewDto>>(
       `/novels/${novelId}/chapters/${chapterId}/scenes`,
       { params: { page, size } }
     );
-    return response.content ?? [];
+    return response;
   },
 
   deleteNovel: async (novelId: string): Promise<{ message: string }> => {
