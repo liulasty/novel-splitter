@@ -6,6 +6,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.ColumnDefault;
 
 @Entity
 @Table(name = "split_tasks")
@@ -21,6 +22,7 @@ public class JpaSplitTaskEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "task_type", nullable = false)
+    @ColumnDefault("'SPLIT'")
     @Builder.Default
     private com.novel.splitter.domain.enums.TaskType taskType = com.novel.splitter.domain.enums.TaskType.SPLIT;
 

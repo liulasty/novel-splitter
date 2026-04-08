@@ -30,6 +30,8 @@ public class OnnxModelHolder {
     private OrtEnvironment env;
     /** ONNX 模型执行会话 */
     private OrtSession session;
+    /** 启动时提取内置模型使用的临时目录（若使用外部模型则为空） */
+    private Path extractedModelTempDir;
     
     /** 外部 ONNX 模型的文件路径，如果未配置则使用类路径下的内置模型 */
     @org.springframework.beans.factory.annotation.Value("${embedding.onnx.model-path:}")
@@ -77,6 +79,7 @@ public class OnnxModelHolder {
                 log.info("Using bundled ONNX model from classpath");
                 // 提取类路径下的内置模型文件到本次启动独立的临时目录，避免 Windows 文件映射锁导致覆盖失败
                 Path tempDir = Files.createTempDirectory("novel-splitter-embedding-");
+                this.extractedModelTempDir = tempDir;
                 log.info("Extracting bundled ONNX resources to temp dir: {}", tempDir);
                 
                 File modelFile = extractResource(MODEL_RESOURCE_DIR + MODEL_FILE, tempDir.resolve(MODEL_FILE));
@@ -155,6 +158,29 @@ public class OnnxModelHolder {
             }
         } catch (OrtException e) {
             log.error("Error closing ONNX resources", e);
+        } finally {
+            cleanupTempDir();
+        }
+    }
+
+    private void cleanupTempDir() {
+        if (extractedModelTempDir == null) {
+            return;
+        }
+        try (var paths = Files.walk(extractedModelTempDir)) {
+            paths.sorted((a, b) -> b.compareTo(a))
+                    .forEach(path -> {
+                        try {
+                            Files.deleteIfExists(path);
+                        } catch (IOException e) {
+                            log.warn("Failed to delete temp path: {}", path, e);
+                        }
+                    });
+            log.info("Cleaned extracted ONNX temp dir: {}", extractedModelTempDir);
+        } catch (IOException e) {
+            log.warn("Failed to cleanup extracted ONNX temp dir: {}", extractedModelTempDir, e);
+        } finally {
+            extractedModelTempDir = null;
         }
     }
 

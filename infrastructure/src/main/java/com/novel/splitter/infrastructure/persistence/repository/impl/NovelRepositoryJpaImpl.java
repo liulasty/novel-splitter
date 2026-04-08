@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -27,13 +28,19 @@ public class NovelRepositoryJpaImpl implements NovelRepository {
 
     @Override
     public void save(Novel novel) {
-        JpaNovelEntity entity = novelMapper.toEntity(novel);
+        String novelId = Objects.requireNonNull(novel.getId(), "novel.id must not be null");
+        JpaNovelEntity entity = Objects.requireNonNull(
+                jpaNovelRepository.findById(novelId).orElseGet(JpaNovelEntity::new),
+                "entity must not be null"
+        );
+        novelMapper.toEntity(entity, novel);
         jpaNovelRepository.save(entity);
     }
 
     @Override
     public Optional<Novel> findById(String id) {
-        return jpaNovelRepository.findById(id).map(novelMapper::toDomain);
+        String novelId = Objects.requireNonNull(id, "id must not be null");
+        return jpaNovelRepository.findById(novelId).map(novelMapper::toDomain);
     }
 
     @Override

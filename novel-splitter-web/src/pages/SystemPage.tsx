@@ -2,7 +2,6 @@ import { useQuery } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Loader2, Clock, CheckCircle2, XCircle, ArrowRight } from "lucide-react";
 import { vectorApi } from "@/api/vectorApi";
-import { chromaApi } from "@/api/chromaApi";
 import { novelApi } from "@/api/novelApi";
 import { taskApi } from "@/api/taskApi";
 import { cn } from "@/lib/utils";
@@ -29,20 +28,6 @@ export default function SystemPage() {
         queryKey: ['tasks'],
         queryFn: taskApi.getAllTasks,
         refetchInterval: 5000,
-    });
-
-    // Chroma Queries
-    useQuery({
-        queryKey: ['chromaCollections'],
-        queryFn: chromaApi.getCollections,
-        // ✅ 关键：自动解析 JSON 字符串为数组
-        select: (res) => {
-            try {
-                return JSON.parse(res.data);
-            } catch {
-                return []; // 解析失败返回空数组，防止报错
-            }
-        },
     });
 
     return (

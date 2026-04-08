@@ -4,6 +4,7 @@ import com.novel.splitter.domain.model.Novel;
 import com.novel.splitter.infrastructure.persistence.entity.JpaNovelEntity;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.MappingTarget;
 import org.mapstruct.factory.Mappers;
 
 @Mapper(componentModel = "spring")
@@ -17,6 +18,6 @@ public interface NovelMapper {
     Novel toDomain(JpaNovelEntity entity);
 
     // Map Domain Model to JPA Entity
-    @Mapping(target = "isDeleted", expression = "java(domain.isDeleted())")
-    JpaNovelEntity toEntity(Novel domain);
+    @Mapping(target = "deleted", source = "domain.deleted")
+    JpaNovelEntity toEntity(@MappingTarget JpaNovelEntity entity, Novel domain);
 }
