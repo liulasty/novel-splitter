@@ -1,38 +1,28 @@
-# 项目排除路径
-/application/target/
-/domain/target/
-/infrastructure/target/
-/novelDownloader/target/
-/pipeline/target/
-/repository/target/
-/splitter/target/
-/validation/target/
-/embedding/target/
-/retrieval/target/
-/llm-client/target/
-/context-assembler/target/
+# Maven / Java build artifacts
+target/
+**/target/
+*.class
+*.jar
 
-bge-small-zh-v1.5-ONNX
+# IDE / editor
+.idea/
+.vscode/
+.trae/
+*.iml
 
+# OS files
+.DS_Store
 
-# 忽略文件
-.vscode
-.idea
-.trae
+# Env files
 .env
 config/.env.*
 !config/.env.example
 
-# 下载的文件
-data
-
-# 日志文件
-logs
+# Runtime data / logs
+data/
+logs/
 *.log
 
-# target
- target
-
- # 忽略各个模块的编译文件夹
- /**/**/target
+# Local model artifacts
+bge-small-zh-v1.5-ONNX/
 

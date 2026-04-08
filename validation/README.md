@@ -10,11 +10,11 @@
 
 ## 技术栈
 - 核心语言：Java 21
-- 无外部依赖：纯粹的 Java 业务逻辑模块。
+- 轻量依赖：内部依赖 `domain`，并复用父 POM 提供的 `lombok`。
 
 ## 模块依赖
 - 本模块依赖的内部子模块：`domain`
-- 依赖本模块的内部子模块：`batch-processing`, `text-processing`
+- 当前主要依赖本模块的内部子模块：`text-processing`
 
 ## 核心组件
 | 组件名称 | 类型 | 核心职责 |
