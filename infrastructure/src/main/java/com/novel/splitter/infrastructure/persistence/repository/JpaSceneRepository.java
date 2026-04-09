@@ -28,6 +28,9 @@ public interface JpaSceneRepository extends JpaRepository<JpaSceneEntity, Long>,
 
     Page<JpaSceneEntity> findByNovelId(String novelId, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"novel", "chapter"})
+    List<JpaSceneEntity> findByNovelId(String novelId);
+
     Stream<JpaSceneEntity> streamAllByNovelNameAndVersion(String novelName, String version);
 
     @Query("SELECT s FROM JpaSceneEntity s")
@@ -58,6 +61,9 @@ public interface JpaSceneRepository extends JpaRepository<JpaSceneEntity, Long>,
 
     @Query("SELECT DISTINCT s.version FROM JpaSceneEntity s WHERE s.novelName = ?1")
     List<String> findDistinctVersionsByNovelName(String novelName);
+
+    @Query("SELECT DISTINCT s.version FROM JpaSceneEntity s WHERE s.novel.id = ?1")
+    List<String> findDistinctVersionsByNovelId(String novelId);
 
     @Query("SELECT s.novelName, s.version, COUNT(s) FROM JpaSceneEntity s GROUP BY s.novelName, s.version")
     List<Object[]> countScenesByNovelAndVersion();

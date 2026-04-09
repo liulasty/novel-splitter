@@ -27,6 +27,13 @@ public interface KnowledgeBaseService {
     List<SceneDto> getScenesByNovel(String novelName);
 
     /**
+     * 按 novelId 获取指定小说的全部 Scene
+     * @param novelId novels 表主键
+     * @return Scene 列表
+     */
+    List<SceneDto> getScenesByNovelId(String novelId);
+
+    /**
      * 删除指定版本的切分结果（及相关向量）
      * @param novelName 小说名称
      * @param version 版本
@@ -54,4 +61,19 @@ public interface KnowledgeBaseService {
      * @return 版本列表
      */
     List<String> listVersions(String novelName);
+
+    /**
+     * 获取指定小说（按 novelId）的所有版本列表
+     * @param novelId novels 表主键
+     * @return 版本列表
+     */
+    List<String> listVersionsByNovelId(String novelId);
+
+    /**
+     * 按 novelId 删除指定版本的切分结果（及相关向量）
+     * @param novelId novels 表主键
+     * @param version 版本
+     * @return cleanupTaskId
+     */
+    Long deleteVersionByNovelId(String novelId, String version);
 }

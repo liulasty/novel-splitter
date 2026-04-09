@@ -3,13 +3,18 @@ package com.novel.splitter.infrastructure.persistence.entity;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
+import org.hibernate.Hibernate;
 import org.hibernate.annotations.SQLRestriction;
 
 @Entity
 @Table(name = "chapters")
-@Data
+@Getter
+@Setter
+@ToString(exclude = "novel")
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -36,4 +41,17 @@ public class JpaChapterEntity {
     @Column(name = "is_deleted", nullable = false)
     @Builder.Default
     private boolean isDeleted = false;
+
+    @Override
+    public final boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || Hibernate.getClass(this) != Hibernate.getClass(o)) return false;
+        JpaChapterEntity other = (JpaChapterEntity) o;
+        return id != null && id.equals(other.id);
+    }
+
+    @Override
+    public final int hashCode() {
+        return Hibernate.getClass(this).hashCode();
+    }
 }

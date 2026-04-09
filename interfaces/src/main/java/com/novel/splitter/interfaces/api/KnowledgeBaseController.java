@@ -32,16 +32,34 @@ public class KnowledgeBaseController {
         return knowledgeBaseService.getScenesByNovel(novelName);
     }
 
+    @Operation(summary = "按 novelId 获取指定小说的所有段落")
+    @GetMapping("/id/{novelId}/scenes")
+    public List<SceneDto> getScenesByNovelId(@PathVariable("novelId") String novelId) {
+        return knowledgeBaseService.getScenesByNovelId(novelId);
+    }
+
     @Operation(summary = "获取指定小说的所有版本列表")
     @GetMapping("/{novelName}/versions")
     public List<String> listVersions(@PathVariable("novelName") String novelName) {
         return knowledgeBaseService.listVersions(novelName);
     }
 
+    @Operation(summary = "获取指定小说（按 novelId）的所有版本列表")
+    @GetMapping("/id/{novelId}/versions")
+    public List<String> listVersionsByNovelId(@PathVariable("novelId") String novelId) {
+        return knowledgeBaseService.listVersionsByNovelId(novelId);
+    }
+
     @Operation(summary = "删除指定小说的特定版本")
     @DeleteMapping("/{novelName}/versions/{version}")
     public Long deleteVersion(@PathVariable("novelName") String novelName, @PathVariable("version") String version) {
         return knowledgeBaseService.deleteVersion(novelName, version);
+    }
+
+    @Operation(summary = "按 novelId 删除指定版本")
+    @DeleteMapping("/id/{novelId}/versions/{version}")
+    public Long deleteVersionByNovelId(@PathVariable("novelId") String novelId, @PathVariable("version") String version) {
+        return knowledgeBaseService.deleteVersionByNovelId(novelId, version);
     }
 
     @Operation(summary = "按 novelId 删除整部小说的知识库")

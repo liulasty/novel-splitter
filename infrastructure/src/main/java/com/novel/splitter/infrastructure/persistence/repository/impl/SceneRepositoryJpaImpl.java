@@ -143,8 +143,19 @@ public class SceneRepositoryJpaImpl implements SceneRepository {
     }
 
     @Override
+    public List<String> listVersionsByNovelId(String novelId) {
+        return jpaSceneRepository.findDistinctVersionsByNovelId(novelId);
+    }
+
+    @Override
     public List<Scene> findByNovel(String novelName) {
         List<JpaSceneEntity> entities = jpaSceneRepository.findByNovelName(novelName);
+        return entities.stream().map(sceneMapper::toDomain).collect(Collectors.toList());
+    }
+
+    @Override
+    public List<Scene> findAllByNovelId(String novelId) {
+        List<JpaSceneEntity> entities = jpaSceneRepository.findByNovelId(novelId);
         return entities.stream().map(sceneMapper::toDomain).collect(Collectors.toList());
     }
 

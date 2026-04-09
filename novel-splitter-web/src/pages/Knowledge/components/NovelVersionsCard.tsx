@@ -12,8 +12,8 @@ export function NovelVersionsCard({ novelId, novelName }: { novelId: string, nov
     const [deleteConfirming, setDeleteConfirming] = useState(false);
 
     const { data: versions, isLoading, isError } = useQuery({
-        queryKey: ['versions', novelName],
-        queryFn: () => knowledgeApi.getVersions(novelName),
+        queryKey: ['versions', novelId],
+        queryFn: () => knowledgeApi.getVersionsByNovelId(novelId),
     });
 
     const deleteNovelMutation = useMutation({
@@ -33,10 +33,10 @@ export function NovelVersionsCard({ novelId, novelName }: { novelId: string, nov
     });
 
     const deleteVersionMutation = useMutation({
-        mutationFn: (version: string) => knowledgeApi.deleteVersion(novelName, version),
+        mutationFn: (version: string) => knowledgeApi.deleteVersionByNovelId(novelId, version),
         onSuccess: (_, version) => {
             toast.success(`版本 "${version}" 已删除`);
-            queryClient.invalidateQueries({ queryKey: ['versions', novelName] });
+            queryClient.invalidateQueries({ queryKey: ['versions', novelId] });
         },
         onError: (error) => {
             toast.error(`删除版本失败: ${error}`);

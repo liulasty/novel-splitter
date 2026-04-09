@@ -83,6 +83,13 @@ public interface SceneRepository {
      * @return 版本列表
      */
     List<String> listVersions(String novelName);
+
+    /**
+     * 获取指定小说（按 novelId）的所有版本列表
+     * @param novelId novels 表主键
+     * @return 版本列表
+     */
+    List<String> listVersionsByNovelId(String novelId);
     
     /**
      * 查找指定小说的所有 Scene (Convenience method, delegates to loadScenes for all versions or specific logic)
@@ -90,6 +97,13 @@ public interface SceneRepository {
      * @return Scene 列表
      */
     List<Scene> findByNovel(String novelName);
+
+    /**
+     * 按小说 ID 获取全部 Scene（不分页）
+     * @param novelId novels 表主键
+     * @return Scene 列表
+     */
+    List<Scene> findAllByNovelId(String novelId);
 
     /**
      * 统计指定小说和版本下的场景数量

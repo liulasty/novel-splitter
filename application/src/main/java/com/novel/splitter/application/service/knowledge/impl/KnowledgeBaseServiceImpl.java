@@ -75,6 +75,15 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
     }
 
     @Override
+    public List<SceneDto> getScenesByNovelId(String novelId) {
+        String normalizedNovelId = novelId != null ? novelId.trim() : null;
+        if (normalizedNovelId == null || normalizedNovelId.isEmpty()) {
+            throw new IllegalArgumentException("novelId must not be blank");
+        }
+        return dtoMapper.toSceneDtos(sceneRepository.findAllByNovelId(normalizedNovelId));
+    }
+
+    @Override
     @Transactional
     public Long deleteVersion(String novelName, String version) {
         String normalizedNovelName = normalizeNovelName(novelName);
@@ -166,6 +175,56 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
     @Override
     public List<String> listVersions(String novelName) {
         return sceneRepository.listVersions(normalizeNovelName(novelName));
+    }
+
+    @Override
+    public List<String> listVersionsByNovelId(String novelId) {
+        String normalizedNovelId = novelId != null ? novelId.trim() : null;
+        if (normalizedNovelId == null || normalizedNovelId.isEmpty()) {
+            throw new IllegalArgumentException("novelId must not be blank");
+        }
+        return sceneRepository.listVersionsByNovelId(normalizedNovelId);
+    }
+
+    @Override
+    @Transactional
+    public Long deleteVersionByNovelId(String novelId, String version) {
+        String normalizedNovelId = novelId != null ? novelId.trim() : null;
+        if (normalizedNovelId == null || normalizedNovelId.isEmpty()) {
+            throw new IllegalArgumentException("novelId must not be blank");
+        }
+        if (version == null || version.isBlank()) {
+            throw new IllegalArgumentException("version must not be blank");
+        }
+
+        String trimmedVersion = version.trim();
+        log.info("Logical deleting version by novelId: {}/{}", normalizedNovelId, trimmedVersion);
+        sceneRepository.deleteVersionByNovelId(normalizedNovelId, trimmedVersion);
+
+        String novelName = novelRepository.findById(normalizedNovelId)
+                .map(n -> n.getTitle() != null && !n.getTitle().isBlank() ? n.getTitle() : n.getId())
+                .orElse(normalizedNovelId);
+
+        CleanupTask task = CleanupTask.builder()
+                .targetId(normalizedNovelId)
+                .targetType("VERSION_BY_NOVEL_ID")
+                .version(trimmedVersion)
+                .status("PENDING")
+                .build();
+        CleanupTask savedTask = cleanupTaskRepository.save(task);
+
+        CleanupTaskMessage message = CleanupTaskMessage.builder()
+                .cleanupTaskId(savedTask.getId())
+                .targetId(normalizedNovelId)
+                .targetType("VERSION_BY_NOVEL_ID")
+                .novelId(normalizedNovelId)
+                .novelName(novelName)
+                .version(trimmedVersion)
+                .build();
+
+        rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "cleanup", message);
+        log.info("Sent cleanup task {} to MQ for novelId {} version {}", savedTask.getId(), normalizedNovelId, trimmedVersion);
+        return savedTask.getId();
     }
 
     private String normalizeNovelName(String novelName) {

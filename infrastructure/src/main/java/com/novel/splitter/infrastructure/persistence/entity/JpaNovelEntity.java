@@ -4,13 +4,17 @@ import com.novel.splitter.domain.enums.NovelStatus;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
 import org.hibernate.annotations.SQLRestriction;
 
 @Entity
 @Table(name = "novels")
-@Data
+@Getter
+@Setter
+@ToString
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -49,4 +53,16 @@ public class JpaNovelEntity {
     @Column(name = "is_deleted", nullable = false)
     @Builder.Default
     private boolean isDeleted = false;
+
+    @Override
+    public final boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof JpaNovelEntity other)) return false;
+        return id != null && id.equals(other.id);
+    }
+
+    @Override
+    public final int hashCode() {
+        return getClass().hashCode();
+    }
 }

@@ -4,6 +4,7 @@ import { novelApi } from "@/api/novelApi";
 import { knowledgeApi } from "@/api/knowledgeApi";
 import { chatApi } from "@/api/chatApi";
 import type { Citation } from "@/types/api";
+import type { NovelSummaryDto } from "@/api/novelApi";
 
 export interface Message {
     id: string;
@@ -13,7 +14,7 @@ export interface Message {
 }
 
 export function useChatLogic() {
-    const [selectedNovel, setSelectedNovel] = useState<string>("");
+    const [selectedNovel, setSelectedNovel] = useState<string>(""); // novelId
     const [selectedVersion, setSelectedVersion] = useState<string>("");
     const [topK, setTopK] = useState<number>(3);
     const [inputValue, setInputValue] = useState("");
@@ -26,15 +27,15 @@ export function useChatLogic() {
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const { data: novelSummaries } = useQuery({ queryKey: ['novels'], queryFn: novelApi.getNovels });
-    const novels = novelSummaries?.map(n => n.title) ?? [];
+    const novels: Array<Pick<NovelSummaryDto, 'novelId' | 'title'>> = novelSummaries?.map(n => ({ novelId: n.novelId, title: n.title })) ?? [];
     const { data: versions } = useQuery({
         queryKey: ['versions', selectedNovel],
-        queryFn: () => knowledgeApi.getVersions(selectedNovel),
+        queryFn: () => knowledgeApi.getVersionsByNovelId(selectedNovel),
         enabled: !!selectedNovel,
     });
 
     useEffect(() => {
-        if (novels.length && !selectedNovel) setSelectedNovel(novels[0]);
+        if (novels.length && !selectedNovel) setSelectedNovel(novels[0].novelId);
     }, [novels, selectedNovel]);
 
     useEffect(() => {
@@ -70,6 +71,7 @@ export function useChatLogic() {
         setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', content: inputValue }]);
         const q = inputValue;
         setInputValue("");
+        // Backend chat still uses "novel" as a name-like identifier; keep passing novelId for DB-first routing.
         chatMutation.mutate({ question: q, novel: selectedNovel, version: selectedVersion, topK });
     };
 

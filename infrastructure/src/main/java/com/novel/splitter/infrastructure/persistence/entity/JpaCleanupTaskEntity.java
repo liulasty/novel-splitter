@@ -3,8 +3,11 @@ package com.novel.splitter.infrastructure.persistence.entity;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
+import org.hibernate.Hibernate;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -12,7 +15,9 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "cleanup_tasks")
-@Data
+@Getter
+@Setter
+@ToString
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -44,4 +49,17 @@ public class JpaCleanupTaskEntity {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @Override
+    public final boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || Hibernate.getClass(this) != Hibernate.getClass(o)) return false;
+        JpaCleanupTaskEntity other = (JpaCleanupTaskEntity) o;
+        return id != null && id.equals(other.id);
+    }
+
+    @Override
+    public final int hashCode() {
+        return Hibernate.getClass(this).hashCode();
+    }
 }

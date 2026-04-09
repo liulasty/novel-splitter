@@ -9,6 +9,7 @@ import { estimateTokens } from '@/utils/tokenEstimator';
 import { toast } from 'sonner';
 import { CollapseCard } from '@/components/ui/collapse-card';
 import { Copy, Filter, ArrowDownAZ, ArrowUpZA } from 'lucide-react';
+import type { NovelSummaryDto } from '@/api/novelApi';
 
 const TABS = [
   { id: 'retrieval', label: '检索结果 (Retrieval)' },
@@ -17,10 +18,10 @@ const TABS = [
 ];
 
 export default function RagDebugPage() {
-  const [novels, setNovels] = useState<string[]>([]);
+  const [novels, setNovels] = useState<Array<Pick<NovelSummaryDto, 'novelId' | 'title'>>>([]);
   const [versions, setVersions] = useState<string[]>([]);
   
-  const [selectedNovel, setSelectedNovel] = useState<string>('');
+  const [selectedNovel, setSelectedNovel] = useState<string>(''); // novelId
   const [selectedVersion, setSelectedVersion] = useState<string>('');
   const [question, setQuestion] = useState<string>('');
   const [topK, setTopK] = useState<number>(5);
@@ -44,12 +45,14 @@ export default function RagDebugPage() {
   const [contextSortAsc, setContextSortAsc] = useState(false);
 
   useEffect(() => {
-    novelApi.getNovels().then((list) => setNovels(list.map(n => n.title))).catch(console.error);
+    novelApi.getNovels()
+      .then((list) => setNovels(list.map(n => ({ novelId: n.novelId, title: n.title }))))
+      .catch(console.error);
   }, []);
 
   useEffect(() => {
     if (selectedNovel) {
-      knowledgeApi.getVersions(selectedNovel).then(setVersions).catch(console.error);
+      knowledgeApi.getVersionsByNovelId(selectedNovel).then(setVersions).catch(console.error);
       setSelectedVersion('');
     } else {
       setVersions([]);
@@ -429,7 +432,7 @@ export default function RagDebugPage() {
                 onChange={(e) => setSelectedNovel(e.target.value)}
               >
                 <option value="">选择小说...</option>
-                {novels.map(n => <option key={n} value={n}>{n}</option>)}
+                {novels.map(n => <option key={n.novelId} value={n.novelId}>{n.title}</option>)}
               </select>
               <select 
                 className="w-full md:w-32 p-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none"

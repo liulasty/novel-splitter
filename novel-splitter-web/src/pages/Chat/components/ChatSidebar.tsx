@@ -1,8 +1,8 @@
 interface ChatSidebarProps {
     state: {
-        novels: string[] | undefined;
+        novels: Array<{ novelId: string; title: string }> | undefined;
         versions: string[] | undefined;
-        selectedNovel: string;
+        selectedNovel: string; // novelId
         selectedVersion: string;
         topK: number;
     };
@@ -32,7 +32,9 @@ export function ChatSidebar({ state, actions }: ChatSidebarProps) {
                             onChange={(e) => actions.setSelectedNovel(e.target.value)}
                         >
                             <option value="" disabled>-- 请选择 --</option>
-                            {Array.isArray(state.novels) && state.novels.map(n => <option key={n} value={n}>{n}</option>)}
+                            {Array.isArray(state.novels) && state.novels.map(n => (
+                                <option key={n.novelId} value={n.novelId}>{n.title}</option>
+                            ))}
                         </select>
                     </div>
 

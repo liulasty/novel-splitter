@@ -4,13 +4,17 @@ import com.novel.splitter.domain.task.SplitTask.TaskStatus;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
 import org.hibernate.annotations.ColumnDefault;
 
 @Entity
 @Table(name = "split_tasks")
-@Data
+@Getter
+@Setter
+@ToString
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -59,4 +63,16 @@ public class JpaSplitTaskEntity {
 
     @Column(name = "completed_scenes")
     private int completedScenes;
+
+    @Override
+    public final boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof JpaSplitTaskEntity other)) return false;
+        return taskId != null && taskId.equals(other.taskId);
+    }
+
+    @Override
+    public final int hashCode() {
+        return getClass().hashCode();
+    }
 }
