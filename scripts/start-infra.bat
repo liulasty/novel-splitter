@@ -34,9 +34,8 @@ echo [2/3] Starting infrastructure services...
 echo       - PostgreSQL
 echo       - RabbitMQ
 echo       - ChromaDB
-echo       - Adminer
 echo.
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml --env-file config/.env.dev up -d postgres rabbitmq chromadb adminer
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml --env-file config/.env.dev up -d postgres rabbitmq chromadb
 
 if %errorlevel% neq 0 (
     echo.
@@ -49,7 +48,7 @@ if %errorlevel% neq 0 (
 :: 4. 状态检查
 echo.
 echo [3/3] Verifying running containers...
-docker ps --filter "name=postgres" --filter "name=rabbitmq" --filter "name=chromadb" --filter "name=adminer" --format "table {{.Names}}\t{{.Status}}"
+docker ps --filter "name=postgres" --filter "name=rabbitmq" --filter "name=chromadb" --format "table {{.Names}}\t{{.Status}}"
 
 echo.
 echo ========================================================

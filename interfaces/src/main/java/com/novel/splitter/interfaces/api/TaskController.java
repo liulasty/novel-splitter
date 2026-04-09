@@ -6,7 +6,6 @@ import com.novel.splitter.application.model.dto.TaskProgressEventDto;
 import com.novel.splitter.application.mapper.DtoMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,7 +19,6 @@ public class TaskController {
 
     private final TaskService taskService;
 
-    @Autowired
     public TaskController(TaskService taskService) {
         this.taskService = taskService;
     }
@@ -33,22 +31,22 @@ public class TaskController {
 
     @GetMapping("/{taskId}")
     @Operation(summary = "获取单个切分任务状态")
-    public SplitTaskDto getTask(@PathVariable String taskId) {
+    public SplitTaskDto getTask(@PathVariable("taskId") String taskId) {
         return DtoMapper.INSTANCE.toSplitTaskDto(taskService.getTask(taskId));
     }
 
     @DeleteMapping("/{taskId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "删除单个切分任务记录")
-    public void deleteTask(@PathVariable String taskId) {
+    public void deleteTask(@PathVariable("taskId") String taskId) {
         taskService.deleteTask(taskId);
     }
 
     @GetMapping("/{taskId}/events")
     @Operation(summary = "获取单个切分任务的历史事件日志")
     public List<TaskProgressEventDto> getTaskEvents(
-            @PathVariable String taskId,
-            @RequestParam(required = false) Long sinceTimestamp) {
+            @PathVariable("taskId") String taskId,
+            @RequestParam(value = "sinceTimestamp", required = false) Long sinceTimestamp) {
         return DtoMapper.INSTANCE.toTaskProgressEventDtos(taskService.getTaskEvents(taskId, sinceTimestamp));
     }
 }

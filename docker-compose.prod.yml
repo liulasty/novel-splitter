@@ -33,11 +33,6 @@ services:
         limits:
           memory: 1G
 
-  adminer:
-    ports:
-      - "${ADMINER_PORT}:8080"
-    restart: unless-stopped
-
   backend:
     ports:
       - "${BACKEND_PORT}:${BACKEND_PORT}"

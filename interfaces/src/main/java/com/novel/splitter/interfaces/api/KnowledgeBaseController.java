@@ -28,25 +28,25 @@ public class KnowledgeBaseController {
 
     @Operation(summary = "获取指定小说的所有段落")
     @GetMapping("/{novelName}/scenes")
-    public List<SceneDto> getScenes(@PathVariable String novelName) {
+    public List<SceneDto> getScenes(@PathVariable("novelName") String novelName) {
         return knowledgeBaseService.getScenesByNovel(novelName);
     }
 
     @Operation(summary = "获取指定小说的所有版本列表")
     @GetMapping("/{novelName}/versions")
-    public List<String> listVersions(@PathVariable String novelName) {
+    public List<String> listVersions(@PathVariable("novelName") String novelName) {
         return knowledgeBaseService.listVersions(novelName);
     }
 
     @Operation(summary = "删除指定小说的特定版本")
     @DeleteMapping("/{novelName}/versions/{version}")
-    public void deleteVersion(@PathVariable String novelName, @PathVariable String version) {
+    public void deleteVersion(@PathVariable("novelName") String novelName, @PathVariable("version") String version) {
         knowledgeBaseService.deleteVersion(novelName, version);
     }
 
     @Operation(summary = "删除整部小说的知识库")
     @DeleteMapping("/{novelName}")
-    public void deleteKnowledgeBase(@PathVariable String novelName) {
+    public void deleteKnowledgeBase(@PathVariable("novelName") String novelName) {
         knowledgeBaseService.deleteKnowledgeBase(novelName);
     }
 }

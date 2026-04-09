@@ -402,7 +402,6 @@ Compose 文件职责已经拆分：
 👉 **http://localhost:80** (前端界面)
 👉 **http://localhost:8080/swagger-ui/index.html** (后端 API 文档)
 👉 **http://localhost:15672** (RabbitMQ 管理面板，默认账号密码见配置)
-👉 **http://localhost:8081** (Adminer 数据库管理界面)
 
 ### 5. 停止服务
 执行对应的 stop 脚本即可优雅关闭并移除容器：

@@ -2,7 +2,7 @@
 .SYNOPSIS
     Novel Splitter - 基础依赖启动脚本 (Windows 11)
 .DESCRIPTION
-    仅启动依赖的基础设施组件 (PostgreSQL, RabbitMQ, ChromaDB, Adminer)。
+    仅启动依赖的基础设施组件 (PostgreSQL, RabbitMQ, ChromaDB)。
     适用于您在本地 IDE 中直接运行后端，并在终端运行前端的纯本地开发场景。
 #>
 
@@ -17,12 +17,12 @@ Write-Host "========================================================" -Foregroun
 Write-Host "  Novel Splitter - 基础依赖启动脚本 (Windows 11)" -ForegroundColor Cyan
 Write-Host "========================================================" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "此脚本仅启动依赖的基础设施组件 (PostgreSQL, RabbitMQ, ChromaDB, Adminer)。"
+Write-Host "此脚本仅启动依赖的基础设施组件 (PostgreSQL, RabbitMQ, ChromaDB)。"
 Write-Host "适用于您在本地 IDE (如 IDEA) 中直接运行后端，并在终端运行前端的纯本地开发场景。"
 Write-Host ""
 
 Write-Host "[1/2] 正在拉起基础服务..." -ForegroundColor Yellow
-$composeArgs = @("-f", "docker-compose.yml", "-f", "docker-compose.dev.yml", "--env-file", "config/.env.dev", "up", "-d", "postgres", "rabbitmq", "chromadb", "adminer")
+$composeArgs = @("-f", "docker-compose.yml", "-f", "docker-compose.dev.yml", "--env-file", "config/.env.dev", "up", "-d", "postgres", "rabbitmq", "chromadb")
 
 try {
     # 启动进程，并捕获错误

@@ -99,7 +99,7 @@ public class ChromaManagementController {
      */
     @Operation(summary = "获取版本诊断信息", description = "获取数据库与Chroma的同步诊断信息")
     @GetMapping("/diagnostics")
-    public ChromaVersionDiagnosticDto getVersionDiagnostics(@RequestParam String novel, @RequestParam String version) {
+    public ChromaVersionDiagnosticDto getVersionDiagnostics(@RequestParam("novel") String novel, @RequestParam("version") String version) {
         return chromaAdminService.getVersionDiagnostics(novel, version);
     }
 
@@ -162,7 +162,7 @@ public class ChromaManagementController {
 
     @Operation(summary = "更新租户", description = "更新指定租户")
     @PatchMapping("/tenants/{name}")
-    public Object updateTenant(@PathVariable String name, @RequestBody Object body) {
+    public Object updateTenant(@PathVariable("name") String name, @RequestBody Object body) {
         return chromaAdminService.proxyPatch("/api/v2/tenants/" + name, body);
     }
 
@@ -170,25 +170,25 @@ public class ChromaManagementController {
 
     @Operation(summary = "获取数据库列表", description = "获取指定租户下的所有数据库")
     @GetMapping("/tenants/{t}/databases")
-    public Object getDatabases(@PathVariable String t) {
+    public Object getDatabases(@PathVariable("t") String t) {
         return chromaAdminService.proxyGet("/api/v2/tenants/" + t + "/databases");
     }
 
     @Operation(summary = "创建数据库", description = "在指定租户下创建新的数据库")
     @PostMapping("/tenants/{t}/databases")
-    public Object createDatabase(@PathVariable String t, @RequestBody Object body) {
+    public Object createDatabase(@PathVariable("t") String t, @RequestBody Object body) {
         return chromaAdminService.proxyPost("/api/v2/tenants/" + t + "/databases", body);
     }
 
     @Operation(summary = "获取数据库详情", description = "获取指定租户下的数据库详情")
     @GetMapping("/tenants/{t}/databases/{d}")
-    public Object getDatabase(@PathVariable String t, @PathVariable String d) {
+    public Object getDatabase(@PathVariable("t") String t, @PathVariable("d") String d) {
         return chromaAdminService.proxyGet("/api/v2/tenants/" + t + "/databases/" + d);
     }
 
     @Operation(summary = "删除数据库", description = "删除指定租户下的数据库")
     @DeleteMapping("/tenants/{t}/databases/{d}")
-    public Object deleteDatabase(@PathVariable String t, @PathVariable String d) {
+    public Object deleteDatabase(@PathVariable("t") String t, @PathVariable("d") String d) {
         return chromaAdminService.proxyDelete("/api/v2/tenants/" + t + "/databases/" + d);
     }
 
@@ -202,19 +202,19 @@ public class ChromaManagementController {
 
     @Operation(summary = "获取集合详情", description = "获取指定集合的详细信息")
     @GetMapping("/collections/{id}")
-    public Object getCollection(@PathVariable String id) {
+    public Object getCollection(@PathVariable("id") String id) {
         return chromaAdminService.proxyGet("/api/v2/tenants/" + DEFAULT_TENANT + "/databases/" + DEFAULT_DATABASE + "/collections/" + id);
     }
 
     @Operation(summary = "更新集合", description = "更新指定集合的信息")
     @PutMapping("/collections/{id}")
-    public Object updateCollection(@PathVariable String id, @RequestBody Object body) {
+    public Object updateCollection(@PathVariable("id") String id, @RequestBody Object body) {
         return chromaAdminService.proxyPut("/api/v2/tenants/" + DEFAULT_TENANT + "/databases/" + DEFAULT_DATABASE + "/collections/" + id, body);
     }
 
     @Operation(summary = "删除集合", description = "删除指定集合")
     @DeleteMapping("/collections/{id}")
-    public Object deleteCollection(@PathVariable String id) {
+    public Object deleteCollection(@PathVariable("id") String id) {
         return chromaAdminService.proxyDelete("/api/v2/tenants/" + DEFAULT_TENANT + "/databases/" + DEFAULT_DATABASE + "/collections/" + id);
     }
 
@@ -222,43 +222,43 @@ public class ChromaManagementController {
 
     @Operation(summary = "添加文档", description = "向指定集合添加文档")
     @PostMapping("/collections/{id}/add")
-    public Object addDocuments(@PathVariable String id, @RequestBody Object body) {
+    public Object addDocuments(@PathVariable("id") String id, @RequestBody Object body) {
         return chromaAdminService.proxyPost("/api/v2/tenants/" + DEFAULT_TENANT + "/databases/" + DEFAULT_DATABASE + "/collections/" + id + "/add", body);
     }
 
     @Operation(summary = "更新或插入文档", description = "向指定集合更新或插入文档")
     @PostMapping("/collections/{id}/upsert")
-    public Object upsertDocuments(@PathVariable String id, @RequestBody Object body) {
+    public Object upsertDocuments(@PathVariable("id") String id, @RequestBody Object body) {
         return chromaAdminService.proxyPost("/api/v2/tenants/" + DEFAULT_TENANT + "/databases/" + DEFAULT_DATABASE + "/collections/" + id + "/upsert", body);
     }
 
     @Operation(summary = "更新文档", description = "更新指定集合中的文档")
     @PostMapping("/collections/{id}/update")
-    public Object updateDocuments(@PathVariable String id, @RequestBody Object body) {
+    public Object updateDocuments(@PathVariable("id") String id, @RequestBody Object body) {
         return chromaAdminService.proxyPost("/api/v2/tenants/" + DEFAULT_TENANT + "/databases/" + DEFAULT_DATABASE + "/collections/" + id + "/update", body);
     }
 
     @Operation(summary = "删除文档", description = "从指定集合中删除文档")
     @PostMapping("/collections/{id}/delete")
-    public Object deleteDocuments(@PathVariable String id, @RequestBody Object body) {
+    public Object deleteDocuments(@PathVariable("id") String id, @RequestBody Object body) {
         return chromaAdminService.proxyPost("/api/v2/tenants/" + DEFAULT_TENANT + "/databases/" + DEFAULT_DATABASE + "/collections/" + id + "/delete", body);
     }
 
     @Operation(summary = "获取文档", description = "从指定集合中获取文档")
     @PostMapping("/collections/{id}/get")
-    public Object getDocuments(@PathVariable String id, @RequestBody Object body) {
+    public Object getDocuments(@PathVariable("id") String id, @RequestBody Object body) {
         return chromaAdminService.proxyPost("/api/v2/tenants/" + DEFAULT_TENANT + "/databases/" + DEFAULT_DATABASE + "/collections/" + id + "/get", body);
     }
 
     @Operation(summary = "查询文档", description = "在指定集合中查询文档")
     @PostMapping("/collections/{id}/query")
-    public Object queryDocuments(@PathVariable String id, @RequestBody Object body) {
+    public Object queryDocuments(@PathVariable("id") String id, @RequestBody Object body) {
         return chromaAdminService.proxyPost("/api/v2/tenants/" + DEFAULT_TENANT + "/databases/" + DEFAULT_DATABASE + "/collections/" + id + "/query", body);
     }
 
     @Operation(summary = "统计文档数", description = "获取指定集合的文档总数")
     @GetMapping("/collections/{id}/count")
-    public Object countDocuments(@PathVariable String id) {
+    public Object countDocuments(@PathVariable("id") String id) {
         return chromaAdminService.proxyGet("/api/v2/tenants/" + DEFAULT_TENANT + "/databases/" + DEFAULT_DATABASE + "/collections/" + id + "/count");
     }
 }

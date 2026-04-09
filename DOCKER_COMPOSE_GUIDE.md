@@ -60,7 +60,7 @@ docker-compose -f docker-compose.yml -f docker-compose.dev.yml --env-file config
 ```bash
 docker-compose --env-file config/.env.dev up -d postgres
 ```
-*(注：可用的服务名包括 `postgres`, `rabbitmq`, `chromadb`, `backend`, `frontend`, `adminer`)*
+*(注：可用的服务名包括 `postgres`, `rabbitmq`, `chromadb`, `backend`, `frontend`)*
 
 ---
 
@@ -189,13 +189,6 @@ docker builder prune -f
 docker-compose ps
 ```
 这个命令会列出所有服务的状态（State），如果你看到状态是 `Up` 说明运行正常；如果是 `Exit` 说明容器已经退出（通常是启动报错了，需要用 `logs` 命令看原因）。
-
-### 7.2 访问 PostgreSQL 数据库可视化界面
-本项目集成了轻量级的数据库管理工具 `Adminer`。
-1. 在浏览器中打开 `http://localhost:8081`（或你在 `.env` 中配置的 `ADMINER_PORT`）。
-2. 在登录页面，系统（System）选择 **PostgreSQL**。
-3. 服务器（Server）输入 **`postgres`**（重要！这是 Docker 内部的服务名，不要填 localhost）。
-4. 用户名、密码、数据库名填写 `.env` 中配置的信息（默认全是 `postgres` 和 `novel_splitter`）。
 
 ## 💡 8. 简单配置修改与常见问题 (FAQ)
 

@@ -40,7 +40,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
     @Override
     public Page<VectorPreviewRecordDto> getLightweightScenes(Pageable pageable) {
         PagedResult<VectorPreviewRecordDto> result = sceneRepository
-                .findLightweightScenes(PageQuery.of(pageable.getPageNumber(), pageable.getPageSize()))
+                .findLightweightScenes(toPageQuery(pageable))
                 .map(scene -> new VectorPreviewRecordDto() {
             @Override
             public Long getId() {
@@ -131,5 +131,9 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
             return novelName.substring(0, novelName.length() - 4);
         }
         return novelName;
+    }
+
+    private PageQuery toPageQuery(Pageable pageable) {
+        return PageQuery.of(pageable.getPageNumber(), pageable.getPageSize());
     }
 }

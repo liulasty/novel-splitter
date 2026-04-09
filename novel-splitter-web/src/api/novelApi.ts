@@ -127,7 +127,9 @@ export const novelApi = {
   },
 
   deleteNovel: async (novelId: string): Promise<{ message: string }> => {
-    const response = await apiClient.delete<ApiEnvelope<{ message: string }>, { message: string }>(`/novels/${novelId}`);
+    const response = await apiClient.delete<ApiEnvelope<{ message: string }>, { message: string }>(
+      `/knowledge/${encodeURIComponent(novelId)}`
+    );
     return response;
   },
 

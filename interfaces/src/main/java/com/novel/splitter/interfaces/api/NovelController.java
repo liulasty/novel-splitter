@@ -68,33 +68,33 @@ public class NovelController {
      */
     @Operation(summary = "获取小说章节树", description = "获取小说的所有章节层级结构")
     @GetMapping("/{novelId}/chapters")
-    public List<ChapterDto> getChapters(@PathVariable String novelId) {
+    public List<ChapterDto> getChapters(@PathVariable("novelId") String novelId) {
         return novelFacadeService.getChapters(novelId);
     }
 
     @Operation(summary = "获取章节片段", description = "获取某章节下的所有切分片段 (Scenes)")
     @GetMapping("/{novelId}/chapters/{chapterId}/scenes")
     public Page<SceneDto> getScenesByChapter(
-            @PathVariable String novelId,
-            @PathVariable Long chapterId,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "200") int size) {
+            @PathVariable("novelId") String novelId,
+            @PathVariable("chapterId") Long chapterId,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "200") int size) {
         return novelFacadeService.getScenesByChapter(novelId, chapterId, page, size);
     }
     @PostMapping("/{novelId}/split")
-    public TaskSubmitResponseDto splitNovel(@PathVariable String novelId, @Valid @RequestBody IngestRequest request) throws IOException {
+    public TaskSubmitResponseDto splitNovel(@PathVariable("novelId") String novelId, @Valid @RequestBody IngestRequest request) throws IOException {
         return novelFacadeService.split(novelId, request);
     }
 
     @Operation(summary = "触发小说处理流水线", description = "通过 stages 指定处理阶段（SPLIT/EMBED），推荐用于统一触发入口")
     @PostMapping("/{novelId}/pipeline")
-    public TaskSubmitResponseDto triggerPipeline(@PathVariable String novelId, @Valid @RequestBody NovelPipelineRequestDto request) throws IOException {
+    public TaskSubmitResponseDto triggerPipeline(@PathVariable("novelId") String novelId, @Valid @RequestBody NovelPipelineRequestDto request) throws IOException {
         return novelFacadeService.pipeline(novelId, request);
     }
 
     @Operation(summary = "启动小说向量化", description = "触发已切分小说的异步向量化入库流程")
     @PostMapping("/{novelId}/embed")
-    public TaskSubmitResponseDto embedNovel(@PathVariable String novelId) throws IOException {
+    public TaskSubmitResponseDto embedNovel(@PathVariable("novelId") String novelId) throws IOException {
         return novelFacadeService.embed(novelId);
     }
 
