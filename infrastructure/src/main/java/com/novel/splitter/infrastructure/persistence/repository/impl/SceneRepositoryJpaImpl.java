@@ -126,6 +126,18 @@ public class SceneRepositoryJpaImpl implements SceneRepository {
     }
 
     @Override
+    @Transactional
+    public void deleteNovelById(String novelId) {
+        jpaSceneRepository.deleteByNovelId(novelId);
+    }
+
+    @Override
+    @Transactional
+    public void deleteVersionByNovelId(String novelId, String version) {
+        jpaSceneRepository.deleteByNovelIdAndVersion(novelId, version);
+    }
+
+    @Override
     public List<String> listVersions(String novelName) {
         return jpaSceneRepository.findDistinctVersionsByNovelName(novelName);
     }

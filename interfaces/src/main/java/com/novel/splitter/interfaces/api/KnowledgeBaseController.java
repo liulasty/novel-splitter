@@ -40,13 +40,20 @@ public class KnowledgeBaseController {
 
     @Operation(summary = "删除指定小说的特定版本")
     @DeleteMapping("/{novelName}/versions/{version}")
-    public void deleteVersion(@PathVariable("novelName") String novelName, @PathVariable("version") String version) {
-        knowledgeBaseService.deleteVersion(novelName, version);
+    public Long deleteVersion(@PathVariable("novelName") String novelName, @PathVariable("version") String version) {
+        return knowledgeBaseService.deleteVersion(novelName, version);
+    }
+
+    @Operation(summary = "按 novelId 删除整部小说的知识库")
+    @DeleteMapping("/id/{novelId}")
+    public Long deleteKnowledgeBaseById(@PathVariable("novelId") String novelId) {
+        return knowledgeBaseService.deleteKnowledgeBaseById(novelId);
     }
 
     @Operation(summary = "删除整部小说的知识库")
-    @DeleteMapping("/{novelName}")
-    public void deleteKnowledgeBase(@PathVariable("novelName") String novelName) {
-        knowledgeBaseService.deleteKnowledgeBase(novelName);
+    @Deprecated
+    @DeleteMapping("/{novelName:.+}")
+    public Long deleteKnowledgeBase(@PathVariable("novelName") String novelName) {
+        return knowledgeBaseService.deleteKnowledgeBase(novelName);
     }
 }

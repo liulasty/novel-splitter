@@ -52,4 +52,9 @@ public interface NovelService {
      * 获取所有小说
      */
     List<Novel> listNovels();
+
+    /**
+     * 软删除小说（同时将其从 DB-first 列表中隐藏）
+     */
+    void softDeleteNovel(String novelId);
 }

@@ -9,6 +9,7 @@ import com.novel.splitter.domain.task.CleanupTaskMessage;
 import com.novel.splitter.domain.model.paging.PageQuery;
 import com.novel.splitter.domain.model.paging.PagedResult;
 import com.novel.splitter.domain.repository.CleanupTaskRepository;
+import com.novel.splitter.domain.repository.NovelRepository;
 import com.novel.splitter.domain.repository.SceneRepository;
 import com.novel.splitter.application.model.dto.VectorPreviewRecordDto;
 import org.springframework.data.domain.Page;
@@ -31,8 +32,10 @@ import java.util.List;
 public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
 
     private final SceneRepository sceneRepository;
+    private final NovelRepository novelRepository;
     private final CleanupTaskRepository cleanupTaskRepository;
     private final RabbitTemplate rabbitTemplate;
+    private final DtoMapper dtoMapper;
     
     @org.springframework.beans.factory.annotation.Value("${splitter.storage.root-path}")
     private String novelStoragePath;
@@ -68,12 +71,12 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
 
     @Override
     public List<SceneDto> getScenesByNovel(String novelName) {
-        return DtoMapper.INSTANCE.toSceneDtos(sceneRepository.findByNovel(normalizeNovelName(novelName)));
+        return dtoMapper.toSceneDtos(sceneRepository.findByNovel(normalizeNovelName(novelName)));
     }
 
     @Override
     @Transactional
-    public void deleteVersion(String novelName, String version) {
+    public Long deleteVersion(String novelName, String version) {
         String normalizedNovelName = normalizeNovelName(novelName);
         log.info("Logical deleting version: {}/{}", normalizedNovelName, version);
         sceneRepository.deleteVersion(normalizedNovelName, version);
@@ -84,22 +87,24 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                 .version(version)
                 .status("PENDING")
                 .build();
-        cleanupTaskRepository.save(task);
+        CleanupTask savedTask = cleanupTaskRepository.save(task);
 
         CleanupTaskMessage message = CleanupTaskMessage.builder()
-                .cleanupTaskId(task.getId())
+                .cleanupTaskId(savedTask.getId())
                 .targetId(normalizedNovelName)
                 .targetType("VERSION")
                 .version(version)
+                .novelName(normalizedNovelName)
                 .build();
         
         rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "cleanup", message);
-        log.info("Sent cleanup task {} to MQ", task.getId());
+        log.info("Sent cleanup task {} to MQ", savedTask.getId());
+        return savedTask.getId();
     }
 
     @Override
     @Transactional
-    public void deleteKnowledgeBase(String novelName) {
+    public Long deleteKnowledgeBase(String novelName) {
         String normalizedNovelName = normalizeNovelName(novelName);
         log.info("Logical deleting knowledge base for: {}", normalizedNovelName);
         sceneRepository.deleteNovel(normalizedNovelName);
@@ -109,16 +114,53 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                 .targetType("NOVEL")
                 .status("PENDING")
                 .build();
-        cleanupTaskRepository.save(task);
+        CleanupTask savedTask = cleanupTaskRepository.save(task);
 
         CleanupTaskMessage message = CleanupTaskMessage.builder()
-                .cleanupTaskId(task.getId())
+                .cleanupTaskId(savedTask.getId())
                 .targetId(normalizedNovelName)
                 .targetType("NOVEL")
+                .novelName(normalizedNovelName)
                 .build();
         
         rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "cleanup", message);
-        log.info("Sent cleanup task {} to MQ", task.getId());
+        log.info("Sent cleanup task {} to MQ", savedTask.getId());
+        return savedTask.getId();
+    }
+
+    @Override
+    @Transactional
+    public Long deleteKnowledgeBaseById(String novelId) {
+        String normalizedNovelId = novelId != null ? novelId.trim() : null;
+        if (normalizedNovelId == null || normalizedNovelId.isEmpty()) {
+            throw new IllegalArgumentException("novelId must not be blank");
+        }
+
+        String novelName = novelRepository.findById(normalizedNovelId)
+                .map(n -> n.getTitle() != null && !n.getTitle().isBlank() ? n.getTitle() : n.getId())
+                .orElse(normalizedNovelId);
+
+        log.info("Logical deleting knowledge base by novelId: {} (name='{}')", normalizedNovelId, novelName);
+        sceneRepository.deleteNovelById(normalizedNovelId);
+
+        CleanupTask task = CleanupTask.builder()
+                .targetId(normalizedNovelId)
+                .targetType("NOVEL_ID")
+                .status("PENDING")
+                .build();
+        CleanupTask savedTask = cleanupTaskRepository.save(task);
+
+        CleanupTaskMessage message = CleanupTaskMessage.builder()
+                .cleanupTaskId(savedTask.getId())
+                .targetId(normalizedNovelId)
+                .targetType("NOVEL_ID")
+                .novelId(normalizedNovelId)
+                .novelName(novelName)
+                .build();
+
+        rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "cleanup", message);
+        log.info("Sent cleanup task {} to MQ for novelId {}", savedTask.getId(), normalizedNovelId);
+        return savedTask.getId();
     }
 
     @Override

@@ -4,23 +4,26 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Loader2, Book, Trash2, AlertCircle } from "lucide-react";
 import { knowledgeApi } from "@/api/knowledgeApi";
 import { novelApi } from "@/api/novelApi";
-import type { NovelStatRecordDto } from "@/api/novelApi";
 import { toast } from 'sonner';
 import { VersionTag } from "./VersionTag";
 
-export function NovelVersionsCard({ novel, stats }: { novel: string, stats: NovelStatRecordDto[] }) {
+export function NovelVersionsCard({ novelId, novelName }: { novelId: string, novelName: string }) {
     const queryClient = useQueryClient();
     const [deleteConfirming, setDeleteConfirming] = useState(false);
 
     const { data: versions, isLoading, isError } = useQuery({
-        queryKey: ['versions', novel],
-        queryFn: () => knowledgeApi.getVersions(novel),
+        queryKey: ['versions', novelName],
+        queryFn: () => knowledgeApi.getVersions(novelName),
     });
 
     const deleteNovelMutation = useMutation({
-        mutationFn: () => novelApi.deleteNovel(novel),
-        onSuccess: () => {
-            toast.success(`知识库 "${novel}" 已删除`);
+        mutationFn: async () => {
+            const cleanupTaskId = await knowledgeApi.deleteKnowledgeBaseById(novelId);
+            await novelApi.softDeleteNovel(novelId);
+            return cleanupTaskId;
+        },
+        onSuccess: (cleanupTaskId) => {
+            toast.success(`知识库 "${novelName}" 已删除，清理任务：${cleanupTaskId}`);
             queryClient.invalidateQueries({ queryKey: ['novels'] });
         },
         onError: (error) => {
@@ -30,10 +33,10 @@ export function NovelVersionsCard({ novel, stats }: { novel: string, stats: Nove
     });
 
     const deleteVersionMutation = useMutation({
-        mutationFn: (version: string) => knowledgeApi.deleteVersion(novel, version),
+        mutationFn: (version: string) => knowledgeApi.deleteVersion(novelName, version),
         onSuccess: (_, version) => {
             toast.success(`版本 "${version}" 已删除`);
-            queryClient.invalidateQueries({ queryKey: ['versions', novel] });
+            queryClient.invalidateQueries({ queryKey: ['versions', novelName] });
         },
         onError: (error) => {
             toast.error(`删除版本失败: ${error}`);
@@ -55,9 +58,9 @@ export function NovelVersionsCard({ novel, stats }: { novel: string, stats: Nove
                         </div>
                         <CardTitle
                             className="text-base font-semibold text-slate-800 truncate leading-snug"
-                            title={novel}
+                            title={novelName}
                         >
-                            {novel}
+                            {novelName}
                         </CardTitle>
                     </div>
 
@@ -135,7 +138,7 @@ export function NovelVersionsCard({ novel, stats }: { novel: string, stats: Nove
                                 version={v}
                                 onDelete={() => deleteVersionMutation.mutate(v)}
                                 isPending={deleteVersionMutation.isPending}
-                                stat={stats.find(s => s.version === v)}
+                                stat={undefined}
                             />
                         ))}
                     </div>

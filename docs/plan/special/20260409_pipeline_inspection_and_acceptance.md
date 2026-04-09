@@ -22,7 +22,8 @@
 用户上传小说文件
 -> `interfaces` `NovelController.triggerPipeline()`
 -> `application` `NovelFacadeService.pipeline()`
--> `TaskService.createTask()` 写入 `PENDING`
+-> **先落库生成/确定 `novelId`**（`novels.id`，后续全链路以此为主键）
+-> `TaskService.createTask()` 写入 `PENDING`（任务元数据包含 `novelId`、`version`）
 -> RabbitMQ 异步投递
 -> `application` `SplitWorker` 消费
 -> `pipeline-core` `LoadNovelUseCase`
@@ -131,17 +132,19 @@
 ## 4.6 向量化入库检查
 
 - [ ] `EmbedWorker` 可批量读取 Scene
+- [ ] **入库前已具备 `novelId`（`novels.id`）**，并在本次建库链路中保持不变
 - [ ] 限流生效（避免 provider `429`）
 - [ ] `OnnxEmbeddingService` 输出 512 维向量
 - [ ] Mean Pooling + L2 归一化生效
 - [ ] `VectorStore.upsert()` 成功写入 ChromaDB
+- [ ] Chroma 元数据包含 `novelId` 与 `version`（可用于按 `novelId` 精确删除/回收）
 - [ ] 最终状态为 `EMBED_DONE`
 
 通过标准：
 
 - 维度固定 512
 - 向量范数接近 1
-- DB 与向量库数量一致性通过抽样校验
+- DB 与向量库数量一致性通过抽样校验（同一 `novelId` + `version` 的 scene 数量与向量条目数量一致或可解释）
 
 ---
 

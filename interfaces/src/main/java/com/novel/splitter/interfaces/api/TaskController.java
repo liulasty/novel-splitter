@@ -18,21 +18,23 @@ import java.util.List;
 public class TaskController {
 
     private final TaskService taskService;
+    private final DtoMapper dtoMapper;
 
-    public TaskController(TaskService taskService) {
+    public TaskController(TaskService taskService, DtoMapper dtoMapper) {
         this.taskService = taskService;
+        this.dtoMapper = dtoMapper;
     }
 
     @GetMapping
     @Operation(summary = "获取所有切分任务列表")
     public List<SplitTaskDto> getAllTasks() {
-        return DtoMapper.INSTANCE.toSplitTaskDtos(taskService.getAllTasks());
+        return dtoMapper.toSplitTaskDtos(taskService.getAllTasks());
     }
 
     @GetMapping("/{taskId}")
     @Operation(summary = "获取单个切分任务状态")
     public SplitTaskDto getTask(@PathVariable("taskId") String taskId) {
-        return DtoMapper.INSTANCE.toSplitTaskDto(taskService.getTask(taskId));
+        return dtoMapper.toSplitTaskDto(taskService.getTask(taskId));
     }
 
     @DeleteMapping("/{taskId}")
@@ -47,6 +49,6 @@ public class TaskController {
     public List<TaskProgressEventDto> getTaskEvents(
             @PathVariable("taskId") String taskId,
             @RequestParam(value = "sinceTimestamp", required = false) Long sinceTimestamp) {
-        return DtoMapper.INSTANCE.toTaskProgressEventDtos(taskService.getTaskEvents(taskId, sinceTimestamp));
+        return dtoMapper.toTaskProgressEventDtos(taskService.getTaskEvents(taskId, sinceTimestamp));
     }
 }

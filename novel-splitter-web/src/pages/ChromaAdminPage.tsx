@@ -145,8 +145,8 @@ function DiagnosticsTab() {
 
   const { data: stats } = useQuery({ queryKey: ['novelStats'], queryFn: novelApi.getNovelStats });
 
-  const uniqueNovels = Array.from(new Set(stats?.map(s => s.novelId) || []));
-  const availableVersions = stats?.filter(s => s.novelId === selectedNovel).map(s => s.version) || [];
+  const uniqueNovels = Array.from(new Set(stats?.map(s => s.novelName) || []));
+  const availableVersions = stats?.find(s => s.novelName === selectedNovel)?.versions || [];
 
   const { data: diagnostic, isLoading: diagLoading, refetch: runDiag } = useQuery({
     queryKey: ['chroma-diag', selectedNovel, selectedVersion],

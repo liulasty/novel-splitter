@@ -44,7 +44,7 @@ export default function RagDebugPage() {
   const [contextSortAsc, setContextSortAsc] = useState(false);
 
   useEffect(() => {
-    novelApi.getNovels().then(setNovels).catch(console.error);
+    novelApi.getNovels().then((list) => setNovels(list.map(n => n.title))).catch(console.error);
   }, []);
 
   useEffect(() => {

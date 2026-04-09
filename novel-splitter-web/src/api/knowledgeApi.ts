@@ -40,11 +40,20 @@ export const knowledgeApi = {
     return response;
   },
 
-  deleteVersion: async (novelName: string, version: string): Promise<void> => {
-    await apiClient.delete(`/knowledge/${encodeURIComponent(novelName)}/versions/${encodeURIComponent(version)}`);
+  deleteVersion: async (novelName: string, version: string): Promise<number> => {
+    const cleanupTaskId = await apiClient.delete<ApiEnvelope<number>, number>(
+      `/knowledge/${encodeURIComponent(novelName)}/versions/${encodeURIComponent(version)}`
+    );
+    return cleanupTaskId;
   },
 
-  deleteKnowledgeBase: async (novelName: string): Promise<void> => {
-    await apiClient.delete(`/knowledge/${encodeURIComponent(novelName)}`);
+  deleteKnowledgeBase: async (novelName: string): Promise<number> => {
+    const cleanupTaskId = await apiClient.delete<ApiEnvelope<number>, number>(`/knowledge/${encodeURIComponent(novelName)}`);
+    return cleanupTaskId;
+  },
+
+  deleteKnowledgeBaseById: async (novelId: string): Promise<number> => {
+    const cleanupTaskId = await apiClient.delete<ApiEnvelope<number>, number>(`/knowledge/id/${encodeURIComponent(novelId)}`);
+    return cleanupTaskId;
   },
 };

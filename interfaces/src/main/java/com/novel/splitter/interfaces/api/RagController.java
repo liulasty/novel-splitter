@@ -25,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class RagController {
 
     private final RagFacade ragService;
+    private final DtoMapper dtoMapper;
 
     /**
      * RAG 问答接口
@@ -35,7 +36,7 @@ public class RagController {
     @Operation(summary = "RAG问答请求", description = "通过检索增强生成机制，基于小说知识库回答用户问题")
     @PostMapping
     public AnswerDto ask(@Valid @RequestBody RagRequest request) {
-        return DtoMapper.INSTANCE.toAnswerDto(ragService.ask(request));
+        return dtoMapper.toAnswerDto(ragService.ask(request));
     }
 
     /**

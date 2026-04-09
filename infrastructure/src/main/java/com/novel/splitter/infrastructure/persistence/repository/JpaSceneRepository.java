@@ -48,6 +48,14 @@ public interface JpaSceneRepository extends JpaRepository<JpaSceneEntity, Long>,
     @Query("UPDATE JpaSceneEntity s SET s.isDeleted = true WHERE s.novelName = ?1")
     void deleteByNovelName(String novelName);
 
+    @Modifying
+    @Query("UPDATE JpaSceneEntity s SET s.isDeleted = true WHERE s.novel.id = ?1")
+    void deleteByNovelId(String novelId);
+
+    @Modifying
+    @Query("UPDATE JpaSceneEntity s SET s.isDeleted = true WHERE s.novel.id = ?1 AND s.version = ?2")
+    void deleteByNovelIdAndVersion(String novelId, String version);
+
     @Query("SELECT DISTINCT s.version FROM JpaSceneEntity s WHERE s.novelName = ?1")
     List<String> findDistinctVersionsByNovelName(String novelName);
 

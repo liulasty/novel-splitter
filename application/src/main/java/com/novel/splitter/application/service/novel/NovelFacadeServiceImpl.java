@@ -5,6 +5,8 @@ import com.novel.splitter.application.config.AppConfig;
 import com.novel.splitter.application.model.dto.NovelUploadResponseDto;
 import com.novel.splitter.application.model.dto.NovelPipelineRequestDto;
 import com.novel.splitter.application.model.dto.TaskSubmitResponseDto;
+import com.novel.splitter.application.model.dto.NovelSummaryDto;
+import com.novel.splitter.application.mapper.DtoMapper;
 import com.novel.splitter.application.service.download.DownloadService;
 import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.domain.enums.TaskType;
@@ -56,6 +58,8 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
     private final DownloadService downloadService;
     private final AppConfig appConfig;
     private final com.novel.splitter.domain.repository.SceneRepository sceneRepository;
+    private final com.novel.splitter.domain.repository.ChapterRepository chapterRepository;
+    private final DtoMapper dtoMapper;
 
     @Override
     public List<NovelStatRecordDto> getNovelStats() {
@@ -146,6 +150,22 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
     @Override
     public List<String> listNovels() throws IOException {
         return novelStorageService.listNovels();
+    }
+
+    @Override
+    public List<NovelSummaryDto> listNovelsFromDb() {
+        return novelService.listNovels().stream()
+                .filter(n -> n != null && !n.isDeleted())
+                .map(n -> NovelSummaryDto.builder()
+                        .novelId(n.getId())
+                        .title(n.getTitle())
+                        .author(n.getAuthor())
+                        .status(n.getStatus() != null ? n.getStatus().name() : null)
+                        .filePath(n.getFilePath())
+                        .createdAt(n.getCreatedAt())
+                        .updatedAt(n.getUpdatedAt())
+                        .build())
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -296,7 +316,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
             throw new IllegalArgumentException("Novel not found: " + novelId);
         }
         novel.checkCanReadChapters();
-        return com.novel.splitter.application.mapper.DtoMapper.INSTANCE.toChapterDtos(chapterService.getChaptersByNovelId(novelId));
+        return dtoMapper.toChapterDtos(chapterService.getChaptersByNovelId(novelId));
     }
 
     @Override
@@ -310,8 +330,20 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         int safeSize = Math.min(Math.max(size, 1), 500);
         PagedResult<com.novel.splitter.application.model.dto.SceneDto> result = sceneRepository
                 .findByNovelIdAndChapterId(novelId, chapterId, PageQuery.of(safePage, safeSize))
-                .map(com.novel.splitter.application.mapper.DtoMapper.INSTANCE::toSceneDto);
+                .map(dtoMapper::toSceneDto);
         return new PageImpl<>(result.getContent(), org.springframework.data.domain.PageRequest.of(safePage, safeSize), result.getTotalElements());
+    }
+
+    @Override
+    public void softDeleteNovel(String novelId) {
+        if (novelId == null || novelId.isBlank()) {
+            throw new IllegalArgumentException("novelId must not be blank");
+        }
+        String id = novelId.trim();
+        // Soft delete novel row first; also soft delete chapters/scenes for visibility.
+        novelService.softDeleteNovel(id);
+        chapterRepository.deleteByNovelId(id);
+        sceneRepository.deleteNovelById(id);
     }
 
     private String normalizeNovelId(String fileName) {

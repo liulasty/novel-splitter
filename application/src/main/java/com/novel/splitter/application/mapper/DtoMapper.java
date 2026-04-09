@@ -13,15 +13,12 @@ import com.novel.splitter.domain.model.embedding.VectorRecord;
 import com.novel.splitter.domain.task.SplitTask;
 import com.novel.splitter.domain.task.TaskProgressEvent;
 import org.mapstruct.Mapper;
-import org.mapstruct.factory.Mappers;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.List;
 
 @Mapper(componentModel = "spring")
 public interface DtoMapper {
-    DtoMapper INSTANCE = Mappers.getMapper(DtoMapper.class);
-
     ChapterDto toChapterDto(Chapter chapter);
     List<ChapterDto> toChapterDtos(List<Chapter> chapters);
 

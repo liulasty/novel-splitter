@@ -25,17 +25,48 @@ public class NovelServiceImpl implements NovelService {
 
     @Override
     public String createNovel(MultipartFile file, String title, String author, String description) throws IOException {
-        String fileName = novelStorageService.saveNovel(file);
+        String novelId = UUID.randomUUID().toString();
+
+        // 1) DB-first: create record first with stable novelId + planned stored relative path
+        String storedRelativePath = "raw/" + novelId + ".txt";
         try {
-            String novelId = transactionTemplate.execute(status -> saveNovelRecord(fileName, title, author, description));
-            if (novelId == null) {
-                throw new IllegalStateException("Failed to save novel record");
-            }
-            return novelId;
+            transactionTemplate.execute(status -> {
+                saveNovelRecordWithId(novelId, storedRelativePath, title, author, description);
+                return null;
+            });
         } catch (RuntimeException ex) {
-            novelStorageService.deleteNovelIfExists(fileName);
             throw ex;
         }
+
+        // 2) Save file to local storage using novelId-based path
+        try {
+            String actualStored = novelStorageService.saveNovelAsRawByNovelId(novelId, file);
+            if (!storedRelativePath.equals(actualStored)) {
+                // Keep DB consistent with actual stored path
+                transactionTemplate.execute(status -> {
+                    Novel n = novelRepository.findById(novelId).orElseThrow();
+                    n.setFilePath(actualStored);
+                    n.setUpdatedAt(System.currentTimeMillis());
+                    novelRepository.save(n);
+                    return null;
+                });
+            }
+        } catch (RuntimeException | IOException ex) {
+            // Best-effort: mark the novel as deleted to keep DB-first list clean.
+            transactionTemplate.execute(status -> {
+                novelRepository.findById(novelId).ifPresent(n -> {
+                    n.setDeleted(true);
+                    n.setUpdatedAt(System.currentTimeMillis());
+                    novelRepository.save(n);
+                });
+                return null;
+            });
+            // Cleanup local file if partially written
+            novelStorageService.deleteNovelIfExists(storedRelativePath);
+            throw ex;
+        }
+
+        return novelId;
     }
 
     @Override
@@ -49,7 +80,11 @@ public class NovelServiceImpl implements NovelService {
 
     private String saveNovelRecord(String fileName, String title, String author, String description) {
         String novelId = UUID.randomUUID().toString();
+        saveNovelRecordWithId(novelId, fileName, title, author, description);
+        return novelId;
+    }
 
+    private void saveNovelRecordWithId(String novelId, String fileName, String title, String author, String description) {
         Novel novel = Novel.builder()
                 .id(novelId)
                 .title(title != null ? title : fileName.replace(".txt", ""))
@@ -64,8 +99,6 @@ public class NovelServiceImpl implements NovelService {
 
         novelRepository.save(novel);
         log.info("Saved novel entity to database, novelId: {}", novelId);
-
-        return novelId;
     }
 
     @Override
@@ -81,12 +114,30 @@ public class NovelServiceImpl implements NovelService {
 
     @Override
     public Novel getNovelById(String novelId) {
-        return novelRepository.findById(novelId)
+        Novel novel = novelRepository.findById(novelId)
                 .orElseThrow(() -> new IllegalArgumentException("Novel not found: " + novelId));
+        if (novel.isDeleted()) {
+            throw new IllegalArgumentException("Novel is deleted: " + novelId);
+        }
+        return novel;
     }
 
     @Override
     public List<Novel> listNovels() {
         return novelRepository.findAll();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void softDeleteNovel(String novelId) {
+        Novel novel = novelRepository.findById(novelId)
+                .orElseThrow(() -> new IllegalArgumentException("Novel not found: " + novelId));
+        if (novel.isDeleted()) {
+            return;
+        }
+        novel.setDeleted(true);
+        novel.setUpdatedAt(System.currentTimeMillis());
+        novelRepository.save(novel);
+        log.info("Soft deleted novel {}", novelId);
     }
 }

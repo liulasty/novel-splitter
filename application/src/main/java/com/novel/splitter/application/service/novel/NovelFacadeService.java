@@ -3,6 +3,7 @@ package com.novel.splitter.application.service.novel;
 import com.novel.splitter.application.model.dto.DownloadAndIngestRequest;
 import com.novel.splitter.application.model.dto.IngestRequest;
 import com.novel.splitter.application.model.dto.NovelPipelineRequestDto;
+import com.novel.splitter.application.model.dto.NovelSummaryDto;
 import com.novel.splitter.application.model.dto.NovelUploadResponseDto;
 import com.novel.splitter.application.model.dto.NovelStatRecordDto;
 import com.novel.splitter.application.model.dto.ChapterDto;
@@ -17,6 +18,8 @@ import java.util.List;
 public interface NovelFacadeService {
 
     List<String> listNovels() throws IOException;
+
+    List<NovelSummaryDto> listNovelsFromDb();
 
     NovelUploadResponseDto uploadNovel(MultipartFile file, String title, String author, String description) throws IOException;
 
@@ -35,4 +38,6 @@ public interface NovelFacadeService {
     List<ChapterDto> getChapters(String novelId);
 
     Page<SceneDto> getScenesByChapter(String novelId, Long chapterId, int page, int size);
+
+    void softDeleteNovel(String novelId);
 }

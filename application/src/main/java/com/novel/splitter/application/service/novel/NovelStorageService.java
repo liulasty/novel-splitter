@@ -23,6 +23,7 @@ import java.util.stream.Stream;
 public class NovelStorageService {
 
     private static final String DEFAULT_UNKNOWN_FILE_PREFIX = "unknown";
+    private static final String RAW_DIR = "raw";
 
     private final AppConfig appConfig;
 
@@ -48,6 +49,28 @@ public class NovelStorageService {
         Path destination = getStoragePath().resolve(newFilename);
         Files.copy(file.getInputStream(), destination, StandardCopyOption.REPLACE_EXISTING);
         return newFilename;
+    }
+
+    /**
+     * Save novel raw text as raw/{novelId}.txt under storage root.
+     *
+     * @return stored relative path (e.g. raw/xxxx.txt)
+     */
+    public String saveNovelAsRawByNovelId(String novelId, MultipartFile file) throws IOException {
+        if (novelId == null || novelId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "novelId 为空");
+        }
+        if (file == null || file.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "文件为空");
+        }
+        Path rawDir = getStoragePath().resolve(RAW_DIR);
+        if (!Files.exists(rawDir)) {
+            Files.createDirectories(rawDir);
+        }
+        String filename = novelId.trim() + ".txt";
+        Path destination = rawDir.resolve(filename);
+        Files.copy(file.getInputStream(), destination, StandardCopyOption.REPLACE_EXISTING);
+        return RAW_DIR + "/" + filename;
     }
 
     public Path resolveExistingNovelPath(String fileName) throws IOException {

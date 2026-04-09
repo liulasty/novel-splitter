@@ -25,7 +25,8 @@ export function useChatLogic() {
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    const { data: novels } = useQuery({ queryKey: ['novels'], queryFn: novelApi.getNovels });
+    const { data: novelSummaries } = useQuery({ queryKey: ['novels'], queryFn: novelApi.getNovels });
+    const novels = novelSummaries?.map(n => n.title) ?? [];
     const { data: versions } = useQuery({
         queryKey: ['versions', selectedNovel],
         queryFn: () => knowledgeApi.getVersions(selectedNovel),
@@ -33,7 +34,7 @@ export function useChatLogic() {
     });
 
     useEffect(() => {
-        if (novels?.length && !selectedNovel) setSelectedNovel(novels[0]);
+        if (novels.length && !selectedNovel) setSelectedNovel(novels[0]);
     }, [novels, selectedNovel]);
 
     useEffect(() => {

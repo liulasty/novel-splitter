@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 public class ChatController {
 
     private final RagFacade ragService;
+    private final DtoMapper dtoMapper;
 
     /**
      * 发送聊天请求
@@ -34,6 +35,6 @@ public class ChatController {
     @PostMapping
     public AnswerDto chat(@Valid @RequestBody ChatRequest request) {
         log.info("接收到聊天请求: {}", request);
-        return DtoMapper.INSTANCE.toAnswerDto(ragService.ask(request.getQuestion(), request.getTopK(), request.getNovel(), request.getVersion()));
+        return dtoMapper.toAnswerDto(ragService.ask(request.getQuestion(), request.getTopK(), request.getNovel(), request.getVersion()));
     }
 }

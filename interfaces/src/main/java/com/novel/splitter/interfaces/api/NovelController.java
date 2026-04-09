@@ -4,6 +4,7 @@ import com.novel.splitter.application.service.novel.NovelFacadeService;
 import com.novel.splitter.application.model.dto.IngestRequest;
 import com.novel.splitter.application.model.dto.ChapterDto;
 import com.novel.splitter.application.model.dto.NovelPipelineRequestDto;
+import com.novel.splitter.application.model.dto.NovelSummaryDto;
 import com.novel.splitter.application.model.dto.NovelUploadResponseDto;
 import com.novel.splitter.application.model.dto.SceneDto;
 import com.novel.splitter.application.model.dto.TaskSubmitResponseDto;
@@ -42,6 +43,18 @@ public class NovelController {
     @GetMapping
     public List<String> listNovels() throws IOException {
         return novelFacadeService.listNovels();
+    }
+
+    @Operation(summary = "获取小说列表(DB)", description = "DB-first：从数据库返回小说列表（不依赖文件扫描）")
+    @GetMapping("/db")
+    public List<NovelSummaryDto> listNovelsFromDb() {
+        return novelFacadeService.listNovelsFromDb();
+    }
+
+    @Operation(summary = "软删除小说", description = "将小说标记为删除，同时软删除其 chapters/scenes；后续可由 cleanup 任务做物理清理")
+    @DeleteMapping("/{novelId}")
+    public void softDeleteNovel(@PathVariable("novelId") String novelId) {
+        novelFacadeService.softDeleteNovel(novelId);
     }
 
     /**

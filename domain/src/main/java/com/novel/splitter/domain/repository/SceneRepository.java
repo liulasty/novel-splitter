@@ -60,6 +60,19 @@ public interface SceneRepository {
     void deleteNovel(String novelName);
 
     /**
+     * 按小说 ID 删除指定小说的所有数据
+     * @param novelId novels 表主键
+     */
+    void deleteNovelById(String novelId);
+
+    /**
+     * 按小说 ID 删除指定版本的切分结果
+     * @param novelId novels 表主键
+     * @param version 版本
+     */
+    void deleteVersionByNovelId(String novelId, String version);
+
+    /**
      * 删除所有数据
      */
     void deleteAll();

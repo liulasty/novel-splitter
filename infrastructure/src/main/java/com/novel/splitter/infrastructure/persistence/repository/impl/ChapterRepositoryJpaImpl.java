@@ -9,6 +9,7 @@ import com.novel.splitter.infrastructure.persistence.repository.JpaChapterReposi
 import com.novel.splitter.infrastructure.persistence.repository.JpaNovelRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Objects;
@@ -46,5 +47,11 @@ public class ChapterRepositoryJpaImpl implements ChapterRepository {
                 .stream()
                 .map(chapterMapper::toDomain)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public void deleteByNovelId(String novelId) {
+        jpaChapterRepository.deleteByNovelId(novelId);
     }
 }

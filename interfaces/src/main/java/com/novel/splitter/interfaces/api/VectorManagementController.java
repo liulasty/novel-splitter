@@ -24,6 +24,7 @@ import java.util.Map;
 public class VectorManagementController {
 
     private final VectorManagementService vectorManagementService;
+    private final DtoMapper dtoMapper;
 
     /**
      * 获取向量数据库统计信息
@@ -45,7 +46,7 @@ public class VectorManagementController {
     @Operation(summary = "执行向量相似度搜索", description = "根据查询文本进行嵌入转换，并在向量数据库中搜索最相似的记录")
     @PostMapping("/search")
     public List<VectorRecordDto> search(@Valid @RequestBody VectorSearchRequest request) {
-        return DtoMapper.INSTANCE.toVectorRecordDtos(vectorManagementService.search(request));
+        return dtoMapper.toVectorRecordDtos(vectorManagementService.search(request));
     }
 
     /**

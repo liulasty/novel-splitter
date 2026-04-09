@@ -30,14 +30,23 @@ public interface KnowledgeBaseService {
      * 删除指定版本的切分结果（及相关向量）
      * @param novelName 小说名称
      * @param version 版本
+     * @return cleanupTaskId
      */
-    void deleteVersion(String novelName, String version);
+    Long deleteVersion(String novelName, String version);
 
     /**
      * 删除指定小说的所有数据（文件、切分结果、向量）
      * @param novelName 小说名称
+     * @return cleanupTaskId
      */
-    void deleteKnowledgeBase(String novelName);
+    Long deleteKnowledgeBase(String novelName);
+
+    /**
+     * 按 novelId 删除指定小说的所有数据（文件、切分结果、向量）
+     * @param novelId novels 表主键
+     * @return cleanupTaskId
+     */
+    Long deleteKnowledgeBaseById(String novelId);
 
     /**
      * 获取指定小说的所有版本列表

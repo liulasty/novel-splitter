@@ -20,9 +20,10 @@ public class CleanupTaskRepositoryJpaImpl implements CleanupTaskRepository {
     private final CleanupTaskMapper mapper;
 
     @Override
-    public void save(CleanupTask task) {
+    public CleanupTask save(CleanupTask task) {
         JpaCleanupTaskEntity entity = mapper.toEntity(task);
-        jpaCleanupTaskRepository.save(Objects.requireNonNull(entity, "entity must not be null"));
+        JpaCleanupTaskEntity saved = jpaCleanupTaskRepository.save(Objects.requireNonNull(entity, "entity must not be null"));
+        return mapper.toDomain(saved);
     }
 
     @Override

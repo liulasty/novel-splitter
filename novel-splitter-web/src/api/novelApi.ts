@@ -6,11 +6,23 @@ export interface NovelUploadResponse {
   message: string;
 }
 
-export interface NovelStatRecordDto {
+export interface NovelSummaryDto {
   novelId: string;
-  version: string;
+  title: string;
+  author?: string | null;
+  status?: string | null;
+  filePath?: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface NovelStatRecordDto {
+  novelName: string;
+  versions: string[];
   sceneCount: number;
   vectorCount: number;
+  ingestTime?: string | null;
+  status?: string | null;
 }
 
 export interface DashboardStatsDto {
@@ -76,7 +88,14 @@ export const novelApi = {
     return response;
   },
 
-  getNovels: async (): Promise<string[]> => {
+  // DB-first novel list (recommended)
+  getNovels: async (): Promise<NovelSummaryDto[]> => {
+    const response = await apiClient.get<ApiEnvelope<NovelSummaryDto[]>, NovelSummaryDto[]>('/novels/db');
+    return response;
+  },
+
+  // Legacy: list local .txt files under storage root
+  getNovelFiles: async (): Promise<string[]> => {
     const response = await apiClient.get<ApiEnvelope<string[]>, string[]>('/novels');
     return response;
   },
@@ -126,11 +145,8 @@ export const novelApi = {
     return response;
   },
 
-  deleteNovel: async (novelId: string): Promise<{ message: string }> => {
-    const response = await apiClient.delete<ApiEnvelope<{ message: string }>, { message: string }>(
-      `/knowledge/${encodeURIComponent(novelId)}`
-    );
-    return response;
+  softDeleteNovel: async (novelId: string): Promise<void> => {
+    await apiClient.delete<ApiEnvelope<void>, void>(`/novels/${encodeURIComponent(novelId)}`);
   },
 
   // Deprecated, keep for backwards compatibility if needed, or replace.

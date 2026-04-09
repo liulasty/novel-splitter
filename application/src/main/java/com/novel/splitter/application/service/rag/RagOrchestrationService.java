@@ -1,7 +1,6 @@
 package com.novel.splitter.application.service.rag;
 
 import com.novel.splitter.assembler.api.ContextAssembler;
-import com.novel.splitter.assembler.config.AssemblerConfig;
 import com.novel.splitter.domain.model.Answer;
 import com.novel.splitter.domain.model.AnswerType;
 import com.novel.splitter.domain.model.ContextBlock;
@@ -12,7 +11,6 @@ import com.novel.splitter.retrieval.api.RagFacade;
 import com.novel.splitter.retrieval.api.RagRetrievalService;
 import com.novel.splitter.retrieval.config.RagProperties;
 import com.novel.splitter.retrieval.dto.RagDebugResponse;
-import com.novel.splitter.retrieval.dto.RagRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -33,10 +31,10 @@ public class RagOrchestrationService implements RagFacade {
     private final RobustLlmClient llmClient;
     private final ContextAssembler contextAssembler;
     private final RagProperties ragProperties;
-    private final AssemblerConfig assemblerConfig;
+    private final com.novel.splitter.assembler.config.AssemblerConfig assemblerConfig;
 
     @Override
-    public Answer ask(RagRequest request) {
+    public Answer ask(com.novel.splitter.retrieval.dto.RagRequest request) {
         return ask(request.getQuestion(), request.getTopK(), request.getNovel(), request.getVersion());
     }
 
@@ -56,7 +54,7 @@ public class RagOrchestrationService implements RagFacade {
 
         try {
             stopWatch.start("1. Retrieval");
-            RagRequest retrievalRequest = new RagRequest();
+            com.novel.splitter.retrieval.dto.RagRequest retrievalRequest = new com.novel.splitter.retrieval.dto.RagRequest();
             retrievalRequest.setQuestion(question);
             retrievalRequest.setTopK(topK);
             retrievalRequest.setNovel(novel);
@@ -99,7 +97,7 @@ public class RagOrchestrationService implements RagFacade {
     }
 
     @Override
-    public RagDebugResponse preview(RagRequest request) {
+    public RagDebugResponse preview(com.novel.splitter.retrieval.dto.RagRequest request) {
         long startTime = System.currentTimeMillis();
         StopWatch stopWatch = new StopWatch("RAG Debug");
         Map<String, Object> stats = new HashMap<>();

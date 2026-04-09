@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Optional;
 
 public interface CleanupTaskRepository {
-    void save(CleanupTask task);
+    CleanupTask save(CleanupTask task);
     List<CleanupTask> findAll();
     Optional<CleanupTask> findById(Long id);
 }

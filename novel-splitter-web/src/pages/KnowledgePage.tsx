@@ -9,11 +9,6 @@ export default function KnowledgePage() {
     queryFn: novelApi.getNovels,
   });
 
-  const { data: stats } = useQuery({
-    queryKey: ['novelStats'],
-    queryFn: novelApi.getNovelStats,
-  });
-
   const novelList = Array.isArray(novels) ? novels : [];
 
   return (
@@ -82,9 +77,9 @@ export default function KnowledgePage() {
                   <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     {novelList.map((novel) => (
                         <NovelVersionsCard 
-                            key={novel} 
-                            novel={novel} 
-                            stats={stats?.filter(s => s.novelId === novel) || []} 
+                            key={novel.novelId}
+                            novelId={novel.novelId}
+                            novelName={novel.title}
                         />
                     ))}
                   </div>

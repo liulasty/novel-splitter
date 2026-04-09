@@ -6,13 +6,11 @@ import com.novel.splitter.infrastructure.persistence.entity.JpaSceneEntity;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.Named;
-import org.mapstruct.factory.Mappers;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
 @Mapper(componentModel = "spring")
 public interface SceneMapper {
-    SceneMapper INSTANCE = Mappers.getMapper(SceneMapper.class);
     ObjectMapper objectMapper = new ObjectMapper();
 
     @Mapping(target = "id", source = "sceneId")

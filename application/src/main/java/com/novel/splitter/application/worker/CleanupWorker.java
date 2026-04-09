@@ -5,6 +5,8 @@ import com.novel.splitter.domain.task.CleanupTask;
 import com.novel.splitter.domain.task.CleanupTaskMessage;
 import com.novel.splitter.embedding.api.VectorStore;
 import com.novel.splitter.domain.repository.CleanupTaskRepository;
+import com.novel.splitter.domain.repository.NovelRepository;
+import com.novel.splitter.domain.model.Novel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -12,6 +14,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Map;
 import java.util.Optional;
@@ -23,13 +26,21 @@ public class CleanupWorker {
 
     private final VectorStore vectorStore;
     private final CleanupTaskRepository cleanupTaskRepository;
+    private final NovelRepository novelRepository;
 
     @Value("${splitter.storage.root-path}")
     private String novelStoragePath;
 
     @RabbitListener(queues = RabbitConfig.CLEANUP_TASK_QUEUE, concurrency = "1")
     public void handleCleanupTask(CleanupTaskMessage message) {
-        log.info("Received cleanup task for: {} {}", message.getTargetType(), message.getTargetId());
+        log.info(
+                "Received cleanup task for: type={}, targetId={}, novelId={}, novelName={}, version={}",
+                message.getTargetType(),
+                message.getTargetId(),
+                message.getNovelId(),
+                message.getNovelName(),
+                message.getVersion()
+        );
         
         Optional<CleanupTask> taskOpt = cleanupTaskRepository.findById(message.getCleanupTaskId());
         if (taskOpt.isEmpty()) {
@@ -45,14 +56,46 @@ public class CleanupWorker {
 
         try {
             if ("VERSION".equals(message.getTargetType())) {
-                log.info("Physically deleting ChromaDB vectors for {}/{}", message.getTargetId(), message.getVersion());
-                vectorStore.delete(Map.of("novel", message.getTargetId(), "version", message.getVersion()));
+                String novelId = firstNonBlank(message.getNovelId(), null);
+                String novelName = firstNonBlank(message.getNovelName(), message.getTargetId());
+                String version = message.getVersion();
+
+                if (novelId != null) {
+                    log.info("Physically deleting ChromaDB vectors for novelId={} version={}", novelId, version);
+                    vectorStore.delete(Map.of("novelId", novelId, "version", version));
+                }
+                if (novelName != null) {
+                    log.info("Physically deleting ChromaDB vectors for novel='{}' version={}", novelName, version);
+                    vectorStore.delete(Map.of("novel", novelName, "version", version));
+                }
             } else if ("NOVEL".equals(message.getTargetType())) {
-                log.info("Physically deleting ChromaDB vectors for novel {}", message.getTargetId());
-                vectorStore.delete(Map.of("novel", message.getTargetId()));
-                
-                // Delete raw file
-                deleteRawFile(message.getTargetId());
+                String novelName = firstNonBlank(message.getNovelName(), message.getTargetId());
+                if (novelName == null) {
+                    throw new IllegalArgumentException("novelName must not be blank for NOVEL cleanup");
+                }
+                log.info("Physically deleting ChromaDB vectors for novel='{}'", novelName);
+                vectorStore.delete(Map.of("novel", novelName));
+
+                deleteRawFileByName(novelName);
+            } else if ("NOVEL_ID".equals(message.getTargetType())) {
+                String novelId = firstNonBlank(message.getNovelId(), message.getTargetId());
+                if (novelId == null) {
+                    throw new IllegalArgumentException("novelId must not be blank for NOVEL_ID cleanup");
+                }
+
+                // Delete vectors by novelId (preferred)
+                log.info("Physically deleting ChromaDB vectors for novelId={}", novelId);
+                vectorStore.delete(Map.of("novelId", novelId));
+
+                // Backward compatibility: if we know a legacy novelName, also delete by novel
+                String novelName = firstNonBlank(message.getNovelName(), null);
+                if (novelName != null) {
+                    log.info("Physically deleting ChromaDB vectors (compat) for novel='{}'", novelName);
+                    vectorStore.delete(Map.of("novel", novelName));
+                }
+
+                // Delete raw file using DB filePath if available; fallback to name-based deletion.
+                deleteRawFileByNovelId(novelId, novelName);
             } else {
                 log.warn("Unknown targetType {} for cleanup task {}", message.getTargetType(), task.getId());
             }
@@ -72,7 +115,30 @@ public class CleanupWorker {
         }
     }
 
-    private void deleteRawFile(String novelName) {
+    private void deleteRawFileByNovelId(String novelId, String fallbackNovelName) {
+        try {
+            Optional<Novel> novelOpt = novelRepository.findById(novelId);
+            if (novelOpt.isPresent() && novelOpt.get().getFilePath() != null && !novelOpt.get().getFilePath().isBlank()) {
+                Path filePath = Paths.get(novelOpt.get().getFilePath());
+                if (Files.exists(filePath)) {
+                    Files.delete(filePath);
+                    log.info("Deleted raw file by filePath: {}", filePath);
+                    return;
+                }
+                log.warn("filePath not found on disk: {}", filePath);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to delete raw file by novelId={}, falling back to name-based deletion. err={}", novelId, e.getMessage());
+        }
+
+        if (fallbackNovelName != null) {
+            deleteRawFileByName(fallbackNovelName);
+        } else {
+            log.warn("No fallback novelName available for novelId={}", novelId);
+        }
+    }
+
+    private void deleteRawFileByName(String novelName) {
         try {
             java.nio.file.Path rootDir = Paths.get(novelStoragePath);
             java.nio.file.Path rawDir = rootDir.resolve("raw");
@@ -108,5 +174,11 @@ public class CleanupWorker {
         }
         
         return false;
+    }
+
+    private String firstNonBlank(String a, String b) {
+        if (a != null && !a.isBlank()) return a;
+        if (b != null && !b.isBlank()) return b;
+        return null;
     }
 }
