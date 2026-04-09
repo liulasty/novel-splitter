@@ -6,11 +6,13 @@ import com.novel.splitter.application.model.dto.SceneDto;
 import com.novel.splitter.application.mapper.DtoMapper;
 import com.novel.splitter.domain.task.CleanupTask;
 import com.novel.splitter.domain.task.CleanupTaskMessage;
-import com.novel.splitter.embedding.api.VectorStore;
+import com.novel.splitter.domain.model.paging.PageQuery;
+import com.novel.splitter.domain.model.paging.PagedResult;
 import com.novel.splitter.domain.repository.CleanupTaskRepository;
 import com.novel.splitter.domain.repository.SceneRepository;
 import com.novel.splitter.application.model.dto.VectorPreviewRecordDto;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,7 +31,6 @@ import java.util.List;
 public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
 
     private final SceneRepository sceneRepository;
-    private final VectorStore vectorStore;
     private final CleanupTaskRepository cleanupTaskRepository;
     private final RabbitTemplate rabbitTemplate;
     
@@ -38,7 +39,9 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
 
     @Override
     public Page<VectorPreviewRecordDto> getLightweightScenes(Pageable pageable) {
-        return sceneRepository.findLightweightScenes(pageable).map(scene -> new VectorPreviewRecordDto() {
+        PagedResult<VectorPreviewRecordDto> result = sceneRepository
+                .findLightweightScenes(PageQuery.of(pageable.getPageNumber(), pageable.getPageSize()))
+                .map(scene -> new VectorPreviewRecordDto() {
             @Override
             public Long getId() {
                 return scene.getId() != null ? Long.valueOf(scene.getId()) : null;
@@ -60,6 +63,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                 return scene.getText();
             }
         });
+        return new PageImpl<>(result.getContent(), pageable, result.getTotalElements());
     }
 
     @Override

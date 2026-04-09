@@ -5,7 +5,6 @@ import com.novel.splitter.domain.model.RawParagraph;
 import com.novel.splitter.domain.model.Scene;
 import com.novel.splitter.domain.model.SceneMetadata;
 import com.novel.splitter.domain.model.SemanticSegment;
-import com.novel.splitter.embedding.api.EmbeddingService;
 import com.novel.splitter.rule.DynamicWindowRule;
 import com.novel.splitter.rule.SplitRule;
 import com.novel.splitter.domain.task.IngestProgress;
@@ -46,20 +45,10 @@ public class SceneAssembler {
 
     /**
      * 默认构造函数
-     * 初始化时不提供 EmbeddingService，可能导致部分依赖向量计算的功能受限。
+     * 使用纯文本策略构建语义段，不依赖向量模型。
      */
     public SceneAssembler() {
-        this(null);
-    }
-
-    /**
-     * 带有 Embedding 服务的构造函数
-     *
-     * @param embeddingService 文本向量化服务，用于上下文感知的语义段构建
-     */
-    public SceneAssembler(EmbeddingService embeddingService) {
-        // 使用 Phase 2 引入的 ContextAwareSegmentBuilder，支持基于向量的上下文感知
-        this.segmentBuilder = new ContextAwareSegmentBuilder(embeddingService);
+        this.segmentBuilder = new ContextAwareSegmentBuilder();
         this.splitRules = new ArrayList<>();
         // 使用 Phase 3 引入的动态窗口规则，根据文本特征动态调整切分边界
         this.splitRules.add(new DynamicWindowRule());

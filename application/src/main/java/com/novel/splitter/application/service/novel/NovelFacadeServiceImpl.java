@@ -11,6 +11,8 @@ import com.novel.splitter.domain.enums.TaskType;
 import com.novel.splitter.domain.task.EmbedTaskMessage;
 import com.novel.splitter.application.model.dto.DownloadAndIngestRequest;
 import com.novel.splitter.application.model.dto.IngestRequest;
+import com.novel.splitter.domain.model.paging.PageQuery;
+import com.novel.splitter.domain.model.paging.PagedResult;
 import com.novel.splitter.domain.task.SplitTaskMessage;
 import com.novel.splitter.application.model.dto.NovelStatRecordDto;
 import com.novel.splitter.domain.task.SplitTask;
@@ -18,7 +20,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -306,8 +308,10 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         novel.checkCanReadChapters();
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 500);
-        return sceneRepository.findByNovelIdAndChapterId(novelId, chapterId, PageRequest.of(safePage, safeSize))
+        PagedResult<com.novel.splitter.application.model.dto.SceneDto> result = sceneRepository
+                .findByNovelIdAndChapterId(novelId, chapterId, PageQuery.of(safePage, safeSize))
                 .map(com.novel.splitter.application.mapper.DtoMapper.INSTANCE::toSceneDto);
+        return new PageImpl<>(result.getContent(), org.springframework.data.domain.PageRequest.of(safePage, safeSize), result.getTotalElements());
     }
 
     private String normalizeNovelId(String fileName) {

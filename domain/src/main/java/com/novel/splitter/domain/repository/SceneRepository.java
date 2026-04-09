@@ -1,8 +1,8 @@
 package com.novel.splitter.domain.repository;
 
 import com.novel.splitter.domain.model.Scene;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import com.novel.splitter.domain.model.paging.PagedResult;
+import com.novel.splitter.domain.model.paging.PageQuery;
 
 import java.util.List;
 
@@ -90,7 +90,7 @@ public interface SceneRepository {
      * 分页查询轻量级场景信息，供前端列表/预览使用
      * 这里的返回类型应该是一个纯净的 DTO 或者是 Domain 模型投影，但为兼容当前项目结构先用 Object 数组或 Domain 投射
      */
-    Page<Scene> findLightweightScenes(Pageable pageable);
+    PagedResult<Scene> findLightweightScenes(PageQuery pageQuery);
 
     /**
      * 根据小说 ID 分页获取场景
@@ -98,12 +98,12 @@ public interface SceneRepository {
      * @param pageable 分页参数
      * @return 场景分页
      */
-    Page<Scene> findByNovelId(String novelId, Pageable pageable);
+    PagedResult<Scene> findByNovelId(String novelId, PageQuery pageQuery);
 
     /**
      * 根据小说 ID 和章节 ID 分页获取场景，避免一次性加载过大结果集
      */
-    Page<Scene> findByNovelIdAndChapterId(String novelId, Long chapterId, Pageable pageable);
+    PagedResult<Scene> findByNovelIdAndChapterId(String novelId, Long chapterId, PageQuery pageQuery);
     /**
      * 统计所有小说和版本下的场景数量，返回格式为 Object[] {novelName, version, count}
      * @return 统计结果列表

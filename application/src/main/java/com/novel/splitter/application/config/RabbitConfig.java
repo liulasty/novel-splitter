@@ -13,11 +13,24 @@ import org.springframework.amqp.rabbit.config.RetryInterceptorBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.retry.interceptor.RetryOperationsInterceptor;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.util.Map;
 
 @Configuration
 public class RabbitConfig {
+    @Value("${splitter.rabbitmq.retry.max-attempts:3}")
+    private int retryMaxAttempts;
+
+    @Value("${splitter.rabbitmq.retry.initial-interval-ms:1000}")
+    private long retryInitialIntervalMs;
+
+    @Value("${splitter.rabbitmq.retry.multiplier:2.0}")
+    private double retryMultiplier;
+
+    @Value("${splitter.rabbitmq.retry.max-interval-ms:10000}")
+    private long retryMaxIntervalMs;
+
 
     public static final String EXCHANGE_NAME = "novel.task.exchange";
 
@@ -167,8 +180,8 @@ public class RabbitConfig {
     @Bean
     public RetryOperationsInterceptor rabbitRetryInterceptor() {
         return RetryInterceptorBuilder.stateless()
-                .maxAttempts(3)
-                .backOffOptions(1000, 2.0, 10000)
+                .maxAttempts(retryMaxAttempts)
+                .backOffOptions(retryInitialIntervalMs, retryMultiplier, retryMaxIntervalMs)
                 .recoverer(new RejectAndDontRequeueRecoverer())
                 .build();
     }

@@ -1,6 +1,8 @@
 package com.novel.splitter.infrastructure.persistence.repository.impl;
 
 import com.novel.splitter.domain.model.Scene;
+import com.novel.splitter.domain.model.paging.PageQuery;
+import com.novel.splitter.domain.model.paging.PagedResult;
 import com.novel.splitter.domain.repository.SceneRepository;
 import com.novel.splitter.infrastructure.persistence.entity.JpaChapterEntity;
 import com.novel.splitter.infrastructure.persistence.entity.JpaNovelEntity;
@@ -11,17 +13,20 @@ import com.novel.splitter.infrastructure.persistence.repository.JpaNovelReposito
 import com.novel.splitter.infrastructure.persistence.repository.JpaSceneRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Value;
 
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -33,6 +38,11 @@ public class SceneRepositoryJpaImpl implements SceneRepository {
     private final JpaNovelRepository jpaNovelRepository;
     private final JpaChapterRepository jpaChapterRepository;
     private final SceneMapper sceneMapper;
+    @PersistenceContext
+    private EntityManager entityManager;
+
+    @Value("${spring.jpa.properties.hibernate.jdbc.batch_size:500}")
+    private int jdbcBatchSize;
 
     @Override
     public List<Long> saveScenes(String novelId, String novelName, String version, List<Scene> scenes) {
@@ -73,11 +83,13 @@ public class SceneRepositoryJpaImpl implements SceneRepository {
         }).collect(Collectors.toList());
 
         List<Long> savedIds = new ArrayList<>();
-        int batchSize = 500;
+        int batchSize = Math.max(1, jdbcBatchSize);
         for (int i = 0; i < entities.size(); i += batchSize) {
             int end = Math.min(i + batchSize, entities.size());
             List<JpaSceneEntity> batch = entities.subList(i, end);
-            List<JpaSceneEntity> savedBatch = jpaSceneRepository.saveAll(Objects.requireNonNull(batch, "batch must not be null"));
+            List<JpaSceneEntity> savedBatch = jpaSceneRepository.saveAll(new ArrayList<>(batch));
+            jpaSceneRepository.flush();
+            entityManager.clear();
             savedBatch.forEach(entity -> savedIds.add(entity.getId()));
         }
         return savedIds;
@@ -136,10 +148,10 @@ public class SceneRepositoryJpaImpl implements SceneRepository {
     }
 
     @Override
-    public Page<Scene> findLightweightScenes(Pageable pageable) {
+    public PagedResult<Scene> findLightweightScenes(PageQuery pageQuery) {
         // Here we map the DTO returned by JpaSceneRepository to Domain Scene
         // We'll construct dummy Scene objects to satisfy Domain contract or return partial models
-        return jpaSceneRepository.findLightweightScenes(pageable)
+        Page<Scene> page = jpaSceneRepository.findLightweightScenes(toPageable(pageQuery))
                 .map(dto -> {
                     Scene scene = new Scene();
                     scene.setId(dto.getId() != null ? String.valueOf(dto.getId()) : null);
@@ -150,21 +162,34 @@ public class SceneRepositoryJpaImpl implements SceneRepository {
                     scene.setText(dto.getTextContent());
                     return scene;
                 });
+        return toPagedResult(page);
     }
 
     @Override
-    public Page<Scene> findByNovelId(String novelId, Pageable pageable) {
-        return jpaSceneRepository.findByNovelId(novelId, pageable).map(sceneMapper::toDomain);
+    public PagedResult<Scene> findByNovelId(String novelId, PageQuery pageQuery) {
+        Page<Scene> page = jpaSceneRepository.findByNovelId(novelId, toPageable(pageQuery)).map(sceneMapper::toDomain);
+        return toPagedResult(page);
     }
 
     @Override
-    public Page<Scene> findByNovelIdAndChapterId(String novelId, Long chapterId, Pageable pageable) {
-        return jpaSceneRepository.findByNovelIdAndChapterId(novelId, chapterId, pageable)
+    public PagedResult<Scene> findByNovelIdAndChapterId(String novelId, Long chapterId, PageQuery pageQuery) {
+        Page<Scene> page = jpaSceneRepository.findByNovelIdAndChapterId(novelId, chapterId, toPageable(pageQuery))
                 .map(sceneMapper::toDomain);
+        return toPagedResult(page);
     }
 
     @Override
     public List<Object[]> countScenesByNovelAndVersion() {
         return jpaSceneRepository.countScenesByNovelAndVersion();
+    }
+
+    private Pageable toPageable(PageQuery pageQuery) {
+        int page = Math.max(0, pageQuery.getPage());
+        int size = Math.max(1, pageQuery.getSize());
+        return PageRequest.of(page, size);
+    }
+
+    private PagedResult<Scene> toPagedResult(Page<Scene> page) {
+        return PagedResult.of(page.getContent(), page.getNumber(), page.getSize(), page.getTotalElements());
     }
 }

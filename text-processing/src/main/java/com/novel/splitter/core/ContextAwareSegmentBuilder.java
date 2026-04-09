@@ -2,12 +2,14 @@ package com.novel.splitter.core;
 
 import com.novel.splitter.domain.model.RawParagraph;
 import com.novel.splitter.domain.model.SemanticSegment;
-import com.novel.splitter.embedding.api.EmbeddingService;
 import com.novel.splitter.validation.core.SemanticSegmentBuilder;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * 上下文感知语义段构建器 (Phase 2)
@@ -16,7 +18,7 @@ import java.util.List;
  * 1. 识别 Anchor (标题、代码块) 并特殊处理。
  * 2. 增强的对话识别 (支持混合结构)。
  * 3. 动作描写吸附 (Adsorption)。
- * 4. 集成 OnnxEmbeddingService 计算余弦相似度。
+ * 4. 基于词项重叠度评估语义相似性。
  * 在 NLP 和 RAG 系统中，用于将段落组合成具有上下文连贯性的语义段落（Segment）。
  * </p>
  */
@@ -30,7 +32,6 @@ public class ContextAwareSegmentBuilder extends SemanticSegmentBuilder {
     
     private final SpeakerModel speakerModel;
     private final ParagraphRelevanceScorer relevanceScorer;
-    private final EmbeddingService embeddingService;
 
     /**
      * 默认构造函数。
@@ -39,18 +40,8 @@ public class ContextAwareSegmentBuilder extends SemanticSegmentBuilder {
      * </p>
      */
     public ContextAwareSegmentBuilder() {
-        this(null);
-    }
-
-    /**
-     * 带嵌入服务的构造函数。
-     *
-     * @param embeddingService 文本向量化服务，用于计算段落间的余弦相似度
-     */
-    public ContextAwareSegmentBuilder(EmbeddingService embeddingService) {
         this.speakerModel = new SpeakerModel();
         this.relevanceScorer = new ParagraphRelevanceScorer(speakerModel);
-        this.embeddingService = embeddingService;
     }
 
     /**
@@ -154,7 +145,7 @@ public class ContextAwareSegmentBuilder extends SemanticSegmentBuilder {
     /**
      * 评估基于语义的合并决定。
      * <p>
-     * 通过计算当前段落与缓冲区最后一个段落的向量余弦相似度，
+     * 通过计算当前段落与缓冲区最后一个段落的词项重叠度，
      * 判断是否应该将它们合并。
      * </p>
      *
@@ -163,7 +154,7 @@ public class ContextAwareSegmentBuilder extends SemanticSegmentBuilder {
      * @return 如果相似度高返回 true (合并)；相似度低返回 false (切分)；无法判断则返回 null
      */
     private Boolean evaluateSemanticMerge(List<RawParagraph> buffer, RawParagraph current) {
-        if (buffer.isEmpty() || embeddingService == null) return null;
+        if (buffer.isEmpty()) return null;
         RawParagraph last = buffer.get(buffer.size() - 1);
 
         try {
@@ -174,17 +165,8 @@ public class ContextAwareSegmentBuilder extends SemanticSegmentBuilder {
                 return null;
             }
 
-            // 获取文本的向量表示
-            float[] v1 = embeddingService.embedBatch(java.util.Collections.singletonList(content1)).get(0);
-            float[] v2 = embeddingService.embedBatch(java.util.Collections.singletonList(content2)).get(0);
-            
-            if (v1 == null || v2 == null || v1.length == 0 || v2.length == 0) {
-                log.warn("Embedding result is null or empty, falling back to rule-based merge evaluation.");
-                return null;
-            }
-
-            // 计算余弦相似度
-            double similarity = cosineSimilarity(v1, v2);
+            // 在纯算法模块中使用词项重叠度近似语义相似性，避免外部向量服务依赖。
+            double similarity = tokenOverlapSimilarity(content1, content2);
 
             if (similarity > 0.85) {
                 return true; // 相似度高，建议合并
@@ -215,25 +197,30 @@ public class ContextAwareSegmentBuilder extends SemanticSegmentBuilder {
         return relevanceScorer.shouldMerge(last, current, prevType, currType);
     }
 
-    /**
-     * 计算两个向量的余弦相似度。
-     *
-     * @param v1 向量1
-     * @param v2 向量2
-     * @return 两个向量的余弦相似度值，范围在 [-1.0, 1.0] 之间
-     */
-    private double cosineSimilarity(float[] v1, float[] v2) {
-        if (v1 == null || v2 == null || v1.length != v2.length) return 0;
-        double dotProduct = 0;
-        double normA = 0;
-        double normB = 0;
-        for (int i = 0; i < v1.length; i++) {
-            dotProduct += v1[i] * v2[i];
-            normA += v1[i] * v1[i];
-            normB += v2[i] * v2[i];
+    private double tokenOverlapSimilarity(String content1, String content2) {
+        Set<String> tokens1 = tokenize(content1);
+        Set<String> tokens2 = tokenize(content2);
+        if (tokens1.isEmpty() || tokens2.isEmpty()) {
+            return 0;
         }
-        if (normA == 0 || normB == 0) return 0;
-        return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+        Set<String> intersection = new HashSet<>(tokens1);
+        intersection.retainAll(tokens2);
+        Set<String> union = new HashSet<>(tokens1);
+        union.addAll(tokens2);
+        if (union.isEmpty()) {
+            return 0;
+        }
+        return intersection.size() / (double) union.size();
+    }
+
+    private Set<String> tokenize(String text) {
+        if (text == null || text.isBlank()) {
+            return Set.of();
+        }
+        return Arrays.stream(text.toLowerCase().split("[\\p{Punct}\\s]+"))
+                .map(String::trim)
+                .filter(token -> !token.isBlank())
+                .collect(java.util.stream.Collectors.toSet());
     }
 
     /**

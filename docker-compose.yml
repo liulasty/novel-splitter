@@ -37,17 +37,6 @@ services:
       timeout: 5s
       retries: 5
 
-  adminer:
-    image: adminer:latest
-    container_name: adminer
-    environment:
-      ADMINER_DEFAULT_SERVER: postgres
-      ADMINER_DESIGN: pepa-linha
-    networks:
-      - appnet
-    depends_on:
-      - postgres
-
   backend:
     image: novel-splitter-backend:latest
     container_name: backend

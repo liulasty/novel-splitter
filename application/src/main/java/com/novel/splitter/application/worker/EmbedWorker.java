@@ -3,19 +3,21 @@ package com.novel.splitter.application.worker;
 import com.novel.splitter.application.config.RabbitConfig;
 import com.novel.splitter.application.service.novel.NovelService;
 import com.novel.splitter.domain.enums.NovelStatus;
-import com.novel.splitter.domain.task.SplitTask;
+import com.novel.splitter.domain.model.paging.PageQuery;
+import com.novel.splitter.domain.model.paging.PagedResult;
 import com.novel.splitter.domain.task.EmbedTaskMessage;
+import com.novel.splitter.domain.task.SplitTask;
 import com.novel.splitter.pipeline.orchestrator.EmbedNovelUseCase;
 import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.domain.repository.SceneRepository;
+import com.google.common.util.concurrent.RateLimiter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Component
@@ -31,7 +33,13 @@ public class EmbedWorker {
     @org.springframework.beans.factory.annotation.Value("${splitter.ingestion.batch-size:100}")
     private int batchSize;
 
-    @RabbitListener(queues = RabbitConfig.EMBED_TASK_QUEUE)
+    @org.springframework.beans.factory.annotation.Value("${llm.coze.rate-limit.max-requests:2}")
+    private int maxRequests;
+
+    @org.springframework.beans.factory.annotation.Value("${llm.coze.rate-limit.duration-seconds:60}")
+    private int durationSeconds;
+
+    @RabbitListener(queues = RabbitConfig.EMBED_TASK_QUEUE, containerFactory = "rabbitListenerContainerFactory")
     public void processEmbedTask(EmbedTaskMessage message) {
         String taskId = message.getTaskId();
         String novelId = message.getNovelId();
@@ -55,9 +63,12 @@ public class EmbedWorker {
             int page = 0;
             int totalScenesProcessed = 0;
             long totalScenes = 0;
+            double permitsPerSecond = Math.max(1.0d / 60.0d, maxRequests / (double) Math.max(1, durationSeconds));
+            RateLimiter rateLimiter = RateLimiter.create(permitsPerSecond);
             
             while (true) {
-                Page<com.novel.splitter.domain.model.Scene> scenePage = sceneRepository.findByNovelId(novelId, PageRequest.of(page, batchSize));
+                PagedResult<com.novel.splitter.domain.model.Scene> scenePage =
+                        sceneRepository.findByNovelId(novelId, PageQuery.of(page, batchSize));
                 if (page == 0) {
                     totalScenes = scenePage.getTotalElements();
                     task.setTotalScenes((int) totalScenes);
@@ -74,7 +85,11 @@ public class EmbedWorker {
                 if (sceneIds.isEmpty()) {
                     break;
                 }
-                
+
+                // 限制每批向量化任务触发速率，避免外部向量服务 429。
+                if (!rateLimiter.tryAcquire(1, 30, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException("Embedding rate limiter timeout while waiting for permit");
+                }
                 embedNovelUseCase.embedBatch(sceneIds);
                 totalScenesProcessed += sceneIds.size();
                 

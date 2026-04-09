@@ -101,6 +101,12 @@ assembler:
 splitter:
   storage:
     root-path: ${STORAGE_ROOT_PATH:data/novel-storage}
+  rabbitmq:
+    retry:
+      max-attempts: 3
+      initial-interval-ms: 1000
+      multiplier: 2.0
+      max-interval-ms: 10000
   
   ingestion:
     batch-size: 10
