@@ -1,104 +1,75 @@
 package com.novel.splitter.application.service.novel;
 
 import com.novel.splitter.application.config.AppConfig;
+import com.novel.splitter.application.model.command.UploadNovelCommand;
+import com.novel.splitter.application.port.out.FileStoragePort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
 public class NovelStorageService {
 
     private static final String DEFAULT_UNKNOWN_FILE_PREFIX = "unknown";
-    private static final String RAW_DIR = "raw";
 
     private final AppConfig appConfig;
+    private final FileStoragePort fileStoragePort;
 
-    public List<String> listNovels() throws IOException {
-        Path storagePath = getStoragePath();
-        try (Stream<Path> stream = Files.list(storagePath)) {
-            return stream
-                    .filter(file -> !Files.isDirectory(file))
-                    .map(Path::getFileName)
-                    .map(Path::toString)
-                    .filter(name -> name.endsWith(".txt"))
-                    .collect(Collectors.toList());
-        }
+    public List<String> listNovels() {
+        return fileStoragePort.listTxtFiles();
     }
 
-    public String saveNovel(MultipartFile file) throws IOException {
-        if (file == null || file.isEmpty()) {
+    public String saveNovel(UploadNovelCommand command) {
+        if (command == null || command.getSize() == 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "文件为空");
         }
 
-        String originalFilename = file.getOriginalFilename();
+        String originalFilename = command.getOriginalFilename();
         String newFilename = generateUniqueFilename(originalFilename);
-        Path destination = getStoragePath().resolve(newFilename);
-        Files.copy(file.getInputStream(), destination, StandardCopyOption.REPLACE_EXISTING);
+        
+        fileStoragePort.saveFile(newFilename, command.getInputStream());
         return newFilename;
     }
 
     /**
-     * Save novel raw text as raw/{novelId}.txt under storage root.
+     * Save novel raw text as {rawDirName}/{novelId}/{rawFilename} under storage root.
      *
-     * @return stored relative path (e.g. raw/xxxx.txt)
+     * @return stored relative path
      */
-    public String saveNovelAsRawByNovelId(String novelId, MultipartFile file) throws IOException {
+    public String saveNovelAsRawByNovelId(String novelId, UploadNovelCommand command) {
         if (novelId == null || novelId.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "novelId 为空");
         }
-        if (file == null || file.isEmpty()) {
+        if (command == null || command.getSize() == 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "文件为空");
         }
-        Path rawDir = getStoragePath().resolve(RAW_DIR);
-        if (!Files.exists(rawDir)) {
-            Files.createDirectories(rawDir);
-        }
-        String filename = novelId.trim() + ".txt";
-        Path destination = rawDir.resolve(filename);
-        Files.copy(file.getInputStream(), destination, StandardCopyOption.REPLACE_EXISTING);
-        return RAW_DIR + "/" + filename;
+        
+        String rawDirName = appConfig.getStorage().getRawDirName();
+        String rawFilename = appConfig.getStorage().getRawFilename();
+        
+        String relativePath = rawDirName + "/" + novelId.trim() + "/" + rawFilename;
+        fileStoragePort.saveFile(relativePath, command.getInputStream());
+        return relativePath;
     }
 
-    public Path resolveExistingNovelPath(String fileName) throws IOException {
-        Path novelPath = getStoragePath().resolve(fileName);
-        if (!Files.exists(novelPath)) {
+    public Path resolveExistingNovelPath(String fileName) {
+        if (!fileStoragePort.exists(fileName)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "找不到文件: " + fileName);
         }
-        return novelPath;
+        return Paths.get(fileStoragePort.toAbsolutePath(fileName));
     }
 
     public void deleteNovelIfExists(String fileName) {
-        if (fileName == null || fileName.isBlank()) {
-            return;
-        }
-        try {
-            Path novelPath = getStoragePath().resolve(fileName);
-            Files.deleteIfExists(novelPath);
-        } catch (IOException ignored) {
-            // Best-effort compensation only.
-        }
-    }
-
-    private Path getStoragePath() throws IOException {
-        Path path = Paths.get(appConfig.getStorage().getRootPath());
-        if (!Files.exists(path)) {
-            Files.createDirectories(path);
-        }
-        return path;
+        fileStoragePort.deleteIfExists(fileName);
     }
 
     private String generateUniqueFilename(String originalFilename) {

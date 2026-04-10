@@ -21,11 +21,11 @@ import com.novel.splitter.application.model.dto.SplitRetryRequestDto;
 import com.novel.splitter.domain.task.SplitTask;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import com.novel.splitter.application.port.out.TaskQueuePort;
+import com.novel.splitter.application.model.command.UploadNovelCommand;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.nio.file.Paths;
@@ -56,7 +56,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
     private final ChapterService chapterService;
     private final com.novel.splitter.domain.repository.NovelCacheRepository novelCacheRepository;
     private final TaskService taskService;
-    private final RabbitTemplate rabbitTemplate;
+    private final TaskQueuePort taskQueuePort;
     private final DownloadService downloadService;
     private final AppConfig appConfig;
     private final com.novel.splitter.domain.repository.SceneRepository sceneRepository;
@@ -174,8 +174,8 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
     }
 
     @Override
-    public NovelUploadResponseDto uploadNovel(MultipartFile file, String title, String author, String description) throws IOException {
-        String novelId = novelService.createNovel(file, title, author, description);
+    public NovelUploadResponseDto uploadNovel(UploadNovelCommand command) throws IOException {
+        String novelId = novelService.createNovel(command);
         return NovelUploadResponseDto.builder()
                 .message("文件上传成功")
                 .novelId(novelId)
@@ -217,7 +217,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
 
         taskService.createTask(taskId, TaskType.SPLIT, id, novel.getFilePath(), maxScenes, version);
         SplitTaskMessage message = new SplitTaskMessage(taskId, id, maxScenes, version, triggerEmbed);
-        rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "split", message);
+        taskQueuePort.sendToSplitQueue(message);
         log.info("Sent taskId {} to split queue for retrySplit", taskId);
 
         return TaskSubmitResponseDto.builder()
@@ -239,9 +239,9 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         String version = normalizeVersion(request.getVersion());
 
         taskService.createTask(taskId, TaskType.SPLIT, novelId, novel.getFilePath(), maxScenes, version);
-        
+
         SplitTaskMessage message = new SplitTaskMessage(taskId, novelId, maxScenes, version, triggerEmbed);
-        rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "load", message);
+        taskQueuePort.sendToLoadQueue(message);
         log.info("Sent taskId {} to load queue for split", taskId);
 
         return TaskSubmitResponseDto.builder()
@@ -264,9 +264,9 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         String version = DEFAULT_VERSION;
         
         taskService.createTask(taskId, TaskType.EMBED, novelId, novel.getFilePath(), Integer.MAX_VALUE, version);
-        
+
         EmbedTaskMessage message = new EmbedTaskMessage(taskId, novelId, version);
-        rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "embed", message);
+        taskQueuePort.sendToEmbedQueue(message);
         log.info("Sent taskId {} to embed queue", taskId);
 
         return TaskSubmitResponseDto.builder()
@@ -319,9 +319,9 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         String version = normalizeVersion(request.getVersion());
 
         taskService.createTask(taskId, TaskType.SPLIT, novelId, request.getFileName(), maxScenes, version);
-        
+
         SplitTaskMessage message = new SplitTaskMessage(taskId, novelId, maxScenes, version);
-        rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "load", message);
+        taskQueuePort.sendToLoadQueue(message);
         log.info("Sent taskId {} to load queue", taskId);
 
         log.info("入库任务已发送到队列, taskId: {}", taskId);
@@ -334,10 +334,9 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
     @Override
     public TaskSubmitResponseDto downloadAndIngest(DownloadAndIngestRequest request) throws IOException {
         log.info("接收到下载并入库请求: url={}, name={}", request.getUrl(), request.getName());
-        
-        // 1. 同步下载，得到落盘文件名
-        String savedFileName = downloadService.downloadNovel(request.getUrl(), request.getName());
-        String relativePath = toStorageRelativePath(savedFileName);
+
+        // 1. 同步下载，得到落盘相对路径
+        String relativePath = downloadService.downloadNovel(request.getUrl(), request.getName());
 
         // 2. 下载后先创建 Novel 资源，再统一走 novelId 驱动 pipeline
         String novelId = novelService.createNovelFromStoredFile(relativePath, request.getName(), null, "downloaded from " + request.getUrl());
@@ -364,7 +363,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
     }
 
     @Override
-    public Page<com.novel.splitter.application.model.dto.SceneDto> getScenesByChapter(String novelId, Long chapterId, int page, int size) {
+    public PagedResult<com.novel.splitter.application.model.dto.SceneDto> getScenesByChapter(String novelId, Long chapterId, int page, int size) {
         com.novel.splitter.domain.model.Novel novel = novelService.getNovelById(novelId);
         if (novel == null) {
             throw new IllegalArgumentException("Novel not found: " + novelId);
@@ -372,10 +371,9 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         novel.checkCanReadChapters();
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 500);
-        PagedResult<com.novel.splitter.application.model.dto.SceneDto> result = sceneRepository
+        return sceneRepository
                 .findByNovelIdAndChapterId(novelId, chapterId, PageQuery.of(safePage, safeSize))
                 .map(dtoMapper::toSceneDto);
-        return new PageImpl<>(result.getContent(), org.springframework.data.domain.PageRequest.of(safePage, safeSize), result.getTotalElements());
     }
 
     @Override
@@ -402,17 +400,5 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
             return DEFAULT_VERSION;
         }
         return version.trim();
-    }
-
-    private String toStorageRelativePath(String absoluteOrRelativePath) {
-        if (absoluteOrRelativePath == null || absoluteOrRelativePath.isBlank()) {
-            throw new IllegalArgumentException("downloaded file path is empty");
-        }
-        Path storageRoot = Paths.get(appConfig.getStorage().getRootPath()).toAbsolutePath().normalize();
-        Path downloaded = Paths.get(absoluteOrRelativePath).toAbsolutePath().normalize();
-        if (!downloaded.startsWith(storageRoot)) {
-            throw new IllegalArgumentException("downloaded file is outside storage root: " + downloaded);
-        }
-        return storageRoot.relativize(downloaded).toString().replace('\\', '/');
     }
 }

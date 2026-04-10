@@ -1,6 +1,5 @@
 package com.novel.splitter.application.worker;
 
-import com.novel.splitter.application.config.AppConfig;
 import com.novel.splitter.application.config.RabbitConfig;
 import com.novel.splitter.domain.task.SplitTask;
 import com.novel.splitter.domain.task.SplitTaskMessage;
@@ -9,13 +8,14 @@ import com.novel.splitter.pipeline.orchestrator.LoadNovelUseCase;
 import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.application.service.novel.NovelService;
 import com.novel.splitter.application.service.novel.ChapterService;
+import com.novel.splitter.application.port.out.FileStoragePort;
+import com.novel.splitter.application.port.out.TaskQueuePort;
 import com.novel.splitter.domain.enums.NovelStatus;
 import com.novel.splitter.domain.model.Chapter;
 import com.novel.splitter.domain.model.Novel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Files;
@@ -34,8 +34,8 @@ public class LoadWorker {
     private final LoadNovelUseCase loadNovelUseCase;
     private final TaskService taskService;
     private final NovelCacheRepository novelCacheRepository;
-    private final RabbitTemplate rabbitTemplate;
-    private final AppConfig appConfig;
+    private final TaskQueuePort taskQueuePort;
+    private final FileStoragePort fileStoragePort;
     private final NovelService novelService;
     private final ChapterService chapterService;
 
@@ -69,7 +69,7 @@ public class LoadWorker {
             }
             if (hasDbChapters && hasParsedFiles) {
                 taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, 15, "检测到已完整结构化产物，跳过解析，进入切分阶段");
-                rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "split", message);
+                taskQueuePort.sendToSplitQueue(message);
                 log.info("任务 {} 已完整结构化（dbChapters={}, parsedFiles={}），已直接发送至 Split 队列", taskId, hasDbChapters, hasParsedFiles);
                 return;
             }
@@ -82,8 +82,7 @@ public class LoadWorker {
                         taskId, hasDbChapters, hasParsedFiles);
             }
 
-            String rootPath = appConfig.getStorage().getRootPath();
-            Path uploadPath = Paths.get(rootPath, task.getFileName());
+            Path uploadPath = Paths.get(fileStoragePort.toAbsolutePath(task.getFileName()));
             Path rawPath = novelCacheRepository.rawOriginalPath(novelId);
             Files.createDirectories(rawPath.getParent());
             if (!Files.exists(rawPath)) {
@@ -109,7 +108,7 @@ public class LoadWorker {
             log.info("任务 {} 成功将 {} 个章节保存至数据库", taskId, chapterEntities.size());
 
             // Send to split queue
-            rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "split", message);
+            taskQueuePort.sendToSplitQueue(message);
             log.info("任务 {} Load 阶段完成，已发送至 Split 队列", taskId);
             
         } catch (Exception e) {

@@ -1,10 +1,11 @@
-package com.novel.splitter.application.port.out;
+package com.novel.splitter.interfaces.infra;
 
 import com.novel.splitter.application.model.dto.PollResponse;
+import com.novel.splitter.application.port.out.TaskCachePort;
 import org.springframework.stereotype.Component;
 
 @Component
-public class NoOpTaskCache implements TaskCachePort {
+public class NoOpTaskCacheAdapter implements TaskCachePort {
 
     @Override
     public PollResponse get(String taskId) {

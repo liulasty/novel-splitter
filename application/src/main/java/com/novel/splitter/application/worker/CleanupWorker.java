@@ -1,5 +1,7 @@
 package com.novel.splitter.application.worker;
 
+import com.novel.splitter.application.config.AppConfig;
+import com.novel.splitter.application.port.out.FileStoragePort;
 import com.novel.splitter.application.config.RabbitConfig;
 import com.novel.splitter.domain.task.CleanupTask;
 import com.novel.splitter.domain.task.CleanupTaskMessage;
@@ -27,9 +29,8 @@ public class CleanupWorker {
     private final VectorStore vectorStore;
     private final CleanupTaskRepository cleanupTaskRepository;
     private final NovelRepository novelRepository;
-
-    @Value("${splitter.storage.root-path}")
-    private String novelStoragePath;
+    private final FileStoragePort fileStoragePort;
+    private final AppConfig appConfig;
 
     @RabbitListener(queues = RabbitConfig.CLEANUP_TASK_QUEUE, concurrency = "1")
     public void handleCleanupTask(CleanupTaskMessage message) {
@@ -118,9 +119,9 @@ public class CleanupWorker {
     private void deleteRawFileByNovelId(String novelId, String fallbackNovelName) {
         // Preferred: novelId-bound directory cleanup (raw + parsed)
         try {
-            Path rootDir = Paths.get(novelStoragePath);
-            deleteDirectoryRecursivelyIfExists(rootDir.resolve("novel-raw").resolve(novelId));
-            deleteDirectoryRecursivelyIfExists(rootDir.resolve("novel-parsed").resolve(novelId));
+            Path rootDir = Paths.get(fileStoragePort.toAbsolutePath(""));
+            deleteDirectoryRecursivelyIfExists(rootDir.resolve(appConfig.getStorage().getRawDirName()).resolve(novelId));
+            deleteDirectoryRecursivelyIfExists(rootDir.resolve(appConfig.getStorage().getParsedDirName()).resolve(novelId));
         } catch (Exception e) {
             log.warn("Failed to delete novelId-bound directories for novelId={}, err={}", novelId, e.getMessage());
         }
@@ -128,13 +129,9 @@ public class CleanupWorker {
         try {
             Optional<Novel> novelOpt = novelRepository.findById(novelId);
             if (novelOpt.isPresent() && novelOpt.get().getFilePath() != null && !novelOpt.get().getFilePath().isBlank()) {
-                Path filePath = Paths.get(novelOpt.get().getFilePath());
-                if (Files.exists(filePath)) {
-                    Files.delete(filePath);
-                    log.info("Deleted raw file by filePath: {}", filePath);
-                    return;
-                }
-                log.warn("filePath not found on disk: {}", filePath);
+                fileStoragePort.deleteIfExists(novelOpt.get().getFilePath());
+                log.info("Deleted raw file by filePath: {}", novelOpt.get().getFilePath());
+                return;
             }
         } catch (Exception e) {
             log.warn("Failed to delete raw file by novelId={}, falling back to name-based deletion. err={}", novelId, e.getMessage());
@@ -162,14 +159,14 @@ public class CleanupWorker {
 
     private void deleteRawFileByName(String novelName) {
         try {
-            java.nio.file.Path rootDir = Paths.get(novelStoragePath);
-            java.nio.file.Path rawDir = rootDir.resolve("raw");
-            
-            boolean deleted = deleteFileIfExists(rawDir, novelName);
+            boolean deleted = deleteFileByRelativePathIfExists(appConfig.getStorage().getRawDirName() + "/" + novelName + ".txt");
             if (!deleted) {
-                deleted = deleteFileIfExists(rootDir, novelName);
+                deleted = deleteFileByRelativePathIfExists(novelName + ".txt");
             }
-            
+            if (!deleted) {
+                deleted = deleteFileByRelativePathIfExists(novelName);
+            }
+
             if (deleted) {
                 log.info("Successfully deleted raw file for novel: {}", novelName);
             } else {
@@ -180,21 +177,12 @@ public class CleanupWorker {
         }
     }
 
-    private boolean deleteFileIfExists(java.nio.file.Path dir, String novelName) throws java.io.IOException {
-        java.nio.file.Path path = dir.resolve(novelName + ".txt");
-        if (Files.exists(path)) {
-            Files.delete(path);
-            log.info("Deleted raw file: {}", path);
+    private boolean deleteFileByRelativePathIfExists(String relativePath) {
+        if (fileStoragePort.exists(relativePath)) {
+            fileStoragePort.deleteIfExists(relativePath);
+            log.info("Deleted raw file: {}", relativePath);
             return true;
         }
-        
-        path = dir.resolve(novelName);
-        if (Files.exists(path)) {
-            Files.delete(path);
-            log.info("Deleted raw file: {}", path);
-            return true;
-        }
-        
         return false;
     }
 

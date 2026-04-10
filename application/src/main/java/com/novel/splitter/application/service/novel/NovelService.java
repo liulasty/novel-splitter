@@ -18,7 +18,7 @@ public interface NovelService {
      * @param description 描述
      * @return 返回 novelId
      */
-    String createNovel(MultipartFile file, String title, String author, String description) throws IOException;
+    String createNovel(com.novel.splitter.application.model.command.UploadNovelCommand command) throws IOException;
 
     /**
      * 基于已落盘的相对路径创建小说记录（不执行文件写入）

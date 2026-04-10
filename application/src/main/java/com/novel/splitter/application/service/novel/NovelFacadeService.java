@@ -10,11 +10,11 @@ import com.novel.splitter.application.model.dto.ChapterDto;
 import com.novel.splitter.application.model.dto.SceneDto;
 import com.novel.splitter.application.model.dto.SplitRetryRequestDto;
 import com.novel.splitter.application.model.dto.TaskSubmitResponseDto;
-import org.springframework.data.domain.Page;
-import org.springframework.web.multipart.MultipartFile;
+import com.novel.splitter.domain.model.paging.PagedResult;
 
 import java.io.IOException;
 import java.util.List;
+import com.novel.splitter.application.model.command.UploadNovelCommand;
 
 public interface NovelFacadeService {
 
@@ -22,7 +22,7 @@ public interface NovelFacadeService {
 
     List<NovelSummaryDto> listNovelsFromDb();
 
-    NovelUploadResponseDto uploadNovel(MultipartFile file, String title, String author, String description) throws IOException;
+    NovelUploadResponseDto uploadNovel(UploadNovelCommand command) throws IOException;
 
     TaskSubmitResponseDto split(String novelId, IngestRequest request) throws IOException;
 
@@ -43,7 +43,7 @@ public interface NovelFacadeService {
 
     List<ChapterDto> getChapters(String novelId);
 
-    Page<SceneDto> getScenesByChapter(String novelId, Long chapterId, int page, int size);
+    PagedResult<SceneDto> getScenesByChapter(String novelId, Long chapterId, int page, int size);
 
     void softDeleteNovel(String novelId);
 }

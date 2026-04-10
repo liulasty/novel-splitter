@@ -1,5 +1,7 @@
 package com.novel.splitter.application.service.novel;
 
+import com.novel.splitter.application.model.command.UploadNovelCommand;
+import com.novel.splitter.application.config.AppConfig;
 import com.novel.splitter.domain.model.Novel;
 import com.novel.splitter.domain.enums.NovelStatus;
 import com.novel.splitter.domain.repository.NovelRepository;
@@ -8,7 +10,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.List;
@@ -22,27 +23,28 @@ public class NovelServiceImpl implements NovelService {
     private final NovelRepository novelRepository;
     private final NovelStorageService novelStorageService;
     private final TransactionTemplate transactionTemplate;
+    private final AppConfig appConfig;
 
     @Override
-    public String createNovel(MultipartFile file, String title, String author, String description) throws IOException {
+    public String createNovel(UploadNovelCommand command) throws IOException {
         String novelId = UUID.randomUUID().toString();
 
-        // 1) DB-first: create record first with stable novelId + planned stored relative path
-        String storedRelativePath = "raw/" + novelId + ".txt";
+        String rawDirName = appConfig.getStorage().getRawDirName();
+        String rawFilename = appConfig.getStorage().getRawFilename();
+        String storedRelativePath = rawDirName + "/" + novelId + "/" + rawFilename;
+
         try {
             transactionTemplate.execute(status -> {
-                saveNovelRecordWithId(novelId, storedRelativePath, title, author, description);
+                saveNovelRecordWithId(novelId, storedRelativePath, command.getTitle(), command.getAuthor(), command.getDescription());
                 return null;
             });
         } catch (RuntimeException ex) {
             throw ex;
         }
 
-        // 2) Save file to local storage using novelId-based path
         try {
-            String actualStored = novelStorageService.saveNovelAsRawByNovelId(novelId, file);
+            String actualStored = novelStorageService.saveNovelAsRawByNovelId(novelId, command);
             if (!storedRelativePath.equals(actualStored)) {
-                // Keep DB consistent with actual stored path
                 transactionTemplate.execute(status -> {
                     Novel n = novelRepository.findById(novelId).orElseThrow();
                     n.setFilePath(actualStored);
@@ -51,8 +53,7 @@ public class NovelServiceImpl implements NovelService {
                     return null;
                 });
             }
-        } catch (RuntimeException | IOException ex) {
-            // Best-effort: mark the novel as deleted to keep DB-first list clean.
+        } catch (RuntimeException ex) {
             transactionTemplate.execute(status -> {
                 novelRepository.findById(novelId).ifPresent(n -> {
                     n.setDeleted(true);
@@ -61,7 +62,6 @@ public class NovelServiceImpl implements NovelService {
                 });
                 return null;
             });
-            // Cleanup local file if partially written
             novelStorageService.deleteNovelIfExists(storedRelativePath);
             throw ex;
         }
