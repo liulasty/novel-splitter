@@ -55,7 +55,8 @@ class SystemSettingsControllerTest {
 
         mockMvc.perform(get("/api/settings"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.embedding.type").value("chroma"));
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.embedding.type").value("chroma"));
 
         verify(systemSettingsService).getSettings();
     }
@@ -69,7 +70,9 @@ class SystemSettingsControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(dto)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message").value("Settings updated successfully"));
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.message").value("操作成功"))
+                .andExpect(jsonPath("$.data.message").value("Settings updated successfully"));
 
         verify(systemSettingsService).saveSettings(any(SystemSettingsDto.class));
     }

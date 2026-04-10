@@ -1,6 +1,8 @@
 package com.novel.splitter.interfaces.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.novel.splitter.application.mapper.DtoMapper;
+import com.novel.splitter.application.model.dto.VectorRecordDto;
 import com.novel.splitter.application.model.dto.VectorSearchRequest;
 import com.novel.splitter.application.service.vector.VectorManagementService;
 import com.novel.splitter.domain.model.embedding.VectorRecord;
@@ -38,6 +40,9 @@ class VectorManagementControllerTest {
     @Mock
     private VectorManagementService vectorManagementService;
 
+    @Mock
+    private DtoMapper dtoMapper;
+
     @InjectMocks
     private VectorManagementController vectorManagementController;
 
@@ -56,8 +61,9 @@ class VectorManagementControllerTest {
 
         mockMvc.perform(get("/api/admin/vector/stats"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(2))
-                .andExpect(jsonPath("$.type").value("MockStore"));
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.count").value(2))
+                .andExpect(jsonPath("$.data.type").value("MockStore"));
 
         verify(vectorManagementService).getStats();
     }
@@ -66,14 +72,18 @@ class VectorManagementControllerTest {
     void shouldDelegateSearchToService() throws Exception {
         when(vectorManagementService.search(any(VectorSearchRequest.class)))
                 .thenReturn(List.of(new VectorRecord("1", 0.9, Map.of())));
+        when(dtoMapper.toVectorRecordDtos(any()))
+                .thenReturn(List.of(VectorRecordDto.builder().id("1").score(0.9).build()));
 
         mockMvc.perform(post("/api/admin/vector/search")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of("query", "测试", "topK", 2))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].score").value(0.9));
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data[0].score").value(0.9));
 
         verify(vectorManagementService).search(any(VectorSearchRequest.class));
+        verify(dtoMapper).toVectorRecordDtos(any());
     }
 
     @Test
@@ -82,7 +92,7 @@ class VectorManagementControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of("novel", "demo"))))
                 .andExpect(status().isOk())
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().string(""));
+                .andExpect(jsonPath("$.code").value(200));
 
         verify(vectorManagementService).delete(any());
     }

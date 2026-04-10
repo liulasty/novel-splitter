@@ -1,7 +1,7 @@
 package com.novel.splitter.application.service;
 
-import com.novel.splitter.application.config.RabbitConfig;
 import com.novel.splitter.application.model.dto.TaskSubmitResponseDto;
+import com.novel.splitter.application.port.out.TaskQueuePort;
 import com.novel.splitter.application.service.novel.NovelFacadeServiceImpl;
 import com.novel.splitter.application.service.novel.NovelStorageService;
 import com.novel.splitter.application.service.task.TaskService;
@@ -14,7 +14,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 import java.nio.file.Path;
 
@@ -33,7 +32,7 @@ class NovelFacadeServiceTest {
     private TaskService taskService;
 
     @Mock
-    private RabbitTemplate rabbitTemplate;
+    private TaskQueuePort taskQueuePort;
 
     @InjectMocks
     private NovelFacadeServiceImpl novelFacadeService;
@@ -56,7 +55,7 @@ class NovelFacadeServiceTest {
         verify(taskService).createTask(taskIdCaptor.capture(), org.mockito.Mockito.eq(TaskType.SPLIT), novelIdCaptor.capture(), org.mockito.Mockito.eq("demo.txt"),
                 maxScenesCaptor.capture(), versionCaptor.capture());
         
-        verify(rabbitTemplate).convertAndSend(org.mockito.Mockito.eq(RabbitConfig.EXCHANGE_NAME), org.mockito.Mockito.eq("load"), messageCaptor.capture());
+        verify(taskQueuePort).sendLoad(messageCaptor.capture());
 
         SplitTaskMessage message = messageCaptor.getValue();
         assertEquals(taskIdCaptor.getValue(), message.getTaskId());

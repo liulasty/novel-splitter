@@ -57,8 +57,9 @@ class NovelControllerTest {
 
         mockMvc.perform(get("/api/novels"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0]").value("a.txt"))
-                .andExpect(jsonPath("$[1]").value("b.txt"));
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data[0]").value("a.txt"))
+                .andExpect(jsonPath("$.data[1]").value("b.txt"));
 
         verify(novelFacadeService).listNovels();
     }

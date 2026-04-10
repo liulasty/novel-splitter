@@ -1,9 +1,7 @@
 package com.novel.splitter.interfaces.api;
 
-import com.novel.splitter.application.port.out.TaskCachePort;
-import com.novel.splitter.application.service.task.TaskService;
-import com.novel.splitter.domain.enums.TaskType;
-import com.novel.splitter.domain.task.SplitTask;
+import com.novel.splitter.application.model.dto.PollResponse;
+import com.novel.splitter.application.service.task.TaskPollService;
 import com.novel.splitter.interfaces.common.GlobalExceptionHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,7 +14,6 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import java.util.List;
 
 import static org.hamcrest.Matchers.hasSize;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -29,14 +26,11 @@ class TaskPollControllerTest {
     private MockMvc mockMvc;
 
     @Mock
-    private TaskCachePort taskCachePort;
-
-    @Mock
-    private TaskService taskService;
+    private TaskPollService taskPollService;
 
     @BeforeEach
     void setUp() {
-        TaskPollController controller = new TaskPollController(taskCachePort, taskService);
+        TaskPollController controller = new TaskPollController(taskPollService);
         mockMvc = MockMvcBuilders
                 .standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler())
@@ -45,11 +39,12 @@ class TaskPollControllerTest {
 
     @Test
     void pollTasks_should_accept_ids_param() throws Exception {
-        SplitTask task = new SplitTask("task-1", TaskType.SPLIT, "novel-1", "a.txt", 0, "v1");
-        task.startProcessing("running");
-
-        when(taskCachePort.get(anyString())).thenReturn(null);
-        when(taskService.getTasksByIds(List.of("task-1"))).thenReturn(List.of(task));
+        PollResponse task = PollResponse.builder()
+                .taskId("task-1")
+                .status("PROCESSING")
+                .serverTime(System.currentTimeMillis())
+                .build();
+        when(taskPollService.pollTasks(List.of("task-1"), null, null)).thenReturn(List.of(task));
 
         mockMvc.perform(get("/api/tasks/poll").param("ids", "task-1"))
                 .andExpect(status().isOk())
@@ -61,20 +56,23 @@ class TaskPollControllerTest {
 
     @Test
     void pollTasks_should_accept_taskIds_param_for_backward_compatibility() throws Exception {
-        SplitTask task = new SplitTask("task-2", TaskType.EMBED, "novel-2", "b.txt", 0, "v1");
-        task.startProcessing("running");
-
-        when(taskCachePort.get(anyString())).thenReturn(null);
-        when(taskService.getTasksByIds(List.of("task-2"))).thenReturn(List.of(task));
+        PollResponse task = PollResponse.builder()
+                .taskId("task-2")
+                .status("PROCESSING")
+                .serverTime(System.currentTimeMillis())
+                .build();
+        when(taskPollService.pollTasks(null, List.of("task-2"), null)).thenReturn(List.of(task));
 
         mockMvc.perform(get("/api/tasks/poll").param("taskIds", "task-2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].taskId").value("task-2"));
-        verify(taskService).getTasksByIds(List.of("task-2"));
+        verify(taskPollService).pollTasks(null, List.of("task-2"), null);
     }
 
     @Test
     void pollTasks_should_return_bad_request_when_missing_query_params() throws Exception {
+        when(taskPollService.pollTasks(null, null, null))
+                .thenThrow(new IllegalArgumentException("Either ids/taskIds or novelId must be provided"));
         mockMvc.perform(get("/api/tasks/poll"))
                 .andExpect(status().isBadRequest());
     }
@@ -85,6 +83,8 @@ class TaskPollControllerTest {
         for (int i = 0; i < 21; i++) {
             requestBuilder = requestBuilder.param("ids", "task-" + i);
         }
+        when(taskPollService.pollTasks(org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.isNull()))
+                .thenThrow(new IllegalArgumentException("Maximum 20 task IDs are allowed"));
         mockMvc.perform(requestBuilder)
                 .andExpect(status().isBadRequest());
     }

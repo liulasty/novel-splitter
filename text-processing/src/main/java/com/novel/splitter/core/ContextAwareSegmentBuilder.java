@@ -92,21 +92,17 @@ public class ContextAwareSegmentBuilder extends SemanticSegmentBuilder {
             } else {
                 // 普通文本逻辑
                 if (currentType != null) {
-                    // 评估语义合并的可行性
-                    Boolean semanticMerge = evaluateSemanticMerge(buffer, p);
-                    
-                    if (semanticMerge != null) {
-                        // 如果有明确的语义决定 (>0.85 合并, <0.65 拆分)
-                        if (!semanticMerge) {
+                    // 同类型时优先做语义判断；跨类型时交给规则评分（保留对话/旁白吸附能力）
+                    if (currentType.equals(type)) {
+                        Boolean semanticMerge = evaluateSemanticMerge(buffer, p);
+                        if (semanticMerge != null && !semanticMerge) {
+                            // 如果有明确的语义决定且建议拆分
                             shouldSplit = true;
                         }
                     } else {
-                        // 回退到基于类型的相关性评分
-                        if (!currentType.equals(type)) {
-                            boolean canMerge = canMerge(buffer, p, currentType, type);
-                            if (!canMerge) {
-                                shouldSplit = true;
-                            }
+                        boolean canMerge = canMerge(buffer, p, currentType, type);
+                        if (!canMerge) {
+                            shouldSplit = true;
                         }
                     }
                 }

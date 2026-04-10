@@ -30,7 +30,8 @@ class OllamaClientTest {
 
     @Test
     void shouldLoadOllamaClient() {
-        assertThat(llmClient).isInstanceOf(OllamaLlmClient.class);
+        Object delegate = org.springframework.test.util.ReflectionTestUtils.getField(llmClient, "delegate");
+        assertThat(delegate).isInstanceOf(OllamaLlmClient.class);
         assertThat(applicationContext.getBeansOfType(MockLlmClient.class)).isEmpty();
     }
 }

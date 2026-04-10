@@ -15,6 +15,9 @@ import com.novel.splitter.application.model.dto.DownloadAndIngestRequest;
 import com.novel.splitter.application.model.dto.IngestRequest;
 import com.novel.splitter.domain.model.paging.PageQuery;
 import com.novel.splitter.domain.model.paging.PagedResult;
+import com.novel.splitter.domain.repository.ChapterRepository;
+import com.novel.splitter.domain.repository.NovelCacheRepository;
+import com.novel.splitter.domain.repository.SceneRepository;
 import com.novel.splitter.domain.task.SplitTaskMessage;
 import com.novel.splitter.application.model.dto.NovelStatRecordDto;
 import com.novel.splitter.application.model.dto.SplitRetryRequestDto;
@@ -50,12 +53,12 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
     private final NovelStorageService novelStorageService;
     private final NovelService novelService;
     private final ChapterService chapterService;
-    private final com.novel.splitter.domain.repository.NovelCacheRepository novelCacheRepository;
+    private final NovelCacheRepository novelCacheRepository;
     private final TaskService taskService;
     private final TaskQueuePort taskQueuePort;
     private final DownloadService downloadService;
-    private final com.novel.splitter.domain.repository.SceneRepository sceneRepository;
-    private final com.novel.splitter.domain.repository.ChapterRepository chapterRepository;
+    private final SceneRepository sceneRepository;
+    private final ChapterRepository chapterRepository;
     private final DtoMapper dtoMapper;
 
     @Override
