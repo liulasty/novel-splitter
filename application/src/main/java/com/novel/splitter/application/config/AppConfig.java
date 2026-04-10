@@ -17,6 +17,15 @@ public class AppConfig {
     @Data
     public static class StorageConfig {
         private String rootPath;
+        /**
+         * novel-raw/{novelId}/original.txt
+         */
+        private String rawDirName = "novel-raw";
+        /**
+         * novel-parsed/{novelId}/chapter_{index}.json
+         */
+        private String parsedDirName = "novel-parsed";
+        private String rawFilename = "original.txt";
     }
 
     @Data

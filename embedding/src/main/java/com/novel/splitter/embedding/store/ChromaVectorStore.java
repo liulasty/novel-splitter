@@ -92,27 +92,20 @@ public class ChromaVectorStore implements VectorStore {
         List<Map<String, Object>> metadatas = scenes.stream()
                         .map(s -> {
                             Map<String, Object> map = new HashMap<>();
-                            map.put("chapter_index", s.getChapterIndex());
-                            if (s.getChapterTitle() != null) map.put("chapter_title", s.getChapterTitle());
-                            map.put("start_paragraph_index", s.getStartParagraphIndex());
-                            
+                            // P3 contract: metadata must be minimal & stable (no novelName/chinese title).
+                            // Only: novelId, version, sceneId, chapterIndex.
+                            map.put("sceneId", s.getId());
+                            map.put("chapterIndex", s.getChapterIndex());
                             if (s.getMetadata() != null) {
                                 if (s.getMetadata().getNovel() != null) {
                                     map.put("novelId", s.getMetadata().getNovel());
-                                    map.put("novel", s.getMetadata().getNovel()); // Keep for backward compatibility (保留以实现向后兼容)
                                 }
                                 if (s.getMetadata().getVersion() != null) {
                                     map.put("version", s.getMetadata().getVersion());
                                 }
-                                if (s.getMetadata().getParentSceneId() != null) {
-                                    map.put("parent_scene_id", s.getMetadata().getParentSceneId());
-                                }
-                                if (s.getMetadata().getChunkType() != null) {
-                                    map.put("chunk_type", s.getMetadata().getChunkType());
-                                }
-                                if (s.getMetadata().getSequenceNum() != null) {
-                                    map.put("sequenceNum", s.getMetadata().getSequenceNum());
-                                }
+                            }
+                            if (!map.containsKey("novelId") || !map.containsKey("version")) {
+                                throw new IllegalArgumentException("Scene metadata must contain novelId and version for Chroma upsert. sceneId=" + s.getId());
                             }
                             return map;
                         })

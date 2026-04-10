@@ -10,6 +10,7 @@ import com.novel.splitter.domain.task.SplitTask;
 import com.novel.splitter.pipeline.orchestrator.EmbedNovelUseCase;
 import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.domain.repository.SceneRepository;
+import com.novel.splitter.embedding.api.VectorStore;
 import com.google.common.util.concurrent.RateLimiter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +18,7 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -29,6 +31,7 @@ public class EmbedWorker {
     private final TaskService taskService;
     private final SceneRepository sceneRepository;
     private final NovelService novelService;
+    private final VectorStore vectorStore;
 
     @org.springframework.beans.factory.annotation.Value("${splitter.ingestion.batch-size:100}")
     private int batchSize;
@@ -43,6 +46,7 @@ public class EmbedWorker {
     public void processEmbedTask(EmbedTaskMessage message) {
         String taskId = message.getTaskId();
         String novelId = message.getNovelId();
+        String version = message.getVersion();
         
         try {
             SplitTask task = taskService.getTask(taskId);
@@ -55,9 +59,24 @@ public class EmbedWorker {
                 return;
             }
 
-            taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, 0, "开始向量化入库...");
+            taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, 0, "向量化开始：前置幂等清理（失败将阻断任务）...");
             if (novelId != null) {
                 novelService.updateNovelStatus(novelId, NovelStatus.EMBEDDING);
+            }
+
+            if (novelId == null || novelId.isBlank()) {
+                throw new IllegalArgumentException("novelId must not be blank");
+            }
+            if (version == null || version.isBlank()) {
+                throw new IllegalArgumentException("version must not be blank");
+            }
+
+            // P3: mandatory idempotent cleanup (same policy as P2).
+            // Cleanup failure MUST block the task to avoid dirty vector data.
+            try {
+                vectorStore.delete(Map.of("novelId", novelId, "version", version));
+            } catch (Exception e) {
+                throw new IllegalStateException("Failed to cleanup vectors for novelId=" + novelId + " version=" + version, e);
             }
 
             int page = 0;
@@ -68,7 +87,7 @@ public class EmbedWorker {
             
             while (true) {
                 PagedResult<com.novel.splitter.domain.model.Scene> scenePage =
-                        sceneRepository.findByNovelId(novelId, PageQuery.of(page, batchSize));
+                        sceneRepository.findByNovelIdAndVersion(novelId, version, PageQuery.of(page, batchSize));
                 if (page == 0) {
                     totalScenes = scenePage.getTotalElements();
                     task.setTotalScenes((int) totalScenes);

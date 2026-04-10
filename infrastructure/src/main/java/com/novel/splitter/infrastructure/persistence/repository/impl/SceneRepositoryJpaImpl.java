@@ -45,7 +45,7 @@ public class SceneRepositoryJpaImpl implements SceneRepository {
     private int jdbcBatchSize;
 
     @Override
-    public List<Long> saveScenes(String novelId, String novelName, String version, List<Scene> scenes) {
+    public List<Long> saveScenes(String novelId, String version, List<Scene> scenes) {
         JpaNovelEntity novelEntity = null;
         Map<Integer, JpaChapterEntity> chapterMap = new HashMap<>();
 
@@ -63,13 +63,13 @@ public class SceneRepositoryJpaImpl implements SceneRepository {
         
         List<JpaSceneEntity> entities = scenes.stream().map(scene -> {
             if (scene.getMetadata() != null) {
-                scene.getMetadata().setNovel(novelName);
                 scene.getMetadata().setVersion(version);
             }
             
             JpaSceneEntity entity = sceneMapper.toEntity(scene);
-            entity.setNovelName(novelName);
             entity.setVersion(version);
+            // Backward-compat: if DB still has NOT NULL novel_name, write stable novelId here.
+            entity.setLegacyNovelName(novelId);
             
             if (finalNovelEntity != null) {
                 entity.setNovel(finalNovelEntity);
@@ -96,12 +96,6 @@ public class SceneRepositoryJpaImpl implements SceneRepository {
     }
 
     @Override
-    public List<Scene> loadScenes(String novelName, String version) {
-        List<JpaSceneEntity> entities = jpaSceneRepository.findByNovelNameAndVersion(novelName, version);
-        return entities.stream().map(sceneMapper::toDomain).collect(Collectors.toList());
-    }
-
-    @Override
     public List<Scene> findByIds(List<Long> ids) {
         List<JpaSceneEntity> entities = jpaSceneRepository.findByIdIn(ids);
         return entities.stream().map(sceneMapper::toDomain).collect(Collectors.toList());
@@ -111,18 +105,6 @@ public class SceneRepositoryJpaImpl implements SceneRepository {
     public List<Scene> findBySceneIds(List<String> sceneIds) {
         List<JpaSceneEntity> entities = jpaSceneRepository.findBySceneIdIn(sceneIds);
         return entities.stream().map(sceneMapper::toDomain).collect(Collectors.toList());
-    }
-
-    @Override
-    @Transactional
-    public void deleteVersion(String novelName, String version) {
-        jpaSceneRepository.deleteByNovelNameAndVersion(novelName, version);
-    }
-
-    @Override
-    @Transactional
-    public void deleteNovel(String novelName) {
-        jpaSceneRepository.deleteByNovelName(novelName);
     }
 
     @Override
@@ -138,24 +120,19 @@ public class SceneRepositoryJpaImpl implements SceneRepository {
     }
 
     @Override
-    public List<String> listVersions(String novelName) {
-        return jpaSceneRepository.findDistinctVersionsByNovelName(novelName);
-    }
-
-    @Override
     public List<String> listVersionsByNovelId(String novelId) {
         return jpaSceneRepository.findDistinctVersionsByNovelId(novelId);
     }
 
     @Override
-    public List<Scene> findByNovel(String novelName) {
-        List<JpaSceneEntity> entities = jpaSceneRepository.findByNovelName(novelName);
+    public List<Scene> findAllByNovelId(String novelId) {
+        List<JpaSceneEntity> entities = jpaSceneRepository.findByNovelId(novelId);
         return entities.stream().map(sceneMapper::toDomain).collect(Collectors.toList());
     }
 
     @Override
-    public List<Scene> findAllByNovelId(String novelId) {
-        List<JpaSceneEntity> entities = jpaSceneRepository.findByNovelId(novelId);
+    public List<Scene> findByNovelIdAndVersion(String novelId, String version) {
+        List<JpaSceneEntity> entities = jpaSceneRepository.findByNovelIdAndVersion(novelId, version);
         return entities.stream().map(sceneMapper::toDomain).collect(Collectors.toList());
     }
 
@@ -166,8 +143,8 @@ public class SceneRepositoryJpaImpl implements SceneRepository {
     }
 
     @Override
-    public long countByNovelNameAndVersion(String novelName, String version) {
-        return jpaSceneRepository.countByNovelNameAndVersion(novelName, version);
+    public long countByNovelIdAndVersion(String novelId, String version) {
+        return jpaSceneRepository.countByNovelIdAndVersion(novelId, version);
     }
 
     @Override
@@ -191,6 +168,12 @@ public class SceneRepositoryJpaImpl implements SceneRepository {
     @Override
     public PagedResult<Scene> findByNovelId(String novelId, PageQuery pageQuery) {
         Page<Scene> page = jpaSceneRepository.findByNovelId(novelId, toPageable(pageQuery)).map(sceneMapper::toDomain);
+        return toPagedResult(page);
+    }
+
+    @Override
+    public PagedResult<Scene> findByNovelIdAndVersion(String novelId, String version, PageQuery pageQuery) {
+        Page<Scene> page = jpaSceneRepository.findByNovelIdAndVersion(novelId, version, toPageable(pageQuery)).map(sceneMapper::toDomain);
         return toPagedResult(page);
     }
 

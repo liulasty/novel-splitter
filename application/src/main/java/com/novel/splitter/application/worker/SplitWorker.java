@@ -4,13 +4,13 @@ import com.novel.splitter.application.config.RabbitConfig;
 import com.novel.splitter.domain.task.SplitTask;
 import com.novel.splitter.domain.task.SplitTaskMessage;
 import com.novel.splitter.domain.task.EnrichTaskMessage;
-import com.novel.splitter.domain.repository.NovelCacheRepository;
 import com.novel.splitter.domain.enums.TaskType;
 import com.novel.splitter.pipeline.orchestrator.SplitNovelUseCase;
 import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.application.service.novel.NovelService;
 import com.novel.splitter.domain.enums.NovelStatus;
-import com.novel.splitter.domain.model.Novel;
+import com.novel.splitter.domain.repository.SceneRepository;
+import com.novel.splitter.embedding.api.VectorStore;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -18,6 +18,7 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 
 @Component
 @RequiredArgsConstructor
@@ -26,10 +27,11 @@ public class SplitWorker {
 
     private final SplitNovelUseCase splitNovelUseCase;
     private final TaskService taskService;
-    private final NovelCacheRepository novelCacheRepository;
     private final RabbitTemplate rabbitTemplate;
 
     private final NovelService novelService;
+    private final SceneRepository sceneRepository;
+    private final VectorStore vectorStore;
 
     @org.springframework.beans.factory.annotation.Value("${splitter.ingestion.batch-size:10}")
     private int batchSize;
@@ -55,13 +57,35 @@ public class SplitWorker {
                 );
             }
 
-            Novel novel = novelCacheRepository.load(taskId);
-            
-            List<Long> sceneIds = splitNovelUseCase.split(taskId, message.getNovelId(), novel, task.getMaxScenes(), task.getVersion(), (progress, info) -> {
+            String novelId = message.getNovelId();
+            if (novelId == null || novelId.isBlank()) {
+                throw new IllegalArgumentException("novelId must not be blank");
+            }
+            String version = task.getVersion() != null && !task.getVersion().isBlank()
+                    ? task.getVersion().trim()
+                    : (message.getVersion() != null ? message.getVersion().trim() : "");
+            if (version.isBlank()) {
+                throw new IllegalArgumentException("version must not be blank");
+            }
+
+            // P2: strict idempotent cleanup (DB + Chroma). Either failure blocks processing.
+            taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, 1, "幂等清理：删除旧场景与旧向量...");
+            try {
+                sceneRepository.deleteVersionByNovelId(novelId, version);
+            } catch (Exception e) {
+                throw new IllegalStateException("Failed to cleanup DB scenes for novelId=" + novelId + " version=" + version, e);
+            }
+            try {
+                vectorStore.delete(Map.of("novelId", novelId, "version", version));
+            } catch (Exception e) {
+                throw new IllegalStateException("Failed to cleanup Chroma vectors for novelId=" + novelId + " version=" + version, e);
+            }
+
+            String novelTitle = novelId != null ? novelService.getNovelById(novelId).getTitle() : null;
+
+            List<Long> sceneIds = splitNovelUseCase.split(taskId, novelId, novelTitle, task.getMaxScenes(), version, (progress, info) -> {
                 taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, progress, info);
             });
-            // 清理缓存
-            novelCacheRepository.remove(taskId);
 
             if (sceneIds == null || sceneIds.isEmpty()) {
                 log.warn("任务 {} 切分后没有场景，直接标记为成功", taskId);

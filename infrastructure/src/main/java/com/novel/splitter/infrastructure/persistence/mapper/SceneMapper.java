@@ -24,7 +24,7 @@ public interface SceneMapper {
     @Mapping(target = "novel", ignore = true)
     @Mapping(target = "chapter", ignore = true)
     @Mapping(target = "isDeleted", ignore = true)
-    @Mapping(target = "novelName", ignore = true)
+    @Mapping(target = "legacyNovelName", ignore = true)
     @Mapping(target = "version", ignore = true)
     JpaSceneEntity toEntity(Scene domain);
 

@@ -35,6 +35,12 @@ public class JpaChapterEntity {
     @Column(name = "index_num", nullable = false)
     private int indexNum;
 
+    @Column(name = "start_line")
+    private int startLine;
+
+    @Column(name = "end_line")
+    private int endLine;
+
     @Column(name = "word_count")
     private int wordCount;
 

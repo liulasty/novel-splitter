@@ -24,48 +24,39 @@ public interface JpaSceneRepository extends JpaRepository<JpaSceneEntity, Long>,
 
     List<JpaSceneEntity> findBySceneIdIn(List<String> sceneIds);
 
-    List<JpaSceneEntity> findByNovelNameAndVersion(String novelName, String version);
-
     Page<JpaSceneEntity> findByNovelId(String novelId, Pageable pageable);
 
     @EntityGraph(attributePaths = {"novel", "chapter"})
     List<JpaSceneEntity> findByNovelId(String novelId);
 
-    Stream<JpaSceneEntity> streamAllByNovelNameAndVersion(String novelName, String version);
+    @EntityGraph(attributePaths = {"novel", "chapter"})
+    List<JpaSceneEntity> findByNovelIdAndVersion(String novelId, String version);
+
+    @EntityGraph(attributePaths = {"novel", "chapter"})
+    Page<JpaSceneEntity> findByNovelIdAndVersion(String novelId, String version, Pageable pageable);
+
+    Stream<JpaSceneEntity> streamAllByNovelIdAndVersion(String novelId, String version);
 
     @Query("SELECT s FROM JpaSceneEntity s")
     Stream<JpaSceneEntity> streamAll();
 
-    long countByNovelNameAndVersion(String novelName, String version);
-
-    List<JpaSceneEntity> findByNovelName(String novelName);
+    long countByNovelIdAndVersion(String novelId, String version);
 
     @EntityGraph(attributePaths = {"novel", "chapter"})
     Page<JpaSceneEntity> findByNovelIdAndChapterId(String novelId, Long chapterId, Pageable pageable);
 
     @Modifying
-    @Query("UPDATE JpaSceneEntity s SET s.isDeleted = true WHERE s.novelName = ?1 AND s.version = ?2")
-    void deleteByNovelNameAndVersion(String novelName, String version);
-
-    @Modifying
-    @Query("UPDATE JpaSceneEntity s SET s.isDeleted = true WHERE s.novelName = ?1")
-    void deleteByNovelName(String novelName);
+    @Query("UPDATE JpaSceneEntity s SET s.isDeleted = true WHERE s.novel.id = ?1 AND s.version = ?2")
+    void deleteByNovelIdAndVersion(String novelId, String version);
 
     @Modifying
     @Query("UPDATE JpaSceneEntity s SET s.isDeleted = true WHERE s.novel.id = ?1")
     void deleteByNovelId(String novelId);
 
-    @Modifying
-    @Query("UPDATE JpaSceneEntity s SET s.isDeleted = true WHERE s.novel.id = ?1 AND s.version = ?2")
-    void deleteByNovelIdAndVersion(String novelId, String version);
-
-    @Query("SELECT DISTINCT s.version FROM JpaSceneEntity s WHERE s.novelName = ?1")
-    List<String> findDistinctVersionsByNovelName(String novelName);
-
     @Query("SELECT DISTINCT s.version FROM JpaSceneEntity s WHERE s.novel.id = ?1")
     List<String> findDistinctVersionsByNovelId(String novelId);
 
-    @Query("SELECT s.novelName, s.version, COUNT(s) FROM JpaSceneEntity s GROUP BY s.novelName, s.version")
+    @Query("SELECT s.novel.id, s.version, COUNT(s) FROM JpaSceneEntity s GROUP BY s.novel.id, s.version")
     List<Object[]> countScenesByNovelAndVersion();
 
     interface SceneLightweightProjection {

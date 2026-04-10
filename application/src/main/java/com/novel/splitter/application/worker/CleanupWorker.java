@@ -116,6 +116,15 @@ public class CleanupWorker {
     }
 
     private void deleteRawFileByNovelId(String novelId, String fallbackNovelName) {
+        // Preferred: novelId-bound directory cleanup (raw + parsed)
+        try {
+            Path rootDir = Paths.get(novelStoragePath);
+            deleteDirectoryRecursivelyIfExists(rootDir.resolve("novel-raw").resolve(novelId));
+            deleteDirectoryRecursivelyIfExists(rootDir.resolve("novel-parsed").resolve(novelId));
+        } catch (Exception e) {
+            log.warn("Failed to delete novelId-bound directories for novelId={}, err={}", novelId, e.getMessage());
+        }
+
         try {
             Optional<Novel> novelOpt = novelRepository.findById(novelId);
             if (novelOpt.isPresent() && novelOpt.get().getFilePath() != null && !novelOpt.get().getFilePath().isBlank()) {
@@ -135,6 +144,19 @@ public class CleanupWorker {
             deleteRawFileByName(fallbackNovelName);
         } else {
             log.warn("No fallback novelName available for novelId={}", novelId);
+        }
+    }
+
+    private void deleteDirectoryRecursivelyIfExists(Path dir) throws java.io.IOException {
+        if (!Files.exists(dir)) return;
+        try (java.util.stream.Stream<Path> stream = Files.walk(dir)) {
+            stream.sorted(java.util.Comparator.reverseOrder()).forEach(p -> {
+                try {
+                    Files.deleteIfExists(p);
+                } catch (Exception e) {
+                    log.warn("Failed to delete file: {}", p);
+                }
+            });
         }
     }
 

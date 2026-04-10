@@ -37,8 +37,14 @@ public class JpaSceneEntity {
     @Column(name = "scene_id", nullable = false)
     private String sceneId; // String ID from Scene
 
-    @Column(name = "novel_name", nullable = false)
-    private String novelName;
+    /**
+     * Legacy column kept for DB backward compatibility.
+     * <p>
+     * P0 contract: scenes/chapters must not depend on human-facing novelName.
+     * This value is written as a stable key (novelId) and is not used for queries.
+     */
+    @Column(name = "novel_name")
+    private String legacyNovelName;
 
     @Column(name = "version", nullable = false)
     private String version;

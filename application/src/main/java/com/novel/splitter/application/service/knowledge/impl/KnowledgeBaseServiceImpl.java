@@ -71,7 +71,11 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
 
     @Override
     public List<SceneDto> getScenesByNovel(String novelName) {
-        return dtoMapper.toSceneDtos(sceneRepository.findByNovel(normalizeNovelName(novelName)));
+        String normalizedNovelName = normalizeNovelName(novelName);
+        String novelId = novelRepository.findByTitle(normalizedNovelName)
+                .map(n -> n.getId())
+                .orElseThrow(() -> new IllegalArgumentException("novel not found by title: " + normalizedNovelName));
+        return dtoMapper.toSceneDtos(sceneRepository.findAllByNovelId(novelId));
     }
 
     @Override
@@ -87,11 +91,15 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
     @Transactional
     public Long deleteVersion(String novelName, String version) {
         String normalizedNovelName = normalizeNovelName(novelName);
-        log.info("Logical deleting version: {}/{}", normalizedNovelName, version);
-        sceneRepository.deleteVersion(normalizedNovelName, version);
+        String novelId = novelRepository.findByTitle(normalizedNovelName)
+                .map(n -> n.getId())
+                .orElseThrow(() -> new IllegalArgumentException("novel not found by title: " + normalizedNovelName));
+
+        log.info("Logical deleting version: novelId={}/{}", novelId, version);
+        sceneRepository.deleteVersionByNovelId(novelId, version);
         
         CleanupTask task = CleanupTask.builder()
-                .targetId(normalizedNovelName)
+                .targetId(novelId)
                 .targetType("VERSION")
                 .version(version)
                 .status("PENDING")
@@ -100,9 +108,10 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
 
         CleanupTaskMessage message = CleanupTaskMessage.builder()
                 .cleanupTaskId(savedTask.getId())
-                .targetId(normalizedNovelName)
+                .targetId(novelId)
                 .targetType("VERSION")
                 .version(version)
+                .novelId(novelId)
                 .novelName(normalizedNovelName)
                 .build();
         
@@ -115,11 +124,14 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
     @Transactional
     public Long deleteKnowledgeBase(String novelName) {
         String normalizedNovelName = normalizeNovelName(novelName);
-        log.info("Logical deleting knowledge base for: {}", normalizedNovelName);
-        sceneRepository.deleteNovel(normalizedNovelName);
+        String novelId = novelRepository.findByTitle(normalizedNovelName)
+                .map(n -> n.getId())
+                .orElseThrow(() -> new IllegalArgumentException("novel not found by title: " + normalizedNovelName));
+        log.info("Logical deleting knowledge base for novelId={} title={}", novelId, normalizedNovelName);
+        sceneRepository.deleteNovelById(novelId);
         
         CleanupTask task = CleanupTask.builder()
-                .targetId(normalizedNovelName)
+                .targetId(novelId)
                 .targetType("NOVEL")
                 .status("PENDING")
                 .build();
@@ -127,8 +139,9 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
 
         CleanupTaskMessage message = CleanupTaskMessage.builder()
                 .cleanupTaskId(savedTask.getId())
-                .targetId(normalizedNovelName)
+                .targetId(novelId)
                 .targetType("NOVEL")
+                .novelId(novelId)
                 .novelName(normalizedNovelName)
                 .build();
         
@@ -174,7 +187,11 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
 
     @Override
     public List<String> listVersions(String novelName) {
-        return sceneRepository.listVersions(normalizeNovelName(novelName));
+        String normalizedNovelName = normalizeNovelName(novelName);
+        String novelId = novelRepository.findByTitle(normalizedNovelName)
+                .map(n -> n.getId())
+                .orElseThrow(() -> new IllegalArgumentException("novel not found by title: " + normalizedNovelName));
+        return sceneRepository.listVersionsByNovelId(novelId);
     }
 
     @Override

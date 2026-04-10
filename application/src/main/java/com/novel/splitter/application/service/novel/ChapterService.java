@@ -20,4 +20,8 @@ public interface ChapterService {
      * @return 章节列表
      */
     List<Chapter> getChaptersByNovelId(String novelId);
+
+    boolean hasChapters(String novelId);
+
+    void deleteByNovelId(String novelId);
 }

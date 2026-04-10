@@ -50,6 +50,11 @@ public class ChapterRepositoryJpaImpl implements ChapterRepository {
     }
 
     @Override
+    public boolean existsByNovelId(String novelId) {
+        return jpaChapterRepository.existsByNovelId(novelId);
+    }
+
+    @Override
     @Transactional
     public void deleteByNovelId(String novelId) {
         jpaChapterRepository.deleteByNovelId(novelId);

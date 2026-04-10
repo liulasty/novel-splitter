@@ -4,11 +4,11 @@ import com.novel.splitter.domain.repository.NovelCacheRepository;
 import com.novel.splitter.core.SceneAssembler;
 import com.novel.splitter.domain.model.Chapter;
 import com.novel.splitter.domain.model.ChapterData;
-import com.novel.splitter.domain.model.Novel;
 import com.novel.splitter.domain.model.Scene;
 import com.novel.splitter.domain.strategy.ChunkingStrategy;
 import com.novel.splitter.domain.strategy.OverlapChunkingStrategy;
 import com.novel.splitter.domain.task.IngestProgress;
+import com.novel.splitter.domain.repository.ChapterRepository;
 import com.novel.splitter.domain.repository.SceneRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +26,7 @@ public class SplitNovelUseCase {
 
     private final NovelCacheRepository novelCacheRepository;
     private final SceneRepository sceneRepository;
+    private final ChapterRepository chapterRepository;
     
     private final SceneAssembler sceneAssembler = new SceneAssembler();
 
@@ -52,11 +53,11 @@ public class SplitNovelUseCase {
         return valid;
     }
 
-    public List<Long> split(String taskId, String novelId, Novel novel, int maxScenes, String version, BiConsumer<Integer, String> progressCallback) {
-        log.info("=== Start Split Phase for: {} ===", novel.getTitle());
+    public List<Long> split(String taskId, String novelId, String novelTitle, int maxScenes, String version, BiConsumer<Integer, String> progressCallback) {
+        log.info("=== Start Split Phase for novelId={} title={} ===", novelId, novelTitle);
         
         List<Scene> scenes = new ArrayList<>();
-        List<Chapter> chapters = novel.getChapters();
+        List<Chapter> chapters = chapterRepository.findByNovelId(novelId);
         int totalChapters = chapters.size();
         int scenesCount = 0;
         
@@ -70,9 +71,10 @@ public class SplitNovelUseCase {
             Chapter chapter = chapters.get(i);
             
             // Load chapter data from cache
-            ChapterData chapterData = novelCacheRepository.loadChapter(taskId, chapter.getIndex());
+            ChapterData chapterData = novelCacheRepository.loadChapter(novelId, chapter.getIndex());
             
-            List<Scene> chapterScenes = sceneAssembler.assembleChapter(chapter, chapterData.getParagraphs(), novel.getTitle());
+            // Important: downstream metadata must use stable novelId (not chinese title).
+            List<Scene> chapterScenes = sceneAssembler.assembleChapter(chapter, chapterData.getParagraphs(), novelId);
             
             // Apply fine-grained chunking immediately before DB save
             List<Scene> chunkedScenes = new ArrayList<>();
@@ -93,7 +95,7 @@ public class SplitNovelUseCase {
             }
         }
 
-        log.info("Generated {} scenes from novel '{}'", scenes.size(), novel.getTitle());
+        log.info("Generated {} scenes from novelId={} title='{}'", scenes.size(), novelId, novelTitle);
 
         if (progressCallback != null) {
             progressCallback.accept(IngestProgress.VALIDATE_END, String.format("切分完成：共 %d 个初步场景", scenes.size()));
@@ -101,7 +103,7 @@ public class SplitNovelUseCase {
 
         scenes = filterByLength(scenes);
         if (scenes.isEmpty()) {
-            log.warn("All scenes filtered out after length validation for: {}", novel.getTitle());
+            log.warn("All scenes filtered out after length validation for novelId={}", novelId);
             return new ArrayList<>();
         }
 
@@ -120,7 +122,7 @@ public class SplitNovelUseCase {
         if (progressCallback != null) {
             progressCallback.accept(IngestProgress.SAVE_START, "正在保存场景到本地存储...");
         }
-        List<Long> sceneIds = sceneRepository.saveScenes(novelId, novel.getTitle(), finalVersion, scenes);
+        List<Long> sceneIds = sceneRepository.saveScenes(novelId, finalVersion, scenes);
         if (progressCallback != null) {
             progressCallback.accept(IngestProgress.SAVE_END, String.format("本地存储完成，共 %d 个场景", scenes.size()));
         }

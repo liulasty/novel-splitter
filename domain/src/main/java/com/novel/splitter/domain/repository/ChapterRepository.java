@@ -7,5 +7,6 @@ import java.util.List;
 public interface ChapterRepository {
     void saveAll(List<Chapter> chapters);
     List<Chapter> findByNovelId(String novelId);
+    boolean existsByNovelId(String novelId);
     void deleteByNovelId(String novelId);
 }

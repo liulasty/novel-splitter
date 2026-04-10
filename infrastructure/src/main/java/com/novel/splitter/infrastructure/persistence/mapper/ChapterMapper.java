@@ -9,12 +9,14 @@ import org.mapstruct.Mapping;
 public interface ChapterMapper {
     @Mapping(target = "novelId", source = "novel.id")
     @Mapping(target = "index", source = "indexNum")
-    @Mapping(target = "startParagraphIndex", ignore = true) // Not stored in DB
-    @Mapping(target = "endParagraphIndex", ignore = true) // Not stored in DB
+    @Mapping(target = "startParagraphIndex", source = "startLine")
+    @Mapping(target = "endParagraphIndex", source = "endLine")
     Chapter toDomain(JpaChapterEntity entity);
 
     @Mapping(target = "novel", ignore = true) // Handled in RepositoryImpl
     @Mapping(target = "indexNum", source = "index")
+    @Mapping(target = "startLine", source = "startParagraphIndex")
+    @Mapping(target = "endLine", source = "endParagraphIndex")
     @Mapping(target = "isDeleted", ignore = true)
     JpaChapterEntity toEntity(Chapter domain);
 }

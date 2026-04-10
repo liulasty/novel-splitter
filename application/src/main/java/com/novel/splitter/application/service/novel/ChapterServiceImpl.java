@@ -29,4 +29,15 @@ public class ChapterServiceImpl implements ChapterService {
     public List<Chapter> getChaptersByNovelId(String novelId) {
         return chapterRepository.findByNovelId(novelId);
     }
+
+    @Override
+    public boolean hasChapters(String novelId) {
+        return chapterRepository.existsByNovelId(novelId);
+    }
+
+    @Override
+    @Transactional
+    public void deleteByNovelId(String novelId) {
+        chapterRepository.deleteByNovelId(novelId);
+    }
 }

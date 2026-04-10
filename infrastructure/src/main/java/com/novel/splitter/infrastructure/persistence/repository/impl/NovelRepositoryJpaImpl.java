@@ -41,6 +41,12 @@ public class NovelRepositoryJpaImpl implements NovelRepository {
     }
 
     @Override
+    public Optional<Novel> findByTitle(String title) {
+        String t = Objects.requireNonNull(title, "title must not be null");
+        return jpaNovelRepository.findFirstByTitle(t).map(novelMapper::toDomain);
+    }
+
+    @Override
     public List<Novel> findAll() {
         return jpaNovelRepository.findAll().stream()
                 .map(novelMapper::toDomain)

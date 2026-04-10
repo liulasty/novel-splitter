@@ -33,12 +33,12 @@ public class Chapter {
     private String title;
 
     /**
-     * 起始段落索引（包含）
+     * 起始行号（包含）
      */
     private int startParagraphIndex;
 
     /**
-     * 结束段落索引（包含）
+     * 结束行号（包含）
      */
     private int endParagraphIndex;
 

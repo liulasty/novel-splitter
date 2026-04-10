@@ -17,20 +17,11 @@ public interface SceneRepository {
     /**
      * 保存切分好的 Scene 列表，并返回持久化后的 ID 列表
      * @param novelId 小说ID
-     * @param novelName 小说名称
      * @param version 策略版本
      * @param scenes Scene 列表
      * @return 数据库中的自增主键 ID 列表
      */
-    List<Long> saveScenes(String novelId, String novelName, String version, List<Scene> scenes);
-
-    /**
-     * 加载指定版本的切分结果
-     * @param novelName 小说名称
-     * @param version 版本
-     * @return Scene 列表
-     */
-    List<Scene> loadScenes(String novelName, String version);
+    List<Long> saveScenes(String novelId, String version, List<Scene> scenes);
 
     /**
      * 按 ID 列表查询
@@ -45,19 +36,6 @@ public interface SceneRepository {
      * @return Scene 列表
      */
     List<Scene> findBySceneIds(List<String> sceneIds);
-
-    /**
-     * 删除指定小说的指定版本（删除文件产物）
-     * @param novelName 小说名称
-     * @param version 版本
-     */
-    void deleteVersion(String novelName, String version);
-
-    /**
-     * 删除指定小说的所有数据
-     * @param novelName 小说名称
-     */
-    void deleteNovel(String novelName);
 
     /**
      * 按小说 ID 删除指定小说的所有数据
@@ -78,25 +56,11 @@ public interface SceneRepository {
     void deleteAll();
 
     /**
-     * 获取指定小说的所有版本列表
-     * @param novelName 小说名称
-     * @return 版本列表
-     */
-    List<String> listVersions(String novelName);
-
-    /**
      * 获取指定小说（按 novelId）的所有版本列表
      * @param novelId novels 表主键
      * @return 版本列表
      */
     List<String> listVersionsByNovelId(String novelId);
-    
-    /**
-     * 查找指定小说的所有 Scene (Convenience method, delegates to loadScenes for all versions or specific logic)
-     * @param novelName 小说名称
-     * @return Scene 列表
-     */
-    List<Scene> findByNovel(String novelName);
 
     /**
      * 按小说 ID 获取全部 Scene（不分页）
@@ -106,12 +70,17 @@ public interface SceneRepository {
     List<Scene> findAllByNovelId(String novelId);
 
     /**
+     * 按 novelId + version 查询 Scene（用于导出/诊断等管理功能）
+     */
+    List<Scene> findByNovelIdAndVersion(String novelId, String version);
+
+    /**
      * 统计指定小说和版本下的场景数量
-     * @param novelName 小说名称
+     * @param novelId novels 表主键
      * @param version 版本
      * @return 数量
      */
-    long countByNovelNameAndVersion(String novelName, String version);
+    long countByNovelIdAndVersion(String novelId, String version);
 
     /**
      * 分页查询轻量级场景信息，供前端列表/预览使用
@@ -128,11 +97,16 @@ public interface SceneRepository {
     PagedResult<Scene> findByNovelId(String novelId, PageQuery pageQuery);
 
     /**
+     * 根据小说 ID + version 分页获取场景（向量化阶段按版本入库）
+     */
+    PagedResult<Scene> findByNovelIdAndVersion(String novelId, String version, PageQuery pageQuery);
+
+    /**
      * 根据小说 ID 和章节 ID 分页获取场景，避免一次性加载过大结果集
      */
     PagedResult<Scene> findByNovelIdAndChapterId(String novelId, Long chapterId, PageQuery pageQuery);
     /**
-     * 统计所有小说和版本下的场景数量，返回格式为 Object[] {novelName, version, count}
+     * 统计所有小说和版本下的场景数量，返回格式为 Object[] {novelId, version, count}
      * @return 统计结果列表
      */
     List<Object[]> countScenesByNovelAndVersion();

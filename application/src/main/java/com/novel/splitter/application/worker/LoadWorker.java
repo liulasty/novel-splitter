@@ -18,9 +18,12 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.List;
+import java.util.stream.Stream;
 import java.util.stream.Collectors;
 
 @Component
@@ -39,6 +42,7 @@ public class LoadWorker {
     @RabbitListener(queues = RabbitConfig.LOAD_TASK_QUEUE)
     public void processLoadTask(SplitTaskMessage message) {
         String taskId = message.getTaskId();
+        String novelId = message.getNovelId();
         log.info("LoadWorker 接收到加载任务, taskId: {}", taskId);
         
         try {
@@ -49,32 +53,60 @@ public class LoadWorker {
             }
 
             taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, 5, "开始读取文件...");
-            if (message.getNovelId() != null) {
-                novelService.updateNovelStatus(message.getNovelId(), NovelStatus.SPLITTING);
+            if (novelId == null || novelId.isBlank()) {
+                throw new IllegalArgumentException("novelId must not be blank");
+            }
+            novelService.updateNovelStatus(novelId, NovelStatus.SPLITTING);
+
+            // Idempotency (strict): skip only when BOTH parsed files exist AND DB chapters exist.
+            boolean hasDbChapters = chapterService.hasChapters(novelId);
+            Path parsedDir = novelCacheRepository.parsedDirPath(novelId);
+            boolean hasParsedFiles = false;
+            if (Files.exists(parsedDir)) {
+                try (Stream<Path> s = novelCacheRepository.listChapterFiles(novelId)) {
+                    hasParsedFiles = s.findAny().isPresent();
+                }
+            }
+            if (hasDbChapters && hasParsedFiles) {
+                taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, 15, "检测到已完整结构化产物，跳过解析，进入切分阶段");
+                rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "split", message);
+                log.info("任务 {} 已完整结构化（dbChapters={}, parsedFiles={}），已直接发送至 Split 队列", taskId, hasDbChapters, hasParsedFiles);
+                return;
+            }
+            if (hasDbChapters || hasParsedFiles) {
+                taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, 10, "检测到不完整结构化产物，清理后重新解析...");
+                // Prevent partial data from flowing downstream.
+                novelCacheRepository.removeParsedArtifacts(novelId);
+                chapterService.deleteByNovelId(novelId);
+                log.warn("任务 {} 检测到不完整结构化状态（dbChapters={}, parsedFiles={}），已清理 parsedDir 与 chapters 记录，准备重新解析",
+                        taskId, hasDbChapters, hasParsedFiles);
             }
 
             String rootPath = appConfig.getStorage().getRootPath();
-            Path novelPath = Paths.get(rootPath, task.getFileName());
+            Path uploadPath = Paths.get(rootPath, task.getFileName());
+            Path rawPath = novelCacheRepository.rawOriginalPath(novelId);
+            Files.createDirectories(rawPath.getParent());
+            if (!Files.exists(rawPath)) {
+                Files.copy(uploadPath, rawPath, StandardCopyOption.REPLACE_EXISTING);
+            }
             
-            Novel novel = loadNovelUseCase.load(taskId, novelPath, (progress, info) -> {
+            Novel novel = loadNovelUseCase.load(novelId, rawPath, (progress, info) -> {
                 taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, progress, info);
             });
 
-            novelCacheRepository.save(taskId, novel);
-
-            if (message.getNovelId() != null) {
-                Novel novelEntity = novelService.getNovelById(message.getNovelId());
-                List<Chapter> chapterEntities = novel.getChapters().stream()
-                        .map(chapter -> Chapter.builder()
-                                .novelId(novelEntity.getId())
-                                .title(chapter.getTitle())
-                                .index(chapter.getIndex())
-                                .wordCount(0) // Could be calculated if needed
-                                .build())
-                        .collect(Collectors.toList());
-                chapterService.saveChapters(chapterEntities);
-                log.info("任务 {} 成功将 {} 个章节保存至数据库", taskId, chapterEntities.size());
-            }
+            Novel novelEntity = novelService.getNovelById(novelId);
+            List<Chapter> chapterEntities = novel.getChapters().stream()
+                    .map(chapter -> Chapter.builder()
+                            .novelId(novelEntity.getId())
+                            .title(chapter.getTitle())
+                            .index(chapter.getIndex())
+                            .startParagraphIndex(chapter.getStartParagraphIndex())
+                            .endParagraphIndex(chapter.getEndParagraphIndex())
+                            .wordCount(chapter.getWordCount())
+                            .build())
+                    .collect(Collectors.toList());
+            chapterService.saveChapters(chapterEntities);
+            log.info("任务 {} 成功将 {} 个章节保存至数据库", taskId, chapterEntities.size());
 
             // Send to split queue
             rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "split", message);
@@ -83,8 +115,8 @@ public class LoadWorker {
         } catch (Exception e) {
             log.error("处理任务 {} 时发生异常", taskId, e);
             taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.FAILED, 0, "读取失败: " + e.getMessage());
-            if (message.getNovelId() != null) {
-                novelService.updateNovelStatus(message.getNovelId(), NovelStatus.FAILED);
+            if (novelId != null && !novelId.isBlank()) {
+                novelService.updateNovelStatus(novelId, NovelStatus.FAILED);
             }
         }
     }

@@ -31,7 +31,7 @@ public class LocalNovelLoader {
     // Handles spaces: "第 1 章"
     private static final Pattern CHAPTER_PATTERN = Pattern.compile("^\\s*第\\s*[0-9零一二三四五六七八九十百千万]+\\s*[章回].*");
 
-    public Novel load(String taskId, Path path) throws IOException {
+    public Novel load(String novelId, Path path) throws IOException {
         log.info("Loading novel from: {}", path);
         String fileName = path.getFileName().toString();
         // Use the full filename without extension as the title to ensure uniqueness and matching with storage
@@ -48,6 +48,7 @@ public class LocalNovelLoader {
 
         List<Chapter> chapters = new ArrayList<>();
         List<RawParagraph> currentChapterParagraphs = new ArrayList<>();
+        int currentWordCount = 0;
         
         try (BufferedReader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
             String line;
@@ -65,12 +66,14 @@ public class LocalNovelLoader {
                     if (currentChapterBuilder != null) {
                          Chapter finishedChapter = currentChapterBuilder
                                  .endParagraphIndex(lineIndex - 1)
+                                 .wordCount(currentWordCount)
                                  .build();
                          chapters.add(finishedChapter);
-                         if (taskId != null) {
-                             novelCacheRepository.saveChapter(taskId, finishedChapter.getIndex(), new ChapterData(finishedChapter, new ArrayList<>(currentChapterParagraphs)));
+                         if (novelId != null) {
+                             novelCacheRepository.saveChapter(novelId, finishedChapter.getIndex(), new ChapterData(finishedChapter, new ArrayList<>(currentChapterParagraphs)));
                          }
                          currentChapterParagraphs.clear();
+                         currentWordCount = 0;
                     }
                     
                     // Start new chapter
@@ -86,6 +89,9 @@ public class LocalNovelLoader {
                         .content(content)
                         .isEmpty(isEmpty)
                         .build());
+                if (!isEmpty) {
+                    currentWordCount += content.replaceAll("\\s+", "").length();
+                }
                 
                 lineIndex++;
             }
@@ -94,10 +100,11 @@ public class LocalNovelLoader {
             if (currentChapterBuilder != null) {
                 Chapter finishedChapter = currentChapterBuilder
                         .endParagraphIndex(lineIndex - 1)
+                        .wordCount(currentWordCount)
                         .build();
                 chapters.add(finishedChapter);
-                if (taskId != null) {
-                    novelCacheRepository.saveChapter(taskId, finishedChapter.getIndex(), new ChapterData(finishedChapter, new ArrayList<>(currentChapterParagraphs)));
+                if (novelId != null) {
+                    novelCacheRepository.saveChapter(novelId, finishedChapter.getIndex(), new ChapterData(finishedChapter, new ArrayList<>(currentChapterParagraphs)));
                 }
             }
         }

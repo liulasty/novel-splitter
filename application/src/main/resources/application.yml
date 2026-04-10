@@ -102,6 +102,9 @@ assembler:
 splitter:
   storage:
     root-path: ${STORAGE_ROOT_PATH:data/novel-storage}
+    raw-dir-name: ${STORAGE_RAW_DIR_NAME:novel-raw}
+    parsed-dir-name: ${STORAGE_PARSED_DIR_NAME:novel-parsed}
+    raw-filename: ${STORAGE_RAW_FILENAME:original.txt}
   rabbitmq:
     retry:
       max-attempts: 3

@@ -21,6 +21,11 @@ public interface NovelRepository {
     Optional<Novel> findById(String id);
 
     /**
+     * 根据标题查找小说（用于兼容 legacy novelName 入口）
+     */
+    Optional<Novel> findByTitle(String title);
+
+    /**
      * 列出所有小说
      */
     List<Novel> findAll();

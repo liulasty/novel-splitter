@@ -12,6 +12,8 @@ import java.util.List;
 public interface JpaChapterRepository extends JpaRepository<JpaChapterEntity, Long> {
     List<JpaChapterEntity> findByNovelIdOrderByIndexNumAsc(String novelId);
 
+    boolean existsByNovelId(String novelId);
+
     @Modifying
     @Query("UPDATE JpaChapterEntity c SET c.isDeleted = true WHERE c.novel.id = ?1")
     void deleteByNovelId(String novelId);

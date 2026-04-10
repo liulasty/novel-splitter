@@ -17,6 +17,7 @@ import com.novel.splitter.domain.model.paging.PageQuery;
 import com.novel.splitter.domain.model.paging.PagedResult;
 import com.novel.splitter.domain.task.SplitTaskMessage;
 import com.novel.splitter.application.model.dto.NovelStatRecordDto;
+import com.novel.splitter.application.model.dto.SplitRetryRequestDto;
 import com.novel.splitter.domain.task.SplitTask;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -53,6 +54,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
     private final NovelStorageService novelStorageService;
     private final NovelService novelService;
     private final ChapterService chapterService;
+    private final com.novel.splitter.domain.repository.NovelCacheRepository novelCacheRepository;
     private final TaskService taskService;
     private final RabbitTemplate rabbitTemplate;
     private final DownloadService downloadService;
@@ -65,13 +67,13 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
     public List<NovelStatRecordDto> getNovelStats() {
         List<Object[]> sceneCounts = sceneRepository.countScenesByNovelAndVersion();
 
-        // Map: novelName -> map of version -> count
+        // Map: novelId -> map of version -> count
         Map<String, Map<String, Long>> novelVersionCounts = new HashMap<>();
         for (Object[] row : sceneCounts) {
-            String novelName = (String) row[0];
+            String novelId = (String) row[0];
             String version = (String) row[1];
             long count = ((Number) row[2]).longValue();
-            novelVersionCounts.computeIfAbsent(novelName, k -> new HashMap<>()).put(version, count);
+            novelVersionCounts.computeIfAbsent(novelId, k -> new HashMap<>()).put(version, count);
         }
 
         List<SplitTask> allTasks = taskService.getAllTasks();
@@ -84,14 +86,14 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
 
         // Merge data
         for (Map.Entry<String, Map<String, Long>> entry : novelVersionCounts.entrySet()) {
-            String novelName = entry.getKey();
+            String novelId = entry.getKey();
             Map<String, Long> versionMap = entry.getValue();
 
             List<String> versions = new ArrayList<>(versionMap.keySet());
             long totalScenes = versionMap.values().stream().mapToLong(Long::longValue).sum();
 
             // Get latest task for this novel
-            List<SplitTask> novelTasks = tasksByNovel.getOrDefault(novelName, Collections.emptyList());
+            List<SplitTask> novelTasks = tasksByNovel.getOrDefault(novelId, Collections.emptyList());
             SplitTask latestTask = novelTasks.stream()
                     .max(Comparator.comparing(SplitTask::getCreatedAt))
                     .orElse(null);
@@ -105,8 +107,10 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
                 status = latestTask.getStatus() != null ? latestTask.getStatus().name() : "UNKNOWN";
             }
 
+            String titleForDisplay = novelService.getNovelById(novelId) != null ? novelService.getNovelById(novelId).getTitle() : novelId;
+
             NovelStatRecordDto dto = NovelStatRecordDto.builder()
-                    .novelName(novelName)
+                    .novelName(titleForDisplay)
                     .versions(versions)
                     .sceneCount(totalScenes)
                     .vectorCount(totalScenes) // Assume 1 scene = 1 vector
@@ -118,8 +122,8 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
 
         // Add novels that have tasks but no scenes yet
         for (Map.Entry<String, List<SplitTask>> entry : tasksByNovel.entrySet()) {
-            String novelName = entry.getKey();
-            if (!novelVersionCounts.containsKey(novelName)) {
+            String novelId = entry.getKey();
+            if (!novelVersionCounts.containsKey(novelId)) {
                 SplitTask latestTask = entry.getValue().stream()
                         .max(Comparator.comparing(SplitTask::getCreatedAt))
                         .orElse(null);
@@ -132,8 +136,9 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
                     status = latestTask.getStatus() != null ? latestTask.getStatus().name() : "UNKNOWN";
                 }
 
+                String titleForDisplay = novelService.getNovelById(novelId) != null ? novelService.getNovelById(novelId).getTitle() : novelId;
                 NovelStatRecordDto dto = NovelStatRecordDto.builder()
-                        .novelName(novelName)
+                        .novelName(titleForDisplay)
                         .versions(Collections.emptyList())
                         .sceneCount(0)
                         .vectorCount(0)
@@ -180,6 +185,45 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
     @Override
     public TaskSubmitResponseDto split(String novelId, IngestRequest request) throws IOException {
         return split(novelId, request, false);
+    }
+
+    @Override
+    public TaskSubmitResponseDto retrySplit(String novelId, SplitRetryRequestDto request) throws IOException {
+        if (novelId == null || novelId.isBlank()) {
+            throw new IllegalArgumentException("novelId must not be blank");
+        }
+        String id = novelId.trim();
+        com.novel.splitter.domain.model.Novel novel = novelService.getNovelById(id);
+        if (novel == null) {
+            throw new IllegalArgumentException("Novel not found: " + id);
+        }
+
+        boolean hasDbChapters = chapterService.hasChapters(id);
+        boolean hasParsedFiles = false;
+        try (java.util.stream.Stream<java.nio.file.Path> s = novelCacheRepository.listChapterFiles(id)) {
+            hasParsedFiles = s.findAny().isPresent();
+        } catch (Exception e) {
+            // treat as not ready
+            hasParsedFiles = false;
+        }
+        if (!hasDbChapters || !hasParsedFiles) {
+            throw new IllegalStateException("Split retry requires structured artifacts. hasDbChapters=" + hasDbChapters + ", hasParsedFiles=" + hasParsedFiles);
+        }
+
+        String taskId = UUID.randomUUID().toString();
+        int maxScenes = (request != null && request.getMaxScenes() > 0) ? request.getMaxScenes() : Integer.MAX_VALUE;
+        String version = normalizeVersion(request != null ? request.getVersion() : null);
+        boolean triggerEmbed = request != null && request.isTriggerEmbed();
+
+        taskService.createTask(taskId, TaskType.SPLIT, id, novel.getFilePath(), maxScenes, version);
+        SplitTaskMessage message = new SplitTaskMessage(taskId, id, maxScenes, version, triggerEmbed);
+        rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "split", message);
+        log.info("Sent taskId {} to split queue for retrySplit", taskId);
+
+        return TaskSubmitResponseDto.builder()
+                .message("切分重试任务已提交到队列（跳过 Load）")
+                .taskId(taskId)
+                .build();
     }
 
     private TaskSubmitResponseDto split(String novelId, IngestRequest request, boolean triggerEmbed) throws IOException {

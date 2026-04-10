@@ -8,6 +8,7 @@ import com.novel.splitter.application.model.dto.NovelUploadResponseDto;
 import com.novel.splitter.application.model.dto.NovelStatRecordDto;
 import com.novel.splitter.application.model.dto.ChapterDto;
 import com.novel.splitter.application.model.dto.SceneDto;
+import com.novel.splitter.application.model.dto.SplitRetryRequestDto;
 import com.novel.splitter.application.model.dto.TaskSubmitResponseDto;
 import org.springframework.data.domain.Page;
 import org.springframework.web.multipart.MultipartFile;
@@ -24,6 +25,11 @@ public interface NovelFacadeService {
     NovelUploadResponseDto uploadNovel(MultipartFile file, String title, String author, String description) throws IOException;
 
     TaskSubmitResponseDto split(String novelId, IngestRequest request) throws IOException;
+
+    /**
+     * 手动重试：从 Split 阶段重新触发（不重跑 Load），要求 chapters + parsed JSON 均已存在。
+     */
+    TaskSubmitResponseDto retrySplit(String novelId, SplitRetryRequestDto request) throws IOException;
 
     TaskSubmitResponseDto embed(String novelId) throws IOException;
 

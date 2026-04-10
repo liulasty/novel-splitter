@@ -1,6 +1,7 @@
 package com.novel.splitter.application.service.chroma;
 
 import com.novel.splitter.embedding.api.VectorStore;
+import com.novel.splitter.domain.repository.NovelRepository;
 import com.novel.splitter.domain.repository.SceneRepository;
 import com.novel.splitter.application.model.dto.ChromaVersionDiagnosticDto;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,7 @@ public class ChromaAdminServiceImpl implements ChromaAdminService {
     private final VectorStore vectorStore;
     private final ChromaApiClient chromaApiClient;
     private final SceneRepository sceneRepository;
+    private final NovelRepository novelRepository;
     private final ObjectMapper objectMapper;
 
     @Value("${chroma.collection:novel-splitter}")
@@ -36,9 +38,13 @@ public class ChromaAdminServiceImpl implements ChromaAdminService {
             try (JsonGenerator jsonGenerator = objectMapper.getFactory().createGenerator(outputStream)) {
                 jsonGenerator.writeStartArray();
                 // Simple implementation fetching lists, could be optimized via streaming in Repository
-                List<com.novel.splitter.domain.model.Scene> scenes = (novelName != null && version != null) ?
-                        sceneRepository.loadScenes(novelName, version) :
-                        sceneRepository.findByNovel(novelName != null ? novelName : ""); // Placeholder for fetch all if novelName empty
+                if (novelName == null || novelName.isBlank()) {
+                    throw new IllegalArgumentException("novelName must not be blank");
+                }
+                String novelId = resolveNovelId(novelName);
+                List<com.novel.splitter.domain.model.Scene> scenes = (version != null && !version.isBlank())
+                        ? sceneRepository.findByNovelIdAndVersion(novelId, version)
+                        : sceneRepository.findAllByNovelId(novelId);
                 
                 for (com.novel.splitter.domain.model.Scene scene : scenes) {
                     try {
@@ -124,7 +130,8 @@ public class ChromaAdminServiceImpl implements ChromaAdminService {
 
     @Override
     public ChromaVersionDiagnosticDto getVersionDiagnostics(String novel, String version) {
-        long dbCount = sceneRepository.countByNovelNameAndVersion(novel, version);
+        String novelId = resolveNovelId(novel);
+        long dbCount = sceneRepository.countByNovelIdAndVersion(novelId, version);
         long chromaCount = 0;
         List<String> metadataKeys = new ArrayList<>();
 
@@ -145,7 +152,7 @@ public class ChromaAdminServiceImpl implements ChromaAdminService {
 
             if (collectionId != null) {
                 Map<String, Object> where = Map.of("$and", List.of(
-                        Map.of("novel", Map.of("$eq", novel)),
+                        Map.of("novelId", Map.of("$eq", novelId)),
                         Map.of("version", Map.of("$eq", version))
                 ));
 
@@ -189,6 +196,18 @@ public class ChromaAdminServiceImpl implements ChromaAdminService {
         dto.setMetadataKeys(metadataKeys);
 
         return dto;
+    }
+
+    private String resolveNovelId(String novelOrTitle) {
+        if (novelOrTitle == null || novelOrTitle.isBlank()) {
+            throw new IllegalArgumentException("novel must not be blank");
+        }
+        String normalized = novelOrTitle.trim();
+        return novelRepository.findById(normalized)
+                .map(n -> n.getId())
+                .orElseGet(() -> novelRepository.findByTitle(normalized)
+                        .map(n -> n.getId())
+                        .orElseThrow(() -> new IllegalArgumentException("novel not found: " + normalized)));
     }
 
     @Override

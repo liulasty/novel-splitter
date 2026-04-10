@@ -7,6 +7,7 @@ import com.novel.splitter.application.model.dto.NovelPipelineRequestDto;
 import com.novel.splitter.application.model.dto.NovelSummaryDto;
 import com.novel.splitter.application.model.dto.NovelUploadResponseDto;
 import com.novel.splitter.application.model.dto.SceneDto;
+import com.novel.splitter.application.model.dto.SplitRetryRequestDto;
 import com.novel.splitter.application.model.dto.TaskSubmitResponseDto;
 import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
@@ -97,6 +98,12 @@ public class NovelController {
     @PostMapping("/{novelId}/split")
     public TaskSubmitResponseDto splitNovel(@PathVariable("novelId") String novelId, @Valid @RequestBody IngestRequest request) throws IOException {
         return novelFacadeService.split(novelId, request);
+    }
+
+    @Operation(summary = "重试 Split（跳过 Load）", description = "当 SplitWorker 清理失败/切分失败时，可手动从 Split 阶段重新触发；要求 chapters 与 chapter JSON 均已存在")
+    @PostMapping("/{novelId}/split/retry")
+    public TaskSubmitResponseDto retrySplitNovel(@PathVariable("novelId") String novelId, @RequestBody SplitRetryRequestDto request) throws IOException {
+        return novelFacadeService.retrySplit(novelId, request);
     }
 
     @Operation(summary = "触发小说处理流水线", description = "通过 stages 指定处理阶段（SPLIT/EMBED），推荐用于统一触发入口")
