@@ -8,6 +8,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.Hibernate;
 import org.hibernate.annotations.SQLRestriction;
 
 @Entity
@@ -57,7 +58,8 @@ public class JpaNovelEntity {
     @Override
     public final boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof JpaNovelEntity other)) return false;
+        if (o == null || Hibernate.getClass(this) != Hibernate.getClass(o)) return false;
+        JpaNovelEntity other = (JpaNovelEntity) o;
         return id != null && id.equals(other.id);
     }
 

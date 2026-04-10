@@ -113,7 +113,7 @@ export default function SystemPage() {
                                     ) : tasks?.slice(0, 4).map((task) => (
                                         <tr key={task.taskId} className="hover:bg-gray-50/50">
                                             <td className="px-4 py-3">
-                                                <div className="font-medium text-gray-900">{titleById.get(task.novelId) ?? task.novelId}</div>
+                                                <div className="font-medium text-gray-900">{task.novelTitle ?? titleById.get(task.novelId) ?? task.novelId}</div>
                                                 <div className="text-xs text-gray-500 font-mono mt-0.5">{task.novelId}</div>
                                                 <div className="text-xs text-gray-500 font-mono mt-0.5">{task.version}</div>
                                             </td>

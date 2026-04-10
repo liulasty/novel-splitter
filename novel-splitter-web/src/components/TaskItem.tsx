@@ -39,7 +39,7 @@ export function TaskItem({
                     <Icon className={cn("w-4 h-4 flex-shrink-0", currentStatus === 'PROCESSING' && "animate-spin",
                         currentStatus === 'SUCCESS' ? "text-teal-600" : currentStatus === 'FAILED' ? "text-red-500" : "text-gray-400"
                     )} />
-                    {task.novelId || task.fileName}
+                    {task.novelTitle || task.fileName || task.novelId}
                     <span className={cn(
                         "text-[10px] font-semibold px-1.5 py-0.5 rounded ml-1 tracking-wider uppercase",
                         taskType === 'EMBED' ? "bg-indigo-100 text-indigo-700" : "bg-blue-100 text-blue-700"

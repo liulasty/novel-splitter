@@ -44,7 +44,7 @@ export function TaskPollerStatus({ tasks, poller, onManualRefresh }: TaskPollerS
       {tasks.map(task => {
         const isStuck = poller.stuckTaskIds.includes(task.taskId);
         const isTimeout = poller.timeoutTaskIds.includes(task.taskId);
-        const novelTitle = titleById.get(task.novelId);
+        const novelTitle = task.novelTitle ?? titleById.get(task.novelId);
         const displayName = novelTitle || task.fileName || task.novelId;
 
         return (

@@ -8,6 +8,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.Hibernate;
 import org.hibernate.annotations.ColumnDefault;
 
 @Entity
@@ -67,7 +68,8 @@ public class JpaSplitTaskEntity {
     @Override
     public final boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof JpaSplitTaskEntity other)) return false;
+        if (o == null || Hibernate.getClass(this) != Hibernate.getClass(o)) return false;
+        JpaSplitTaskEntity other = (JpaSplitTaskEntity) o;
         return taskId != null && taskId.equals(other.taskId);
     }
 
