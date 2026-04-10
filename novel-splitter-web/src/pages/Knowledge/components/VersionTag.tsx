@@ -6,14 +6,17 @@ export function VersionTag({
     version,
     onDelete,
     isPending,
+    disabled,
     stat,
 }: {
     version: string;
     onDelete: () => void;
     isPending: boolean;
+    disabled?: boolean;
     stat?: NovelStatRecordDto;
 }) {
     const [confirming, setConfirming] = useState(false);
+    const isDisabled = Boolean(disabled);
 
     if (confirming) {
         return (
@@ -21,14 +24,15 @@ export function VersionTag({
                 <span className="mr-0.5">删除此版本？</span>
                 <button
                     onClick={() => { onDelete(); setConfirming(false); }}
-                    disabled={isPending}
+                    disabled={isPending || isDisabled}
                     className="px-1.5 py-0.5 rounded bg-red-500 text-white hover:bg-red-600 transition-colors text-[10px] font-semibold"
                 >
                     {isPending ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : '确认'}
                 </button>
                 <button
                     onClick={() => setConfirming(false)}
-                    className="p-0.5 rounded hover:bg-red-100 transition-colors text-red-400 hover:text-red-600"
+                    disabled={isPending}
+                    className="p-0.5 rounded hover:bg-red-100 transition-colors text-red-400 hover:text-red-600 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                     <X className="w-3 h-3" />
                 </button>
@@ -45,8 +49,9 @@ export function VersionTag({
                 </span>
                 <button
                     onClick={() => setConfirming(true)}
-                    className="p-1 rounded-md text-indigo-300 hover:text-red-500 hover:bg-white opacity-0 group-hover/tag:opacity-100 transition-all duration-150"
-                    title="删除版本"
+                    disabled={isDisabled}
+                    className="p-1 rounded-md text-indigo-300 hover:text-red-500 hover:bg-white opacity-0 group-hover/tag:opacity-100 transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
+                    title={isDisabled ? "存在运行中任务，暂不可删除" : "删除版本"}
                 >
                     <X className="w-3.5 h-3.5" />
                 </button>

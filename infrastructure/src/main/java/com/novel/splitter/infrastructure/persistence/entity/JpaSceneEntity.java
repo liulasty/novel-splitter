@@ -35,7 +35,7 @@ public class JpaSceneEntity {
     private JpaChapterEntity chapter;
 
     @Column(name = "scene_id", nullable = false)
-    private String sceneId; // String ID from Scene
+    private String sceneId;
 
     /**
      * Legacy column kept for DB backward compatibility.

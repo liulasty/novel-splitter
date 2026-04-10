@@ -1,6 +1,7 @@
 package com.novel.splitter.interfaces.api;
 
 import com.novel.splitter.application.service.novel.NovelFacadeService;
+import com.novel.splitter.application.model.command.UploadNovelCommand;
 import com.novel.splitter.application.model.dto.IngestRequest;
 import com.novel.splitter.application.model.dto.ChapterDto;
 import com.novel.splitter.application.model.dto.NovelPipelineRequestDto;
@@ -14,11 +15,11 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.novel.splitter.application.model.dto.NovelStatRecordDto;
+import com.novel.splitter.domain.model.paging.PagedResult;
 
 import java.io.IOException;
 import java.util.List;
@@ -71,7 +72,9 @@ public class NovelController {
             @Parameter(description = "小说标题") @RequestParam(value = "title", required = false) String title,
             @Parameter(description = "小说作者") @RequestParam(value = "author", required = false) String author,
             @Parameter(description = "小说描述") @RequestParam(value = "description", required = false) String description) throws IOException {
-        return novelFacadeService.uploadNovel(file, title, author, description);
+        try (java.io.InputStream in = file.getInputStream()) {
+            return novelFacadeService.uploadNovel(new UploadNovelCommand(in, file.getOriginalFilename(), title, author, description));
+        }
     }
 
     /**
@@ -88,7 +91,7 @@ public class NovelController {
 
     @Operation(summary = "获取章节片段", description = "获取某章节下的所有切分片段 (Scenes)")
     @GetMapping("/{novelId}/chapters/{chapterId}/scenes")
-    public Page<SceneDto> getScenesByChapter(
+    public PagedResult<SceneDto> getScenesByChapter(
             @PathVariable("novelId") String novelId,
             @PathVariable("chapterId") Long chapterId,
             @RequestParam(value = "page", defaultValue = "0") int page,

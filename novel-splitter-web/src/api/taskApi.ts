@@ -3,6 +3,7 @@ import { apiClient, type ApiEnvelope } from './client';
 export interface SplitTask {
   taskId: string;
   novelId: string;
+  novelTitle?: string | null;
   fileName: string;
   maxScenes: number;
   version: string;

@@ -100,6 +100,17 @@ public class TaskService {
     }
 
     @Transactional(readOnly = true)
+    public boolean hasActiveTasksForNovelId(String novelId) {
+        if (novelId == null || novelId.isBlank()) {
+            return false;
+        }
+        List<SplitTask> tasks = taskRepository.findRecentByNovelId(novelId.trim(), 50);
+        return tasks.stream().anyMatch(t ->
+                t != null && (t.getStatus() == SplitTask.TaskStatus.PENDING || t.getStatus() == SplitTask.TaskStatus.PROCESSING)
+        );
+    }
+
+    @Transactional(readOnly = true)
     public List<SplitTask> getAllTasks() {
         List<SplitTask> tasks = taskRepository.findAll();
         tasks.sort(Comparator.comparing(SplitTask::getCreatedAt).reversed());

@@ -1,7 +1,7 @@
-import { Zap, Database, GitBranch } from "lucide-react";
+import { Zap, Database, GitBranch, Activity } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useIngestTask } from "./Ingest/hooks/useIngestTask";
 import { UploadPanel } from "./Ingest/components/UploadPanel";
-import { TaskQueueBoard } from "./Ingest/components/TaskQueueBoard";
 
 export default function IngestPage() {
     const { state, actions } = useIngestTask();
@@ -30,12 +30,15 @@ export default function IngestPage() {
             {/* Upload & Config Panel */}
             <UploadPanel state={state} actions={actions} />
 
-            {/* Task Queue Board */}
-            <TaskQueueBoard 
-                tasks={state.tasks} 
-                selectedTaskId={state.selectedTaskId} 
-                actions={actions} 
-            />
+            <div className="flex justify-end">
+                <Link
+                    to={state.currentNovelId ? `/tasks?novelId=${encodeURIComponent(state.currentNovelId)}` : '/tasks'}
+                    className="inline-flex items-center gap-2 h-9 px-4 rounded-full text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 transition-colors"
+                >
+                    <Activity className="w-4 h-4" />
+                    查看任务监控
+                </Link>
+            </div>
         </div>
     );
 }

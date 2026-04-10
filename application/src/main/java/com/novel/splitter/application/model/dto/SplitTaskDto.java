@@ -14,6 +14,11 @@ public class SplitTaskDto {
     private String taskId;
     private TaskType taskType;
     private String novelId;
+    /**
+     * Human-facing display title for the novel (from DB).
+     * Optional for backward compatibility.
+     */
+    private String novelTitle;
     private String fileName;
     private int maxScenes;
     private String version;

@@ -1,5 +1,7 @@
 import { Loader2, AlertTriangle, Clock } from 'lucide-react';
 import type { SplitTask } from '@/api/taskApi';
+import { useQuery } from '@tanstack/react-query';
+import { novelApi } from '@/api/novelApi';
 
 interface TaskPollerStatusProps {
   tasks: SplitTask[];
@@ -14,6 +16,13 @@ interface TaskPollerStatusProps {
 
 export function TaskPollerStatus({ tasks, poller, onManualRefresh }: TaskPollerStatusProps) {
   if (!tasks || tasks.length === 0) return null;
+
+  const { data: novels } = useQuery({
+    queryKey: ['novels'],
+    queryFn: novelApi.getNovels,
+  });
+
+  const titleById = new Map((novels ?? []).map(n => [n.novelId, n.title] as const));
 
   return (
     <div className="mt-4 space-y-2">
@@ -35,6 +44,8 @@ export function TaskPollerStatus({ tasks, poller, onManualRefresh }: TaskPollerS
       {tasks.map(task => {
         const isStuck = poller.stuckTaskIds.includes(task.taskId);
         const isTimeout = poller.timeoutTaskIds.includes(task.taskId);
+        const novelTitle = titleById.get(task.novelId);
+        const displayName = novelTitle || task.fileName || task.novelId;
 
         return (
           <div key={task.taskId} className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-xl shadow-sm">
@@ -42,7 +53,10 @@ export function TaskPollerStatus({ tasks, poller, onManualRefresh }: TaskPollerS
               <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
               <div>
                 <div className="text-sm font-medium text-gray-800">
-                  {task.taskType === 'EMBED' ? '向量化' : '切分'}任务: {task.fileName || task.novelId}
+                  {task.taskType === 'EMBED' ? '向量化' : '切分'}任务: {displayName}
+                  {!novelTitle && task.novelId && (
+                    <span className="ml-2 text-xs text-gray-400 font-mono">({task.novelId})</span>
+                  )}
                 </div>
                 <div className="text-xs text-gray-500">{task.message || '处理中...'}</div>
               </div>

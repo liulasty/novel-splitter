@@ -8,9 +8,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
 import java.util.UUID;
 
@@ -24,11 +24,11 @@ public class NovelServiceImpl implements NovelService {
     private final TransactionTemplate transactionTemplate;
 
     @Override
-    public String createNovel(MultipartFile file, String title, String author, String description) throws IOException {
+    public String createNovel(InputStream content, String originalFilename, String title, String author, String description) throws IOException {
         String novelId = UUID.randomUUID().toString();
 
         // 1) DB-first: create record first with stable novelId + planned stored relative path
-        String storedRelativePath = "raw/" + novelId + ".txt";
+        String storedRelativePath = novelStorageService.rawRelativePath(novelId);
         try {
             transactionTemplate.execute(status -> {
                 saveNovelRecordWithId(novelId, storedRelativePath, title, author, description);
@@ -40,7 +40,7 @@ public class NovelServiceImpl implements NovelService {
 
         // 2) Save file to local storage using novelId-based path
         try {
-            String actualStored = novelStorageService.saveNovelAsRawByNovelId(novelId, file);
+            String actualStored = novelStorageService.saveNovelAsRawByNovelId(novelId, content);
             if (!storedRelativePath.equals(actualStored)) {
                 // Keep DB consistent with actual stored path
                 transactionTemplate.execute(status -> {

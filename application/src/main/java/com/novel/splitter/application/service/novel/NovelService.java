@@ -2,9 +2,9 @@ package com.novel.splitter.application.service.novel;
 
 import com.novel.splitter.domain.model.Novel;
 import com.novel.splitter.domain.enums.NovelStatus;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
 
 public interface NovelService {
@@ -12,13 +12,14 @@ public interface NovelService {
     /**
      * 上传小说并记录到数据库
      *
-     * @param file        上传的文件
+     * @param content     上传内容流（调用方负责关闭）
+     * @param originalFilename 原文件名（用于生成展示 title 的 fallback）
      * @param title       小说标题
      * @param author      小说作者
      * @param description 描述
      * @return 返回 novelId
      */
-    String createNovel(MultipartFile file, String title, String author, String description) throws IOException;
+    String createNovel(InputStream content, String originalFilename, String title, String author, String description) throws IOException;
 
     /**
      * 基于已落盘的相对路径创建小说记录（不执行文件写入）

@@ -27,6 +27,7 @@ export function TaskItem({
     const currentMessage = task.message;
     const currentStatus = task.status;
     const taskType = task.taskType || 'SPLIT';
+    const canDelete = currentStatus !== 'PENDING' && currentStatus !== 'PROCESSING';
     
     const cfg = STATUS_CONFIG[currentStatus as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.PENDING;
 
@@ -62,10 +63,14 @@ export function TaskItem({
                     </button>
                     <button
                         onClick={() => onDelete(task.taskId)}
-                        className="w-6 h-6 rounded-md bg-red-50 hover:bg-red-100 flex items-center justify-center transition-colors"
-                        title="删除任务"
+                        disabled={!canDelete}
+                        className={cn(
+                            "w-6 h-6 rounded-md flex items-center justify-center transition-colors",
+                            canDelete ? "bg-red-50 hover:bg-red-100" : "bg-gray-100 cursor-not-allowed opacity-60"
+                        )}
+                        title={canDelete ? "删除任务" : "任务运行中，无法删除"}
                     >
-                        <Trash2 className="w-3 h-3 text-red-500" />
+                        <Trash2 className={cn("w-3 h-3", canDelete ? "text-red-500" : "text-gray-400")} />
                     </button>
                 </div>
             </div>

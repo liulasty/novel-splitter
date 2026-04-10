@@ -1,21 +1,17 @@
 package com.novel.splitter.application.service.novel;
 
 import com.novel.splitter.application.config.AppConfig;
+import com.novel.splitter.application.port.out.FileStoragePort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
+import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @Service
@@ -23,62 +19,68 @@ import java.util.stream.Stream;
 public class NovelStorageService {
 
     private static final String DEFAULT_UNKNOWN_FILE_PREFIX = "unknown";
-    private static final String RAW_DIR = "raw";
 
     private final AppConfig appConfig;
+    private final FileStoragePort fileStoragePort;
 
     public List<String> listNovels() throws IOException {
-        Path storagePath = getStoragePath();
-        try (Stream<Path> stream = Files.list(storagePath)) {
-            return stream
-                    .filter(file -> !Files.isDirectory(file))
-                    .map(Path::getFileName)
-                    .map(Path::toString)
-                    .filter(name -> name.endsWith(".txt"))
-                    .collect(Collectors.toList());
-        }
+        // Prefer configured rawDirName/{novelId}/{rawFilename}. Keep legacy root listing for compatibility.
+        List<String> legacyRootTxt = fileStoragePort.listFiles("")
+                .stream()
+                .filter(name -> name.endsWith(".txt"))
+                .toList();
+
+        List<String> rawNovelIds = fileStoragePort.listDirectories(appConfig.getStorage().getRawDirName());
+        List<String> configuredRawPaths = rawNovelIds.stream().map(this::rawRelativePath).toList();
+
+        // Return configured paths first to nudge callers off legacy root fileName usage.
+        return Stream.concat(configuredRawPaths.stream(), legacyRootTxt.stream()).distinct().toList();
     }
 
-    public String saveNovel(MultipartFile file) throws IOException {
-        if (file == null || file.isEmpty()) {
+    public String saveNovel(String originalFilename, InputStream content) throws IOException {
+        if (content == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "文件为空");
         }
-
-        String originalFilename = file.getOriginalFilename();
         String newFilename = generateUniqueFilename(originalFilename);
-        Path destination = getStoragePath().resolve(newFilename);
-        Files.copy(file.getInputStream(), destination, StandardCopyOption.REPLACE_EXISTING);
+        fileStoragePort.write(newFilename, content, true);
         return newFilename;
     }
 
     /**
-     * Save novel raw text as raw/{novelId}.txt under storage root.
-     *
-     * @return stored relative path (e.g. raw/xxxx.txt)
+     * Raw original relative path under storage root.
+     * Format: {rawDirName}/{novelId}/{rawFilename}
      */
-    public String saveNovelAsRawByNovelId(String novelId, MultipartFile file) throws IOException {
+    public String rawRelativePath(String novelId) {
         if (novelId == null || novelId.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "novelId 为空");
         }
-        if (file == null || file.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "文件为空");
-        }
-        Path rawDir = getStoragePath().resolve(RAW_DIR);
-        if (!Files.exists(rawDir)) {
-            Files.createDirectories(rawDir);
-        }
-        String filename = novelId.trim() + ".txt";
-        Path destination = rawDir.resolve(filename);
-        Files.copy(file.getInputStream(), destination, StandardCopyOption.REPLACE_EXISTING);
-        return RAW_DIR + "/" + filename;
+        String rawDirName = appConfig.getStorage().getRawDirName();
+        String rawFilename = appConfig.getStorage().getRawFilename();
+        return rawDirName + "/" + novelId.trim() + "/" + rawFilename;
     }
 
-    public Path resolveExistingNovelPath(String fileName) throws IOException {
-        Path novelPath = getStoragePath().resolve(fileName);
-        if (!Files.exists(novelPath)) {
+    /**
+     * Save novel raw text as {rawDirName}/{novelId}/{rawFilename} under storage root.
+     *
+     * @return stored relative path (e.g. novel-raw/{novelId}/original.txt)
+     */
+    public String saveNovelAsRawByNovelId(String novelId, InputStream content) throws IOException {
+        if (content == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "文件为空");
+        }
+        String relativePath = rawRelativePath(novelId);
+        fileStoragePort.write(relativePath, content, true);
+        return relativePath;
+    }
+
+    public java.nio.file.Path resolveExistingNovelPath(String fileName) throws IOException {
+        if (fileName == null || fileName.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "fileName 为空");
+        }
+        if (!fileStoragePort.exists(fileName)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "找不到文件: " + fileName);
         }
-        return novelPath;
+        return fileStoragePort.toAbsolutePath(fileName);
     }
 
     public void deleteNovelIfExists(String fileName) {
@@ -86,19 +88,10 @@ public class NovelStorageService {
             return;
         }
         try {
-            Path novelPath = getStoragePath().resolve(fileName);
-            Files.deleteIfExists(novelPath);
+            fileStoragePort.deleteIfExists(fileName);
         } catch (IOException ignored) {
             // Best-effort compensation only.
         }
-    }
-
-    private Path getStoragePath() throws IOException {
-        Path path = Paths.get(appConfig.getStorage().getRootPath());
-        if (!Files.exists(path)) {
-            Files.createDirectories(path);
-        }
-        return path;
     }
 
     private String generateUniqueFilename(String originalFilename) {

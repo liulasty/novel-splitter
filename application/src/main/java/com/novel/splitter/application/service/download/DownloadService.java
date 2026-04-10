@@ -1,6 +1,7 @@
 package com.novel.splitter.application.service.download;
 
 import com.novel.splitter.application.config.AppConfig;
+import com.novel.splitter.application.port.out.FileStoragePort;
 import com.novel.splitter.downloader.api.NovelDownloader;
 import com.novel.splitter.downloader.core.DownloaderFactory;
 import com.novel.splitter.domain.model.downloader.DownloadChapter;
@@ -10,10 +11,8 @@ import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 
 /**
@@ -26,12 +25,14 @@ public class DownloadService {
 
     private final AppConfig appConfig;
     private final DownloaderFactory downloaderFactory;
+    private final FileStoragePort fileStoragePort;
 
     // 移除 NovelRepository 依赖，因为这里主要做文件写入，直接用 NIO
     // 如果必须用 NovelRepository，请确保 BeanConfig 中已定义
     
-    public DownloadService(AppConfig appConfig) {
+    public DownloadService(AppConfig appConfig, FileStoragePort fileStoragePort) {
         this.appConfig = appConfig;
+        this.fileStoragePort = fileStoragePort;
         
         // 初始化工厂
         AppConfig.DownloaderConfig dlConfig = appConfig.getDownloader();
@@ -69,7 +70,7 @@ public class DownloadService {
      *
      * @param url 目录页 URL
      * @param saveName   保存的文件名（不含后缀，默认保存为 txt）
-     * @return 保存的绝对路径
+     * @return 保存的 storageRoot 相对路径
      */
     public String downloadNovel(String url, String saveName) {
         // 1. 获取下载器
@@ -94,18 +95,15 @@ public class DownloadService {
             }
         }
 
-        String rootPath = appConfig.getStorage().getRootPath();
-        Path rawDir = Paths.get(rootPath, "raw");
         try {
-            if (!Files.exists(rawDir)) {
-                Files.createDirectories(rawDir);
-            }
             String safeName = name.replaceAll("[\\\\/:*?\"<>|]", "_");
-            Path targetFile = rawDir.resolve(safeName + ".txt");
-            
-            Files.write(targetFile, sb.toString().getBytes(StandardCharsets.UTF_8));
-            log.info("Saved novel to: {}", targetFile.toAbsolutePath());
-            return targetFile.toAbsolutePath().toString();
+            // Keep downloads under configured raw-dir-name to avoid scattering raw storage conventions.
+            String relativePath = appConfig.getStorage().getRawDirName() + "/_downloads/" + safeName + ".txt";
+            try (InputStream in = new java.io.ByteArrayInputStream(sb.toString().getBytes(StandardCharsets.UTF_8))) {
+                fileStoragePort.write(relativePath, in, true);
+            }
+            log.info("Saved downloaded novel to: {}", relativePath);
+            return relativePath;
         } catch (IOException e) {
             throw new RuntimeException("Failed to save downloaded novel", e);
         }

@@ -1,13 +1,15 @@
 package com.novel.splitter.interfaces.api;
 
-import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.application.model.dto.SplitTaskDto;
 import com.novel.splitter.application.model.dto.TaskProgressEventDto;
 import com.novel.splitter.application.mapper.DtoMapper;
+import com.novel.splitter.application.service.task.TaskQueryService;
+import com.novel.splitter.application.service.task.TaskService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -19,28 +21,35 @@ public class TaskController {
 
     private final TaskService taskService;
     private final DtoMapper dtoMapper;
+    private final TaskQueryService taskQueryService;
 
-    public TaskController(TaskService taskService, DtoMapper dtoMapper) {
+    public TaskController(TaskService taskService, DtoMapper dtoMapper, TaskQueryService taskQueryService) {
         this.taskService = taskService;
         this.dtoMapper = dtoMapper;
+        this.taskQueryService = taskQueryService;
     }
 
     @GetMapping
     @Operation(summary = "获取所有切分任务列表")
     public List<SplitTaskDto> getAllTasks() {
-        return dtoMapper.toSplitTaskDtos(taskService.getAllTasks());
+        return taskQueryService.getAllTasksWithNovelTitle();
     }
 
     @GetMapping("/{taskId}")
     @Operation(summary = "获取单个切分任务状态")
     public SplitTaskDto getTask(@PathVariable("taskId") String taskId) {
-        return dtoMapper.toSplitTaskDto(taskService.getTask(taskId));
+        return taskQueryService.getTaskWithNovelTitle(taskId);
     }
 
     @DeleteMapping("/{taskId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "删除单个切分任务记录")
     public void deleteTask(@PathVariable("taskId") String taskId) {
+        var task = taskService.getTask(taskId);
+        if (task != null && (task.getStatus() == com.novel.splitter.domain.task.SplitTask.TaskStatus.PENDING
+                || task.getStatus() == com.novel.splitter.domain.task.SplitTask.TaskStatus.PROCESSING)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Task is running; cannot delete. Please wait until it finishes.");
+        }
         taskService.deleteTask(taskId);
     }
 

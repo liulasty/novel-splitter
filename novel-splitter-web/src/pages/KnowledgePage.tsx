@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Loader2, Book, AlertCircle, Database, ChevronRight } from "lucide-react";
 import { novelApi } from "@/api/novelApi";
+import { taskApi } from "@/api/taskApi";
 import { NovelVersionsCard } from "./Knowledge/components/NovelVersionsCard";
 
 export default function KnowledgePage() {
@@ -8,8 +9,19 @@ export default function KnowledgePage() {
     queryKey: ['novels'],
     queryFn: novelApi.getNovels,
   });
+  const { data: tasks = [] } = useQuery({
+    queryKey: ['tasks'],
+    queryFn: taskApi.getAllTasks,
+    refetchInterval: 5000,
+  });
 
   const novelList = Array.isArray(novels) ? novels : [];
+  const runningNovelIds = new Set(
+    tasks
+      .filter(task => task.status === 'PENDING' || task.status === 'PROCESSING')
+      .map(task => task.novelId)
+      .filter((novelId): novelId is string => Boolean(novelId))
+  );
 
   return (
       <div className="min-h-screen bg-slate-50">
@@ -80,6 +92,7 @@ export default function KnowledgePage() {
                             key={novel.novelId}
                             novelId={novel.novelId}
                             novelName={novel.title}
+                            hasRunningTasks={runningNovelIds.has(novel.novelId)}
                         />
                     ))}
                   </div>

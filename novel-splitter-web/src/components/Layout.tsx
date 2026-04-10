@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { MessageSquare, Database, FileInput, Settings, Bug, Server, Menu, X } from 'lucide-react';
+import { MessageSquare, Database, FileInput, Settings, Bug, Server, Menu, X, Activity } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import TokenManager from './TokenManager';
 
@@ -12,6 +12,7 @@ export default function Layout() {
     { path: '/', label: '对话问答', icon: MessageSquare },
     { path: '/knowledge', label: '知识库', icon: Database },
     { path: '/ingest', label: '入库处理', icon: FileInput },
+    { path: '/tasks', label: '任务监控', icon: Activity },
     { path: '/debug', label: 'RAG 调试', icon: Bug },
     { path: '/settings', label: '系统配置', icon: Settings },
     { path: '/system', label: '系统管理', icon: Server },

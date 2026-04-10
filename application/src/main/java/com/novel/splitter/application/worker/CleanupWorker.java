@@ -13,9 +13,6 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Map;
 import java.util.Optional;
 
@@ -27,9 +24,16 @@ public class CleanupWorker {
     private final VectorStore vectorStore;
     private final CleanupTaskRepository cleanupTaskRepository;
     private final NovelRepository novelRepository;
+    private final com.novel.splitter.application.port.out.FileStoragePort fileStoragePort;
 
     @Value("${splitter.storage.root-path}")
     private String novelStoragePath;
+
+    @Value("${splitter.storage.raw-dir-name:novel-raw}")
+    private String rawDirName;
+
+    @Value("${splitter.storage.parsed-dir-name:novel-parsed}")
+    private String parsedDirName;
 
     @RabbitListener(queues = RabbitConfig.CLEANUP_TASK_QUEUE, concurrency = "1")
     public void handleCleanupTask(CleanupTaskMessage message) {
@@ -118,9 +122,8 @@ public class CleanupWorker {
     private void deleteRawFileByNovelId(String novelId, String fallbackNovelName) {
         // Preferred: novelId-bound directory cleanup (raw + parsed)
         try {
-            Path rootDir = Paths.get(novelStoragePath);
-            deleteDirectoryRecursivelyIfExists(rootDir.resolve("novel-raw").resolve(novelId));
-            deleteDirectoryRecursivelyIfExists(rootDir.resolve("novel-parsed").resolve(novelId));
+            fileStoragePort.deleteTreeIfExists(rawDirName + "/" + novelId);
+            fileStoragePort.deleteTreeIfExists(parsedDirName + "/" + novelId);
         } catch (Exception e) {
             log.warn("Failed to delete novelId-bound directories for novelId={}, err={}", novelId, e.getMessage());
         }
@@ -128,13 +131,16 @@ public class CleanupWorker {
         try {
             Optional<Novel> novelOpt = novelRepository.findById(novelId);
             if (novelOpt.isPresent() && novelOpt.get().getFilePath() != null && !novelOpt.get().getFilePath().isBlank()) {
-                Path filePath = Paths.get(novelOpt.get().getFilePath());
-                if (Files.exists(filePath)) {
-                    Files.delete(filePath);
-                    log.info("Deleted raw file by filePath: {}", filePath);
+                String relativeOrAbsolute = novelOpt.get().getFilePath();
+                // Prefer relative-path deletion; if absolute-path was stored historically, fall back to name-based deletion.
+                try {
+                    String rel = fileStoragePort.toRelativePath(relativeOrAbsolute);
+                    fileStoragePort.deleteIfExists(rel);
+                    log.info("Deleted raw file by filePath: {}", rel);
                     return;
+                } catch (Exception ignored) {
+                    // ignored, fallback below
                 }
-                log.warn("filePath not found on disk: {}", filePath);
             }
         } catch (Exception e) {
             log.warn("Failed to delete raw file by novelId={}, falling back to name-based deletion. err={}", novelId, e.getMessage());
@@ -147,27 +153,23 @@ public class CleanupWorker {
         }
     }
 
-    private void deleteDirectoryRecursivelyIfExists(Path dir) throws java.io.IOException {
-        if (!Files.exists(dir)) return;
-        try (java.util.stream.Stream<Path> stream = Files.walk(dir)) {
-            stream.sorted(java.util.Comparator.reverseOrder()).forEach(p -> {
-                try {
-                    Files.deleteIfExists(p);
-                } catch (Exception e) {
-                    log.warn("Failed to delete file: {}", p);
-                }
-            });
-        }
-    }
-
     private void deleteRawFileByName(String novelName) {
         try {
-            java.nio.file.Path rootDir = Paths.get(novelStoragePath);
-            java.nio.file.Path rawDir = rootDir.resolve("raw");
-            
-            boolean deleted = deleteFileIfExists(rawDir, novelName);
+            // Legacy name-based deletion: raw/xxx.txt or storageRoot/xxx.txt
+            boolean deleted = false;
+            try {
+                fileStoragePort.deleteIfExists("raw/" + novelName + ".txt");
+                deleted = true;
+            } catch (Exception ignored) {
+                // ignore
+            }
             if (!deleted) {
-                deleted = deleteFileIfExists(rootDir, novelName);
+                try {
+                    fileStoragePort.deleteIfExists(novelName + ".txt");
+                    deleted = true;
+                } catch (Exception ignored) {
+                    // ignore
+                }
             }
             
             if (deleted) {
@@ -178,24 +180,6 @@ public class CleanupWorker {
         } catch (Exception e) {
             log.error("Failed to delete raw file for novel: " + novelName, e);
         }
-    }
-
-    private boolean deleteFileIfExists(java.nio.file.Path dir, String novelName) throws java.io.IOException {
-        java.nio.file.Path path = dir.resolve(novelName + ".txt");
-        if (Files.exists(path)) {
-            Files.delete(path);
-            log.info("Deleted raw file: {}", path);
-            return true;
-        }
-        
-        path = dir.resolve(novelName);
-        if (Files.exists(path)) {
-            Files.delete(path);
-            log.info("Deleted raw file: {}", path);
-            return true;
-        }
-        
-        return false;
     }
 
     private String firstNonBlank(String a, String b) {

@@ -2,19 +2,40 @@ package com.novel.splitter.infrastructure.persistence.mapper;
 
 import com.novel.splitter.domain.model.Novel;
 import com.novel.splitter.infrastructure.persistence.entity.JpaNovelEntity;
-import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
-import org.mapstruct.MappingTarget;
+import org.springframework.stereotype.Component;
 
-@Mapper(componentModel = "spring")
-public interface NovelMapper {
-    // Map JPA Entity to Domain Model
-    @Mapping(target = "chapters", ignore = true)
-    @Mapping(target = "paragraphs", ignore = true)
-    @Mapping(target = "isDeleted", expression = "java(entity.isDeleted())")
-    Novel toDomain(JpaNovelEntity entity);
+@Component
+public class NovelMapper {
+    public Novel toDomain(JpaNovelEntity entity) {
+        if (entity == null) return null;
+        return Novel.builder()
+                .id(entity.getId())
+                .title(entity.getTitle())
+                .author(entity.getAuthor())
+                .description(entity.getDescription())
+                .coverUrl(entity.getCoverUrl())
+                .filePath(entity.getFilePath())
+                .status(entity.getStatus())
+                .createdAt(entity.getCreatedAt())
+                .updatedAt(entity.getUpdatedAt())
+                .isDeleted(entity.isDeleted())
+                .chapters(null)
+                .paragraphs(null)
+                .build();
+    }
 
-    // Map Domain Model to JPA Entity
-    @Mapping(target = "deleted", source = "domain.deleted")
-    JpaNovelEntity toEntity(@MappingTarget JpaNovelEntity entity, Novel domain);
+    public JpaNovelEntity toEntity(JpaNovelEntity entity, Novel domain) {
+        if (entity == null || domain == null) return entity;
+        entity.setId(domain.getId());
+        entity.setTitle(domain.getTitle());
+        entity.setAuthor(domain.getAuthor());
+        entity.setDescription(domain.getDescription());
+        entity.setCoverUrl(domain.getCoverUrl());
+        entity.setFilePath(domain.getFilePath());
+        entity.setStatus(domain.getStatus());
+        entity.setCreatedAt(domain.getCreatedAt());
+        entity.setUpdatedAt(domain.getUpdatedAt());
+        entity.setDeleted(domain.isDeleted());
+        return entity;
+    }
 }

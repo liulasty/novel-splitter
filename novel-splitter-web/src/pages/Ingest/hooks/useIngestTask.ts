@@ -5,6 +5,7 @@ import { novelApi } from "@/api/novelApi";
 import { taskApi } from "@/api/taskApi";
 import { downloadApi } from "@/api/downloadApi";
 import { useTaskPoller } from './useTaskPoller';
+import { getApiErrorMessage, handleConflict409 } from '@/lib/apiError';
 
 export function useIngestTask() {
     const queryClient = useQueryClient();
@@ -124,6 +125,12 @@ export function useIngestTask() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['tasks'] });
             toast.success("任务已删除");
+        },
+        onError: (error: any) => {
+            if (handleConflict409(error, "任务运行中，暂不可删除，请等待任务完成后重试")) {
+                return;
+            }
+            toast.error(getApiErrorMessage(error, "删除失败"));
         },
     });
 

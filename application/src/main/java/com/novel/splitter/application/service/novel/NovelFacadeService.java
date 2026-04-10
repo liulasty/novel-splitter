@@ -1,5 +1,6 @@
 package com.novel.splitter.application.service.novel;
 
+import com.novel.splitter.application.model.command.UploadNovelCommand;
 import com.novel.splitter.application.model.dto.DownloadAndIngestRequest;
 import com.novel.splitter.application.model.dto.IngestRequest;
 import com.novel.splitter.application.model.dto.NovelPipelineRequestDto;
@@ -10,8 +11,6 @@ import com.novel.splitter.application.model.dto.ChapterDto;
 import com.novel.splitter.application.model.dto.SceneDto;
 import com.novel.splitter.application.model.dto.SplitRetryRequestDto;
 import com.novel.splitter.application.model.dto.TaskSubmitResponseDto;
-import org.springframework.data.domain.Page;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.List;
@@ -22,7 +21,7 @@ public interface NovelFacadeService {
 
     List<NovelSummaryDto> listNovelsFromDb();
 
-    NovelUploadResponseDto uploadNovel(MultipartFile file, String title, String author, String description) throws IOException;
+    NovelUploadResponseDto uploadNovel(UploadNovelCommand command) throws IOException;
 
     TaskSubmitResponseDto split(String novelId, IngestRequest request) throws IOException;
 
@@ -43,7 +42,7 @@ public interface NovelFacadeService {
 
     List<ChapterDto> getChapters(String novelId);
 
-    Page<SceneDto> getScenesByChapter(String novelId, Long chapterId, int page, int size);
+    com.novel.splitter.domain.model.paging.PagedResult<SceneDto> getScenesByChapter(String novelId, Long chapterId, int page, int size);
 
     void softDeleteNovel(String novelId);
 }

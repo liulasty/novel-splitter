@@ -7,6 +7,7 @@ import { novelApi } from "@/api/novelApi";
 
 import { cn } from "@/lib/utils";
 import { toast } from 'sonner';
+import { getApiErrorMessage, handleConflict409 } from "@/lib/apiError";
 
 type TabType = 'system' | 'collections' | 'diagnostics';
 
@@ -180,7 +181,10 @@ function DiagnosticsTab() {
       toast.success(data?.message || `已成功删除 ${selectedNovel} - ${selectedVersion}`);
     },
     onError: (err: any) => {
-      toast.error(`删除失败: ${err.message}`);
+      if (handleConflict409(err, '当前版本存在运行中任务或被占用，请等待相关任务完成后再删除')) {
+        return;
+      }
+      toast.error(`删除失败: ${getApiErrorMessage(err, '删除失败')}`);
     }
   });
 

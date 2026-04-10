@@ -1,7 +1,7 @@
 package com.novel.splitter.application.worker;
 
-import com.novel.splitter.application.config.AppConfig;
 import com.novel.splitter.application.config.RabbitConfig;
+import com.novel.splitter.application.port.out.FileStoragePort;
 import com.novel.splitter.domain.task.SplitTask;
 import com.novel.splitter.domain.task.SplitTaskMessage;
 import com.novel.splitter.domain.repository.NovelCacheRepository;
@@ -20,7 +20,6 @@ import org.springframework.stereotype.Component;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.stream.Stream;
@@ -35,7 +34,7 @@ public class LoadWorker {
     private final TaskService taskService;
     private final NovelCacheRepository novelCacheRepository;
     private final RabbitTemplate rabbitTemplate;
-    private final AppConfig appConfig;
+    private final FileStoragePort fileStoragePort;
     private final NovelService novelService;
     private final ChapterService chapterService;
 
@@ -82,8 +81,7 @@ public class LoadWorker {
                         taskId, hasDbChapters, hasParsedFiles);
             }
 
-            String rootPath = appConfig.getStorage().getRootPath();
-            Path uploadPath = Paths.get(rootPath, task.getFileName());
+            Path uploadPath = fileStoragePort.toAbsolutePath(task.getFileName());
             Path rawPath = novelCacheRepository.rawOriginalPath(novelId);
             Files.createDirectories(rawPath.getParent());
             if (!Files.exists(rawPath)) {

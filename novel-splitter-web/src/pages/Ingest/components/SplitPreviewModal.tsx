@@ -15,6 +15,13 @@ export function SplitPreviewModal({ isOpen, onClose, novelId }: SplitPreviewModa
     const [scenePage, setScenePage] = useState(0);
     const scenePageSize = 200;
 
+    const { data: novels } = useQuery({
+        queryKey: ['novels'],
+        queryFn: novelApi.getNovels,
+        enabled: isOpen,
+    });
+    const novelTitle = novels?.find(n => n.novelId === novelId)?.title;
+
     const { data: chapters, isLoading: isChaptersLoading } = useQuery({
         queryKey: ['chapters', novelId],
         queryFn: () => novelApi.getChapters(novelId),
@@ -38,7 +45,8 @@ export function SplitPreviewModal({ isOpen, onClose, novelId }: SplitPreviewModa
                     <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
                         <FileText className="w-5 h-5 text-indigo-600" />
                         切分结果预览
-                        {novelId && <span className="text-sm font-normal text-gray-500 ml-2">ID: {novelId}</span>}
+                        {novelTitle && <span className="text-sm font-normal text-gray-700 ml-2">{novelTitle}</span>}
+                        {novelId && <span className="text-xs font-normal text-gray-400 ml-2 font-mono">({novelId})</span>}
                     </h2>
                     <button
                         onClick={onClose}

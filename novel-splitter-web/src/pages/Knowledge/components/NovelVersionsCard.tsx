@@ -1,15 +1,28 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Loader2, Book, Trash2, AlertCircle } from "lucide-react";
 import { knowledgeApi } from "@/api/knowledgeApi";
 import { novelApi } from "@/api/novelApi";
 import { toast } from 'sonner';
+import { getApiErrorMessage, handleConflict409 } from "@/lib/apiError";
 import { VersionTag } from "./VersionTag";
 
-export function NovelVersionsCard({ novelId, novelName }: { novelId: string, novelName: string }) {
+export function NovelVersionsCard({
+    novelId,
+    novelName,
+    hasRunningTasks,
+}: {
+    novelId: string,
+    novelName: string,
+    hasRunningTasks: boolean,
+}) {
     const queryClient = useQueryClient();
     const [deleteConfirming, setDeleteConfirming] = useState(false);
+
+    useEffect(() => {
+        setDeleteConfirming(false);
+    }, [novelId]);
 
     const { data: versions, isLoading, isError } = useQuery({
         queryKey: ['versions', novelId],
@@ -26,8 +39,13 @@ export function NovelVersionsCard({ novelId, novelName }: { novelId: string, nov
             toast.success(`知识库 "${novelName}" 已删除，清理任务：${cleanupTaskId}`);
             queryClient.invalidateQueries({ queryKey: ['novels'] });
         },
-        onError: (error) => {
-            toast.error(`删除知识库失败: ${error}`);
+        onError: (error: any) => {
+            if (handleConflict409(error, '当前小说存在运行中任务，请等待任务完成后再删除知识库/版本')) {
+                setDeleteConfirming(false);
+                queryClient.invalidateQueries({ queryKey: ['tasks'] });
+                return;
+            }
+            toast.error(`删除知识库失败: ${getApiErrorMessage(error, '删除知识库失败')}`);
             setDeleteConfirming(false);
         },
     });
@@ -38,8 +56,12 @@ export function NovelVersionsCard({ novelId, novelName }: { novelId: string, nov
             toast.success(`版本 "${version}" 已删除`);
             queryClient.invalidateQueries({ queryKey: ['versions', novelId] });
         },
-        onError: (error) => {
-            toast.error(`删除版本失败: ${error}`);
+        onError: (error: any) => {
+            if (handleConflict409(error, '当前小说存在运行中任务，请等待任务完成后再删除版本')) {
+                queryClient.invalidateQueries({ queryKey: ['tasks'] });
+                return;
+            }
+            toast.error(`删除版本失败: ${getApiErrorMessage(error, '删除版本失败')}`);
         },
     });
 
@@ -68,9 +90,9 @@ export function NovelVersionsCard({ novelId, novelName }: { novelId: string, nov
                     {!deleteConfirming && (
                         <button
                             onClick={() => setDeleteConfirming(true)}
-                            disabled={deleteNovelMutation.isPending}
-                            className="shrink-0 p-1.5 rounded-md text-slate-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all duration-150"
-                            title="删除知识库"
+                            disabled={deleteNovelMutation.isPending || hasRunningTasks}
+                            className="shrink-0 p-1.5 rounded-md text-slate-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
+                            title={hasRunningTasks ? "存在运行中任务，暂不可删除" : "删除知识库"}
                         >
                             <Trash2 className="w-4 h-4" />
                         </button>
@@ -99,7 +121,7 @@ export function NovelVersionsCard({ novelId, novelName }: { novelId: string, nov
                         <div className="flex gap-2">
                             <button
                                 onClick={() => deleteNovelMutation.mutate()}
-                                disabled={deleteNovelMutation.isPending}
+                                disabled={deleteNovelMutation.isPending || hasRunningTasks}
                                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-red-500 text-white text-xs font-semibold hover:bg-red-600 disabled:opacity-60 transition-colors"
                             >
                                 {deleteNovelMutation.isPending ? (
@@ -138,6 +160,7 @@ export function NovelVersionsCard({ novelId, novelName }: { novelId: string, nov
                                 version={v}
                                 onDelete={() => deleteVersionMutation.mutate(v)}
                                 isPending={deleteVersionMutation.isPending}
+                                disabled={hasRunningTasks}
                                 stat={undefined}
                             />
                         ))}

@@ -4,6 +4,7 @@ import com.novel.splitter.application.config.RabbitConfig;
 import com.novel.splitter.application.service.knowledge.KnowledgeBaseService;
 import com.novel.splitter.application.model.dto.SceneDto;
 import com.novel.splitter.application.mapper.DtoMapper;
+import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.domain.task.CleanupTask;
 import com.novel.splitter.domain.task.CleanupTaskMessage;
 import com.novel.splitter.domain.model.paging.PageQuery;
@@ -20,6 +21,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 
 import java.util.List;
 
@@ -36,6 +39,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
     private final CleanupTaskRepository cleanupTaskRepository;
     private final RabbitTemplate rabbitTemplate;
     private final DtoMapper dtoMapper;
+    private final TaskService taskService;
     
     @org.springframework.beans.factory.annotation.Value("${splitter.storage.root-path}")
     private String novelStoragePath;
@@ -94,6 +98,9 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         String novelId = novelRepository.findByTitle(normalizedNovelName)
                 .map(n -> n.getId())
                 .orElseThrow(() -> new IllegalArgumentException("novel not found by title: " + normalizedNovelName));
+        if (taskService.hasActiveTasksForNovelId(novelId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Novel has running tasks; cannot delete version right now.");
+        }
 
         log.info("Logical deleting version: novelId={}/{}", novelId, version);
         sceneRepository.deleteVersionByNovelId(novelId, version);
@@ -157,6 +164,9 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         if (normalizedNovelId == null || normalizedNovelId.isEmpty()) {
             throw new IllegalArgumentException("novelId must not be blank");
         }
+        if (taskService.hasActiveTasksForNovelId(normalizedNovelId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Novel has running tasks; cannot delete knowledge base right now.");
+        }
 
         String novelName = novelRepository.findById(normalizedNovelId)
                 .map(n -> n.getTitle() != null && !n.getTitle().isBlank() ? n.getTitle() : n.getId())
@@ -212,6 +222,9 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         }
         if (version == null || version.isBlank()) {
             throw new IllegalArgumentException("version must not be blank");
+        }
+        if (taskService.hasActiveTasksForNovelId(normalizedNovelId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Novel has running tasks; cannot delete version right now.");
         }
 
         String trimmedVersion = version.trim();

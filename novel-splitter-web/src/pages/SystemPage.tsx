@@ -30,6 +30,8 @@ export default function SystemPage() {
         refetchInterval: 5000,
     });
 
+    const titleById = new Map((novels ?? []).map(n => [n.novelId, n.title] as const));
+
     return (
         <div className="max-w-4xl mx-auto space-y-8">
             <div className="flex flex-col gap-2">
@@ -111,7 +113,8 @@ export default function SystemPage() {
                                     ) : tasks?.slice(0, 4).map((task) => (
                                         <tr key={task.taskId} className="hover:bg-gray-50/50">
                                             <td className="px-4 py-3">
-                                                <div className="font-medium text-gray-900">{task.novelId}</div>
+                                                <div className="font-medium text-gray-900">{titleById.get(task.novelId) ?? task.novelId}</div>
+                                                <div className="text-xs text-gray-500 font-mono mt-0.5">{task.novelId}</div>
                                                 <div className="text-xs text-gray-500 font-mono mt-0.5">{task.version}</div>
                                             </td>
                                             <td className="px-4 py-3">

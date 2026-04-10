@@ -32,6 +32,10 @@
         </dependency>
         <dependency>
             <groupId>com.novel.splitter</groupId>
+            <artifactId>text-processing</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.novel.splitter</groupId>
             <artifactId>novelDownloader</artifactId>
         </dependency>
         <dependency>
