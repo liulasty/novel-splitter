@@ -84,7 +84,8 @@ public class EmbedWorker {
                         "chunkSize", chunkSize,
                         "chunkOverlap", chunkOverlap));
             } catch (Exception e) {
-                throw new IllegalStateException("Failed to cleanup vectors for novelId=" + novelId + " version=" + version, e);
+                throw new IllegalStateException("Failed to cleanup vectors for novelId=" + novelId + " version=" + version
+                        + " chunk=" + chunkSize + "/" + chunkOverlap, e);
             }
 
             int page = 0;

@@ -100,7 +100,8 @@ public class SplitWorker {
                         "chunkSize", chunkParams.chunkSize(),
                         "chunkOverlap", chunkParams.chunkOverlap()));
             } catch (Exception e) {
-                throw new IllegalStateException("Failed to cleanup Chroma vectors for novelId=" + novelId + " version=" + version, e);
+                throw new IllegalStateException("Failed to cleanup Chroma vectors for novelId=" + novelId + " version=" + version
+                        + " chunk=" + chunkParams.chunkSize() + "/" + chunkParams.chunkOverlap(), e);
             }
 
             String novelTitle = novelId != null ? novelService.getNovelById(novelId).getTitle() : null;

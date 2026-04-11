@@ -1,5 +1,6 @@
 package com.novel.splitter.infrastructure.persistence.repository;
 
+import com.novel.splitter.domain.model.SceneCountByProfile;
 import com.novel.splitter.infrastructure.persistence.entity.JpaSceneEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -68,9 +69,10 @@ public interface JpaSceneRepository extends JpaRepository<JpaSceneEntity, Long>,
     @Query("SELECT DISTINCT s.version, s.chunkSize, s.chunkOverlap FROM JpaSceneEntity s WHERE s.novel.id = ?1")
     List<Object[]> findDistinctProfilesByNovelId(String novelId);
 
-    @Query("SELECT s.novel.id, s.version, s.chunkSize, s.chunkOverlap, COUNT(s) FROM JpaSceneEntity s "
+    @Query("SELECT new com.novel.splitter.domain.model.SceneCountByProfile("
+            + "s.novel.id, s.version, s.chunkSize, s.chunkOverlap, COUNT(s)) FROM JpaSceneEntity s "
             + "GROUP BY s.novel.id, s.version, s.chunkSize, s.chunkOverlap")
-    List<Object[]> countScenesByNovelVersionAndChunk();
+    List<SceneCountByProfile> countScenesByNovelVersionAndChunk();
 
     interface SceneLightweightProjection {
         Long getId();

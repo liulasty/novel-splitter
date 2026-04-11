@@ -16,6 +16,7 @@ import com.novel.splitter.domain.enums.TaskType;
 import com.novel.splitter.domain.task.EmbedTaskMessage;
 import com.novel.splitter.application.model.dto.DownloadAndIngestRequest;
 import com.novel.splitter.application.model.dto.IngestRequest;
+import com.novel.splitter.domain.model.SceneCountByProfile;
 import com.novel.splitter.domain.model.paging.PageQuery;
 import com.novel.splitter.domain.model.paging.PagedResult;
 import com.novel.splitter.domain.repository.ChapterRepository;
@@ -77,16 +78,16 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
 
     @Override
     public List<NovelStatRecordDto> getNovelStats() {
-        List<Object[]> sceneCounts = sceneRepository.countScenesByNovelVersionAndChunk();
+        List<SceneCountByProfile> sceneCounts = sceneRepository.countScenesByNovelVersionAndChunk();
 
         // novelId -> (profile label -> scene count)
         Map<String, Map<String, Long>> novelProfileCounts = new HashMap<>();
-        for (Object[] row : sceneCounts) {
-            String novelId = (String) row[0];
-            String version = (String) row[1];
-            Integer chunkSize = row[2] != null ? ((Number) row[2]).intValue() : null;
-            Integer chunkOverlap = row[3] != null ? ((Number) row[3]).intValue() : null;
-            long count = ((Number) row[4]).longValue();
+        for (SceneCountByProfile row : sceneCounts) {
+            String novelId = row.novelId();
+            String version = row.version();
+            Integer chunkSize = row.chunkSize();
+            Integer chunkOverlap = row.chunkOverlap();
+            long count = row.sceneCount() != null ? row.sceneCount() : 0L;
             String label = SceneSplitProfileDto.builder()
                     .version(version)
                     .chunkSize(chunkSize)
@@ -411,6 +412,9 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
     public TaskSubmitResponseDto ingest(IngestRequest request) throws IOException {
         // 保留原有的 ingest 作为向前兼容，或者直接复用
         log.info("接收到原 ingest 请求: {}", request);
+        if (request == null) {
+            throw new IllegalArgumentException("request must not be null");
+        }
 
         novelStorageService.resolveExistingNovelPath(request.getFileName());
         ensureChapterTitleRegexValid(request.getChapterTitleRegex());

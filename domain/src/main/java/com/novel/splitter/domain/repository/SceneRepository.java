@@ -1,6 +1,7 @@
 package com.novel.splitter.domain.repository;
 
 import com.novel.splitter.domain.model.Scene;
+import com.novel.splitter.domain.model.SceneCountByProfile;
 import com.novel.splitter.domain.model.SceneSplitProfile;
 import com.novel.splitter.domain.model.paging.PagedResult;
 import com.novel.splitter.domain.model.paging.PageQuery;
@@ -55,7 +56,7 @@ public interface SceneRepository {
     PagedResult<Scene> findByNovelIdAndChapterId(String novelId, Long chapterId, PageQuery pageQuery);
 
     /**
-     * 统计：novelId, version, chunkSize, chunkOverlap, count
+     * 统计：按 novelId、version、chunk 分组后的场景数量。
      */
-    List<Object[]> countScenesByNovelVersionAndChunk();
+    List<SceneCountByProfile> countScenesByNovelVersionAndChunk();
 }

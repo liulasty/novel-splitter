@@ -1,6 +1,7 @@
 package com.novel.splitter.infrastructure.persistence.repository.impl;
 
 import com.novel.splitter.domain.model.Scene;
+import com.novel.splitter.domain.model.SceneCountByProfile;
 import com.novel.splitter.domain.model.SceneMetadata;
 import com.novel.splitter.domain.model.SceneSplitProfile;
 import com.novel.splitter.domain.model.paging.PageQuery;
@@ -220,7 +221,7 @@ public class SceneRepositoryJpaImpl implements SceneRepository {
     }
 
     @Override
-    public List<Object[]> countScenesByNovelVersionAndChunk() {
+    public List<SceneCountByProfile> countScenesByNovelVersionAndChunk() {
         return jpaSceneRepository.countScenesByNovelVersionAndChunk();
     }
 
