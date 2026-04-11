@@ -206,7 +206,7 @@ public class SceneAssembler {
         int currentLength = 0; // 当前缓冲区的文本总长度
         int start = workParagraphs.get(0).getIndex();
         int sceneStartParaIdx = start; // 记录当前正在构建的 Scene 的起始段落索引（已剔除章节标题行）
-        String previousContext = ""; // 记录上一个 Scene 的上下文尾部，用于 RAG 上下文重叠 (Phase 3 需求)
+        String previousContext = null; // 上一个 Scene 的末尾上下文；首块无前文则为 null
 
         for (SemanticSegment seg : segments) {
             // 评估在当前语义段之后是否需要进行场景切分
@@ -236,7 +236,8 @@ public class SceneAssembler {
                 String sceneText = scene.getText();
                 int contextLength = Math.min(sceneText.length(), 200);
                 // 注意：getText() 可能包含末尾换行符，提取后需进行 trim 处理
-                previousContext = sceneText.substring(Math.max(0, sceneText.length() - contextLength)).trim();
+                String tail = sceneText.substring(Math.max(0, sceneText.length() - contextLength)).trim();
+                previousContext = tail.isEmpty() ? null : tail;
 
                 // 清空缓冲区，准备构建下一个 Scene
                 buffer.clear();
