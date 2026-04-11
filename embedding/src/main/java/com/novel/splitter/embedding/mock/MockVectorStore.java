@@ -83,7 +83,7 @@ public class MockVectorStore implements VectorStore {
             SceneMetadata meta = metadataMap.get(id);
             Map<String, Object> metaMap = new HashMap<>();
             if (meta != null) {
-                if (meta.getNovel() != null) metaMap.put("novel", meta.getNovel());
+                if (meta.getNovel() != null) metaMap.put("novelId", meta.getNovel());
                 if (meta.getVersion() != null) metaMap.put("version", meta.getVersion());
                 // include other metadata if needed
             }

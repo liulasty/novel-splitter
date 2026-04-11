@@ -77,6 +77,9 @@ export interface NovelPipelineRequestDto {
   maxScenes?: number;
 }
 
+/** 与 GET /api/novels/summaries?scope= 对齐 */
+export type NovelSummaryScope = 'all' | 'embed_ready';
+
 export const novelApi = {
   getDashboardStats: async (): Promise<DashboardStatsDto> => {
     const response = await apiClient.get<ApiEnvelope<DashboardStatsDto>, DashboardStatsDto>('/stats/dashboard');
@@ -88,9 +91,16 @@ export const novelApi = {
     return response;
   },
 
-  // DB-first novel list (recommended)
-  getNovels: async (): Promise<NovelSummaryDto[]> => {
-    const response = await apiClient.get<ApiEnvelope<NovelSummaryDto[]>, NovelSummaryDto[]>('/novels/db');
+  /**
+   * DB 小说摘要列表（按页面职责选用 scope）。
+   * - all：入库/运维/知识库总览等
+   * - embed_ready：仅向量化已完成，用于 RAG 调试与对话选书
+   */
+  getNovelSummaries: async (scope: NovelSummaryScope = 'all'): Promise<NovelSummaryDto[]> => {
+    const response = await apiClient.get<ApiEnvelope<NovelSummaryDto[]>, NovelSummaryDto[]>(
+      '/novels/summaries',
+      { params: { scope } }
+    );
     return response;
   },
 
@@ -117,13 +127,39 @@ export const novelApi = {
     return response;
   },
 
-  splitNovel: async (novelId: string, request: NovelSplitRequestDto): Promise<TaskSubmitResponse> => {
-    const response = await apiClient.post<ApiEnvelope<TaskSubmitResponse>, TaskSubmitResponse>(`/novels/${novelId}/split`, request);
+  /** 后端 IngestRequest 要求 fileName 非空，占位即可（实际以 novelId 对应 DB 为准） */
+  splitNovel: async (
+    novelId: string,
+    request: { maxScenes?: number; version?: string }
+  ): Promise<TaskSubmitResponse> => {
+    const response = await apiClient.post<ApiEnvelope<TaskSubmitResponse>, TaskSubmitResponse>(
+      `/novels/${encodeURIComponent(novelId)}/split`,
+      {
+        fileName: 'placeholder.txt',
+        maxScenes: request.maxScenes ?? 0,
+        version: request.version ?? 'v1',
+      }
+    );
     return response;
   },
 
-  embedNovel: async (novelId: string): Promise<TaskSubmitResponse> => {
-    const response = await apiClient.post<ApiEnvelope<TaskSubmitResponse>, TaskSubmitResponse>(`/novels/${novelId}/embed`);
+  loadNovel: async (
+    novelId: string,
+    body?: { version?: string; force?: boolean }
+  ): Promise<TaskSubmitResponse> => {
+    const response = await apiClient.post<ApiEnvelope<TaskSubmitResponse>, TaskSubmitResponse>(
+      `/novels/${encodeURIComponent(novelId)}/load`,
+      body ?? {}
+    );
+    return response;
+  },
+
+  embedNovel: async (novelId: string, version?: string): Promise<TaskSubmitResponse> => {
+    const response = await apiClient.post<ApiEnvelope<TaskSubmitResponse>, TaskSubmitResponse>(
+      `/novels/${encodeURIComponent(novelId)}/embed`,
+      undefined,
+      version ? { params: { version } } : undefined
+    );
     return response;
   },
 

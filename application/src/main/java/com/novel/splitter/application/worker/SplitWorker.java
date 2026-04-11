@@ -8,6 +8,7 @@ import com.novel.splitter.domain.enums.TaskType;
 import com.novel.splitter.pipeline.orchestrator.SplitNovelUseCase;
 import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.application.service.novel.NovelService;
+import com.novel.splitter.application.support.TaskFailureFormatter;
 import com.novel.splitter.domain.enums.NovelStatus;
 import com.novel.splitter.domain.repository.SceneRepository;
 import com.novel.splitter.embedding.api.VectorStore;
@@ -47,11 +48,23 @@ public class SplitWorker {
             SplitTask task = taskService.getTask(taskId);
             if (task == null) {
                 log.warn("任务 {} 在内存中不存在，可能由于服务重启，正在尝试自动重建...", taskId);
+                TaskType tt = TaskType.SPLIT;
+                if (message.getTaskTypeForRecovery() != null && !message.getTaskTypeForRecovery().isBlank()) {
+                    try {
+                        tt = TaskType.valueOf(message.getTaskTypeForRecovery().trim());
+                    } catch (IllegalArgumentException ignored) {
+                        tt = TaskType.SPLIT;
+                    }
+                }
+                if (tt != TaskType.PIPELINE && tt != TaskType.SPLIT) {
+                    tt = TaskType.SPLIT;
+                }
+                String fileName = novelService.getNovelById(message.getNovelId()).getFilePath();
                 task = taskService.createTask(
                         taskId,
-                        TaskType.SPLIT,
+                        tt,
                         message.getNovelId(),
-                        message.getNovelId(),
+                        fileName,
                         message.getMaxScenes(),
                         message.getVersion()
                 );
@@ -135,7 +148,9 @@ public class SplitWorker {
             
         } catch (Exception e) {
             log.error("处理任务 {} 时发生异常", taskId, e);
-            taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.FAILED, 0, "切分失败: " + e.getMessage());
+            String failMsg = TaskFailureFormatter.format("SPLIT",
+                    TaskFailureFormatter.params("novelId", message.getNovelId(), "taskId", taskId), e);
+            taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.FAILED, 0, failMsg);
             if (message.getNovelId() != null) {
                 novelService.updateNovelStatus(message.getNovelId(), NovelStatus.FAILED);
             }

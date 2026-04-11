@@ -1,6 +1,7 @@
 package com.novel.splitter.application.service.rag;
 
 import com.novel.splitter.assembler.api.ContextAssembler;
+import com.novel.splitter.assembler.config.AssemblerConfig;
 import com.novel.splitter.domain.model.Answer;
 import com.novel.splitter.domain.model.AnswerType;
 import com.novel.splitter.domain.model.ContextBlock;
@@ -31,15 +32,15 @@ public class RagOrchestrationService implements RagFacade {
     private final RobustLlmClient llmClient;
     private final ContextAssembler contextAssembler;
     private final RagProperties ragProperties;
-    private final com.novel.splitter.assembler.config.AssemblerConfig assemblerConfig;
+    private final AssemblerConfig assemblerConfig;
 
     @Override
     public Answer ask(com.novel.splitter.retrieval.dto.RagRequest request) {
-        return ask(request.getQuestion(), request.getTopK(), request.getNovel(), request.getVersion());
+        return ask(request.getQuestion(), request.getTopK(), request.getNovelId(), request.getVersion());
     }
 
     @Override
-    public Answer ask(String question, int topK, String novel, String version) {
+    public Answer ask(String question, int topK, String novelId, String version) {
         long startTime = System.currentTimeMillis();
         StopWatch stopWatch = new StopWatch("RAG Request");
 
@@ -57,7 +58,7 @@ public class RagOrchestrationService implements RagFacade {
             com.novel.splitter.retrieval.dto.RagRequest retrievalRequest = new com.novel.splitter.retrieval.dto.RagRequest();
             retrievalRequest.setQuestion(question);
             retrievalRequest.setTopK(topK);
-            retrievalRequest.setNovel(novel);
+            retrievalRequest.setNovelId(novelId);
             retrievalRequest.setVersion(version);
             List<Scene> scenes = ragRetrievalService.retrieve(retrievalRequest);
             stopWatch.stop();

@@ -45,7 +45,7 @@ export default function RagDebugPage() {
   const [contextSortAsc, setContextSortAsc] = useState(false);
 
   useEffect(() => {
-    novelApi.getNovels()
+    novelApi.getNovelSummaries('embed_ready')
       .then((list) => setNovels(list.map(n => ({ novelId: n.novelId, title: n.title }))))
       .catch(console.error);
   }, []);
@@ -72,7 +72,7 @@ export default function RagDebugPage() {
     try {
       const request: ChatRequest = {
         question,
-        novel: selectedNovel,
+        novelId: selectedNovel,
         version: selectedVersion,
         topK
       };
@@ -91,7 +91,7 @@ export default function RagDebugPage() {
               if (selectedNovel && selectedVersion) {
                 const records = await chromaAdminApi.getRecords(collection.id, {
                   where: {
-                    novel: selectedNovel,
+                    novelId: selectedNovel,
                     version: selectedVersion
                   },
                   limit: 1,

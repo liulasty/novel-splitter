@@ -84,7 +84,7 @@ public class Novel {
 
     public void checkCanReadChapters() {
         if (this.status == NovelStatus.PENDING || this.status == NovelStatus.SPLITTING) {
-            throw new IllegalStateException("小说正在切分中，请稍后再试");
+            throw new IllegalStateException("小说正在处理中，请稍后再试");
         }
     }
 }

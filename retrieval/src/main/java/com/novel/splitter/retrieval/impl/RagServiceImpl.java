@@ -33,20 +33,15 @@ public class RagServiceImpl implements RagRetrievalService {
     public List<Scene> retrieve(RagRequest request) {
         String question = request.getQuestion();
         int topK = normalizeTopK(request.getTopK());
-        String novel = request.getNovel();
+        String novelId = request.getNovelId();
         String version = request.getVersion();
 
-        log.info("Retrieval request: question='{}', topK={}, novel={}, version={}", question, topK, novel, version);
-
-        String novelId = novel;
-        if (novel != null) {
-            novelId = novel.replace(".txt", "");
-        }
+        log.info("Retrieval request: question='{}', topK={}, novelId={}, version={}", question, topK, novelId, version);
 
         int currentChapter = -1;
         RetrievalQuery query = queryBuilder.build(question, currentChapter);
         query.setTopK(topK);
-        query.setNovel(novelId);
+        query.setNovelId(novelId);
         query.setVersion(version);
         return retrievalService.retrieve(query);
     }

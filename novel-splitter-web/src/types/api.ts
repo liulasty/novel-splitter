@@ -8,7 +8,7 @@ export interface ApiResponse<T = any> {
 // Chat related interfaces
 export interface ChatRequest {
   question: string;
-  novel: string;
+  novelId: string;
   version: string;
   topK?: number;
 }

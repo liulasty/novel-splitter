@@ -65,6 +65,10 @@ public class MarkdownParagraphSplitter extends ParagraphSplitter {
             // 确保内容不为 null
             String content = trimmed == null ? "" : trimmed;
 
+            if (NovelLineNoiseFilter.shouldSkipParagraphLine(content)) {
+                continue;
+            }
+
             // 默认段落类型为普通文本
             ParagraphType type = ParagraphType.TEXT;
             // 默认不是锚点

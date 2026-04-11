@@ -1,11 +1,13 @@
 package com.novel.splitter.application.service.novel;
 
+import com.novel.splitter.application.model.NovelSummaryListScope;
 import com.novel.splitter.application.model.command.UploadNovelCommand;
 import com.novel.splitter.application.model.dto.DownloadAndIngestRequest;
 import com.novel.splitter.application.model.dto.IngestRequest;
 import com.novel.splitter.application.model.dto.NovelPipelineRequestDto;
 import com.novel.splitter.application.model.dto.NovelSummaryDto;
 import com.novel.splitter.application.model.dto.NovelUploadResponseDto;
+import com.novel.splitter.application.model.dto.LoadNovelRequestDto;
 import com.novel.splitter.application.model.dto.NovelStatRecordDto;
 import com.novel.splitter.application.model.dto.ChapterDto;
 import com.novel.splitter.application.model.dto.SceneDto;
@@ -19,7 +21,7 @@ public interface NovelFacadeService {
 
     List<String> listNovels() throws IOException;
 
-    List<NovelSummaryDto> listNovelsFromDb();
+    List<NovelSummaryDto> listNovelSummaries(NovelSummaryListScope scope);
 
     NovelUploadResponseDto uploadNovel(UploadNovelCommand command) throws IOException;
 
@@ -31,6 +33,13 @@ public interface NovelFacadeService {
     TaskSubmitResponseDto retrySplit(String novelId, SplitRetryRequestDto request) throws IOException;
 
     TaskSubmitResponseDto embed(String novelId) throws IOException;
+
+    TaskSubmitResponseDto embed(String novelId, String version) throws IOException;
+
+    /**
+     * 独立 Load：解析原文为 chapters + parsed JSON（不自动进入切分）。
+     */
+    TaskSubmitResponseDto load(String novelId, LoadNovelRequestDto request) throws IOException;
 
     TaskSubmitResponseDto pipeline(String novelId, NovelPipelineRequestDto request) throws IOException;
 

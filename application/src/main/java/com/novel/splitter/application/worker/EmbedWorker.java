@@ -9,6 +9,7 @@ import com.novel.splitter.domain.task.EmbedTaskMessage;
 import com.novel.splitter.domain.task.SplitTask;
 import com.novel.splitter.pipeline.orchestrator.EmbedNovelUseCase;
 import com.novel.splitter.application.service.task.TaskService;
+import com.novel.splitter.application.support.TaskFailureFormatter;
 import com.novel.splitter.domain.repository.SceneRepository;
 import com.novel.splitter.embedding.api.VectorStore;
 import com.google.common.util.concurrent.RateLimiter;
@@ -92,8 +93,7 @@ public class EmbedWorker {
                     totalScenes = scenePage.getTotalElements();
                     task.setTotalScenes((int) totalScenes);
                     if (totalScenes == 0) {
-                        log.warn("任务 {} 没有找到任何场景数据", taskId);
-                        break;
+                        throw new IllegalStateException("No scenes for novelId=" + novelId + " version=" + version + "; run split first");
                     }
                 }
                 
@@ -131,7 +131,9 @@ public class EmbedWorker {
             
         } catch (Exception e) {
             log.error("处理任务 {} 时发生异常", taskId, e);
-            taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.FAILED, 0, "向量化失败: " + e.getMessage());
+            String failMsg = TaskFailureFormatter.format("EMBED",
+                    TaskFailureFormatter.params("novelId", novelId, "version", version, "taskId", taskId), e);
+            taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.FAILED, 0, failMsg);
             if (novelId != null) {
                 novelService.updateNovelStatus(novelId, NovelStatus.FAILED);
             }

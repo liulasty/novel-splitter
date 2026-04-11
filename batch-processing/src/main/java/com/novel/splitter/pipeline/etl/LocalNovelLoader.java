@@ -1,5 +1,6 @@
 package com.novel.splitter.pipeline.etl;
 
+import com.novel.splitter.core.NovelLineNoiseFilter;
 import com.novel.splitter.domain.model.Chapter;
 import com.novel.splitter.domain.model.Novel;
 import com.novel.splitter.domain.model.RawParagraph;
@@ -57,7 +58,11 @@ public class LocalNovelLoader {
             
             while ((line = reader.readLine()) != null) {
                 // Clean content: trim whitespace
-                String content = line.trim(); 
+                String content = line.trim();
+                if (NovelLineNoiseFilter.shouldSkipParagraphLine(content)) {
+                    lineIndex++;
+                    continue;
+                }
                 boolean isEmpty = content.isEmpty();
                 
                 // Check for chapter title

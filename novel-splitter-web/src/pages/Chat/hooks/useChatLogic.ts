@@ -26,7 +26,10 @@ export function useChatLogic() {
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    const { data: novelSummaries } = useQuery({ queryKey: ['novels'], queryFn: novelApi.getNovels });
+    const { data: novelSummaries } = useQuery({
+        queryKey: ['novelSummaries', 'embed_ready'],
+        queryFn: () => novelApi.getNovelSummaries('embed_ready'),
+    });
     const novels: Array<Pick<NovelSummaryDto, 'novelId' | 'title'>> = novelSummaries?.map(n => ({ novelId: n.novelId, title: n.title })) ?? [];
     const { data: versions } = useQuery({
         queryKey: ['versions', selectedNovel],
@@ -71,8 +74,7 @@ export function useChatLogic() {
         setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', content: inputValue }]);
         const q = inputValue;
         setInputValue("");
-        // Backend chat still uses "novel" as a name-like identifier; keep passing novelId for DB-first routing.
-        chatMutation.mutate({ question: q, novel: selectedNovel, version: selectedVersion, topK });
+        chatMutation.mutate({ question: q, novelId: selectedNovel, version: selectedVersion, topK });
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {

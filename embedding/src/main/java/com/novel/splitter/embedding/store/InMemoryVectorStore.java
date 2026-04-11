@@ -141,7 +141,7 @@ public class InMemoryVectorStore implements VectorStore {
                 Object actual = null;
                 
                 // 简单的字段映射：目前仅支持对 novel 和 version 字段的过滤
-                if ("novel".equals(key)) actual = meta.getNovel();
+                if ("novelId".equals(key) || "novel".equals(key)) actual = meta.getNovel();
                 else if ("version".equals(key)) actual = meta.getVersion();
                 
                 if (!Objects.equals(actual, expected)) {
@@ -242,7 +242,7 @@ public class InMemoryVectorStore implements VectorStore {
                     Object actual = null;
                     
                     // Simple field mapping (简单的字段映射，提取实际值用于比较)
-                    if ("novel".equals(key)) actual = meta.getNovel();
+                    if ("novelId".equals(key) || "novel".equals(key)) actual = meta.getNovel();
                     else if ("version".equals(key)) actual = meta.getVersion();
                     
                     if (!Objects.equals(actual, expected)) {
@@ -262,7 +262,7 @@ public class InMemoryVectorStore implements VectorStore {
             Map<String, Object> metaMap = new HashMap<>();
             // 组装返回结果中的元数据字典
             if (meta != null) {
-                if (meta.getNovel() != null) metaMap.put("novel", meta.getNovel());
+                if (meta.getNovel() != null) metaMap.put("novelId", meta.getNovel());
                 if (meta.getVersion() != null) metaMap.put("version", meta.getVersion());
             }
 

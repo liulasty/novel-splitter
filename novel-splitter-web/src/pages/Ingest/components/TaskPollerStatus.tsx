@@ -18,8 +18,8 @@ export function TaskPollerStatus({ tasks, poller, onManualRefresh }: TaskPollerS
   if (!tasks || tasks.length === 0) return null;
 
   const { data: novels } = useQuery({
-    queryKey: ['novels'],
-    queryFn: novelApi.getNovels,
+    queryKey: ['novelSummaries', 'all'],
+    queryFn: () => novelApi.getNovelSummaries('all'),
   });
 
   const titleById = new Map((novels ?? []).map(n => [n.novelId, n.title] as const));
@@ -46,6 +46,9 @@ export function TaskPollerStatus({ tasks, poller, onManualRefresh }: TaskPollerS
         const isTimeout = poller.timeoutTaskIds.includes(task.taskId);
         const novelTitle = task.novelTitle ?? titleById.get(task.novelId);
         const displayName = novelTitle || task.fileName || task.novelId;
+        const tt = task.taskType || 'SPLIT';
+        const phaseLabel =
+          tt === 'EMBED' ? '向量化' : tt === 'LOAD' ? 'Load' : tt === 'PIPELINE' ? '流水线' : '切分';
 
         return (
           <div key={task.taskId} className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-xl shadow-sm">
@@ -53,7 +56,7 @@ export function TaskPollerStatus({ tasks, poller, onManualRefresh }: TaskPollerS
               <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
               <div>
                 <div className="text-sm font-medium text-gray-800">
-                  {task.taskType === 'EMBED' ? '向量化' : '切分'}任务: {displayName}
+                  {phaseLabel}任务: {displayName}
                   {!novelTitle && task.novelId && (
                     <span className="ml-2 text-xs text-gray-400 font-mono">({task.novelId})</span>
                   )}

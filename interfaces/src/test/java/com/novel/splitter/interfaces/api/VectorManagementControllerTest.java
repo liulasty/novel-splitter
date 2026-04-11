@@ -90,7 +90,7 @@ class VectorManagementControllerTest {
     void shouldDelegateDeleteToService() throws Exception {
         mockMvc.perform(delete("/api/admin/vector")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of("novel", "demo"))))
+                        .content(objectMapper.writeValueAsString(Map.of("novelId", "demo"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200));
 

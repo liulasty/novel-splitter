@@ -1,6 +1,8 @@
 package com.novel.splitter.application.service.novel;
 
+import com.novel.splitter.application.model.NovelSummaryListScope;
 import com.novel.splitter.application.model.command.UploadNovelCommand;
+import com.novel.splitter.application.model.dto.LoadNovelRequestDto;
 import com.novel.splitter.application.model.dto.NovelUploadResponseDto;
 import com.novel.splitter.application.model.dto.NovelPipelineRequestDto;
 import com.novel.splitter.application.model.dto.TaskSubmitResponseDto;
@@ -9,6 +11,7 @@ import com.novel.splitter.application.mapper.DtoMapper;
 import com.novel.splitter.application.service.download.DownloadService;
 import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.application.port.out.TaskQueuePort;
+import com.novel.splitter.domain.enums.NovelStatus;
 import com.novel.splitter.domain.enums.TaskType;
 import com.novel.splitter.domain.task.EmbedTaskMessage;
 import com.novel.splitter.application.model.dto.DownloadAndIngestRequest;
@@ -49,6 +52,8 @@ import java.util.stream.Collectors;
 public class NovelFacadeServiceImpl implements NovelFacadeService {
 
     private static final String DEFAULT_VERSION = "v1";
+    /** 与 spring.servlet.multipart.max-file-size 默认 50MB 对齐 */
+    private static final long MAX_UPLOAD_BYTES = 52_428_800L;
 
     private final NovelStorageService novelStorageService;
     private final NovelService novelService;
@@ -156,9 +161,11 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
     }
 
     @Override
-    public List<NovelSummaryDto> listNovelsFromDb() {
+    public List<NovelSummaryDto> listNovelSummaries(NovelSummaryListScope scope) {
+        NovelSummaryListScope s = scope != null ? scope : NovelSummaryListScope.ALL;
         return novelService.listNovels().stream()
                 .filter(n -> n != null && !n.isDeleted())
+                .filter(n -> s != NovelSummaryListScope.EMBED_READY || n.getStatus() == NovelStatus.COMPLETED)
                 .map(n -> NovelSummaryDto.builder()
                         .novelId(n.getId())
                         .title(n.getTitle())
@@ -174,7 +181,17 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
     @Override
     public NovelUploadResponseDto uploadNovel(UploadNovelCommand command) throws IOException {
         if (command == null || command.content() == null) {
-            throw new IllegalArgumentException("upload content is required");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "upload content is required");
+        }
+        String name = command.originalFilename();
+        if (name == null || !name.toLowerCase(Locale.ROOT).endsWith(".txt")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "仅支持 .txt 文件");
+        }
+        if (command.sizeBytes() == 0L) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "文件为空");
+        }
+        if (command.sizeBytes() > 0 && command.sizeBytes() > MAX_UPLOAD_BYTES) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "文件过大，最大允许 " + (MAX_UPLOAD_BYTES / (1024 * 1024)) + "MB");
         }
         String novelId = novelService.createNovel(command.content(), command.originalFilename(), command.title(), command.author(), command.description());
         return NovelUploadResponseDto.builder()
@@ -194,6 +211,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
             throw new IllegalArgumentException("novelId must not be blank");
         }
         String id = novelId.trim();
+        assertNoActiveTasks(id);
         com.novel.splitter.domain.model.Novel novel = novelService.getNovelById(id);
         if (novel == null) {
             throw new IllegalArgumentException("Novel not found: " + id);
@@ -216,8 +234,10 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         String version = normalizeVersion(request != null ? request.getVersion() : null);
         boolean triggerEmbed = request != null && request.isTriggerEmbed();
 
-        taskService.createTask(taskId, TaskType.SPLIT, id, novel.getFilePath(), maxScenes, version);
+        TaskType retryType = triggerEmbed ? TaskType.PIPELINE : TaskType.SPLIT;
+        taskService.createTask(taskId, retryType, id, novel.getFilePath(), maxScenes, version);
         SplitTaskMessage message = new SplitTaskMessage(taskId, id, maxScenes, version, triggerEmbed);
+        message.setTaskTypeForRecovery(retryType.name());
         taskQueuePort.sendSplit(message);
         log.info("Sent taskId {} to split queue for retrySplit", taskId);
 
@@ -234,14 +254,17 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         if (novel == null) {
             throw new IllegalArgumentException("Novel not found: " + novelId);
         }
+        assertNoActiveTasks(novel.getId());
 
         String taskId = UUID.randomUUID().toString();
         int maxScenes = request.getMaxScenes() > 0 ? request.getMaxScenes() : Integer.MAX_VALUE;
         String version = normalizeVersion(request.getVersion());
 
-        taskService.createTask(taskId, TaskType.SPLIT, novelId, novel.getFilePath(), maxScenes, version);
+        TaskType pipelineType = triggerEmbed ? TaskType.PIPELINE : TaskType.SPLIT;
+        taskService.createTask(taskId, pipelineType, novelId, novel.getFilePath(), maxScenes, version);
         
         SplitTaskMessage message = new SplitTaskMessage(taskId, novelId, maxScenes, version, triggerEmbed);
+        message.setTaskTypeForRecovery(pipelineType.name());
         taskQueuePort.sendLoad(message);
         log.info("Sent taskId {} to load queue for split", taskId);
 
@@ -252,21 +275,58 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
     }
 
     @Override
+    public TaskSubmitResponseDto load(String novelId, LoadNovelRequestDto request) throws IOException {
+        if (novelId == null || novelId.isBlank()) {
+            throw new IllegalArgumentException("novelId must not be blank");
+        }
+        String id = novelId.trim();
+        assertNoActiveTasks(id);
+        com.novel.splitter.domain.model.Novel novel = novelService.getNovelById(id);
+        String version = normalizeVersion(request != null ? request.getVersion() : null);
+        boolean force = request != null && request.isForce();
+
+        String taskId = UUID.randomUUID().toString();
+        taskService.createTask(taskId, TaskType.LOAD, id, novel.getFilePath(), 0, version);
+        SplitTaskMessage message = new SplitTaskMessage(taskId, id, 0, version, false);
+        message.setForceReload(force);
+        message.setTaskTypeForRecovery(TaskType.LOAD.name());
+        taskQueuePort.sendLoad(message);
+        log.info("Sent taskId {} to load queue (standalone LOAD)", taskId);
+
+        return TaskSubmitResponseDto.builder()
+                .message("Load 任务已提交到队列")
+                .taskId(taskId)
+                .build();
+    }
+
+    @Override
     public TaskSubmitResponseDto embed(String novelId) throws IOException {
-        log.info("接收到向量化请求: novelId={}", novelId);
+        return embed(novelId, null);
+    }
+
+    @Override
+    public TaskSubmitResponseDto embed(String novelId, String version) throws IOException {
+        log.info("接收到向量化请求: novelId={}, version={}", novelId, version);
         
-        com.novel.splitter.domain.model.Novel novel = novelService.getNovelById(novelId);
-        if (novel == null) {
-            throw new IllegalArgumentException("Novel not found: " + novelId);
+        if (novelId == null || novelId.isBlank()) {
+            throw new IllegalArgumentException("novelId must not be blank");
+        }
+        String nid = novelId.trim();
+        assertNoActiveTasks(nid);
+
+        com.novel.splitter.domain.model.Novel novel = novelService.getNovelById(nid);
+        String v = normalizeVersion(version);
+
+        long sceneCount = sceneRepository.countByNovelIdAndVersion(nid, v);
+        if (sceneCount <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "暂无场景数据，请先完成切分。novelId=" + nid + ", version=" + v);
         }
 
         String taskId = UUID.randomUUID().toString();
-        // Here we assume the latest version or a default one if version is not provided in request
-        String version = DEFAULT_VERSION;
+        taskService.createTask(taskId, TaskType.EMBED, nid, novel.getFilePath(), Integer.MAX_VALUE, v);
         
-        taskService.createTask(taskId, TaskType.EMBED, novelId, novel.getFilePath(), Integer.MAX_VALUE, version);
-        
-        EmbedTaskMessage message = new EmbedTaskMessage(taskId, novelId, version);
+        EmbedTaskMessage message = new EmbedTaskMessage(taskId, nid, v);
         taskQueuePort.sendEmbed(message);
         log.info("Sent taskId {} to embed queue", taskId);
 
@@ -274,6 +334,12 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
                 .message("向量化任务已提交到队列")
                 .taskId(taskId)
                 .build();
+    }
+
+    private void assertNoActiveTasks(String novelId) {
+        if (taskService.hasActiveTasksForNovelId(novelId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "该小说存在进行中的任务，请结束后再试");
+        }
     }
 
     @Override
@@ -305,7 +371,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
             return splitTask;
         }
 
-        return embed(novelId);
+        return embed(novelId, request.getVersion());
     }
 
     @Override
@@ -322,6 +388,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         taskService.createTask(taskId, TaskType.SPLIT, novelId, request.getFileName(), maxScenes, version);
         
         SplitTaskMessage message = new SplitTaskMessage(taskId, novelId, maxScenes, version);
+        message.setTaskTypeForRecovery(TaskType.SPLIT.name());
         taskQueuePort.sendLoad(message);
         log.info("Sent taskId {} to load queue", taskId);
 

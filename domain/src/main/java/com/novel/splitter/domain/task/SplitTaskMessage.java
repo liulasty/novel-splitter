@@ -6,6 +6,12 @@ public class SplitTaskMessage {
     private int maxScenes;
     private String version;
     private boolean triggerEmbed;
+    /** true：忽略“已完整结构化”短路，强制清理并重新解析 */
+    private boolean forceReload;
+    /**
+     * 服务重启后 Worker 可能需重建任务行：与 DB 中 task_type 一致（SPLIT / PIPELINE）。
+     */
+    private String taskTypeForRecovery;
 
     public SplitTaskMessage() {}
 
@@ -35,4 +41,20 @@ public class SplitTaskMessage {
 
     public boolean isTriggerEmbed() { return triggerEmbed; }
     public void setTriggerEmbed(boolean triggerEmbed) { this.triggerEmbed = triggerEmbed; }
+
+    public boolean isForceReload() {
+        return forceReload;
+    }
+
+    public void setForceReload(boolean forceReload) {
+        this.forceReload = forceReload;
+    }
+
+    public String getTaskTypeForRecovery() {
+        return taskTypeForRecovery;
+    }
+
+    public void setTaskTypeForRecovery(String taskTypeForRecovery) {
+        this.taskTypeForRecovery = taskTypeForRecovery;
+    }
 }

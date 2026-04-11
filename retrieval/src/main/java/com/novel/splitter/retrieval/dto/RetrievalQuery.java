@@ -24,11 +24,10 @@ public class RetrievalQuery {
      */
     private String question;
 
-    /** 
-     * 目标小说名称 
-     * // 作为精确匹配的元数据过滤器，确保只在指定小说中进行检索 
+    /**
+     * 目标小说 ID（向量库 metadata 键 novelId）。
      */
-    private String novel;
+    private String novelId;
     
     /** 
      * 数据版本号 

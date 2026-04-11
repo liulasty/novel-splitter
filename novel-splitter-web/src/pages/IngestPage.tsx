@@ -23,7 +23,9 @@ export default function IngestPage() {
                     <span className="inline-flex items-center gap-1 bg-teal-100 text-teal-700 text-xs font-medium px-2 py-0.5 rounded-full mr-1">
                         <Database className="w-3 h-3" /> ChromaDB
                     </span>
-                    上传小说并配置切分参数，由 Worker 异步写入向量知识库
+                    上传后在库中登记小说；切分与向量化完成后，向量才会进入 Chroma 供检索。当前书可通过下拉、
+                    <span className="text-gray-600 font-medium">地址栏 ?novelId=</span>
+                    或上次会话恢复，避免离开页面后无法继续处理。
                 </p>
             </div>
 

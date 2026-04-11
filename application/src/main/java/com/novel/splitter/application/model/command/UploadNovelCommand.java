@@ -7,7 +7,9 @@ public record UploadNovelCommand(
         String originalFilename,
         String title,
         String author,
-        String description
+        String description,
+        /** multipart 大小，未知时 -1 */
+        long sizeBytes
 ) {
 }
 

@@ -50,6 +50,23 @@ export default function TasksPage() {
           <p className="text-sm text-gray-500 mt-1.5 leading-relaxed">
             监控队列任务进度，查看日志与事件，支持按小说 ID 过滤。
           </p>
+          <div className="flex flex-wrap gap-2 mt-3 text-xs">
+            <Link to="/tasks/load" className="px-2 py-1 rounded-lg bg-amber-50 text-amber-800 border border-amber-100 hover:bg-amber-100/80">
+              Load
+            </Link>
+            <Link to="/tasks/split" className="px-2 py-1 rounded-lg bg-blue-50 text-blue-800 border border-blue-100 hover:bg-blue-100/80">
+              Split
+            </Link>
+            <Link to="/tasks/embed" className="px-2 py-1 rounded-lg bg-violet-50 text-violet-800 border border-violet-100 hover:bg-violet-100/80">
+              Embed
+            </Link>
+            <Link to="/tasks/pipeline" className="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-100 hover:bg-emerald-100/80">
+              Pipeline
+            </Link>
+            <Link to="/tasks/dlq" className="px-2 py-1 rounded-lg bg-rose-50 text-rose-800 border border-rose-100 hover:bg-rose-100/80">
+              异常队列
+            </Link>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Link

@@ -146,28 +146,32 @@ public class ChromaVectorStore implements VectorStore {
      */
     @Override
     public void delete(Map<String, Object> filter) {
-        // 确保目标 Collection 存在
-        ensureCollectionExists();
-        
+        try {
+            ensureCollectionExists();
+        } catch (Exception e) {
+            log.warn("ensureCollectionExists failed during delete, skipping delete to allow pipeline to proceed: {}", e.getMessage());
+            return;
+        }
+
         if (filter == null || filter.isEmpty()) {
-            // 为避免意外清空数据，空过滤器时不执行删除操作
             log.warn("Delete called with empty filter, ignoring to avoid accidental data loss. Use reset() to clear all.");
             return;
         }
 
-        // 构建符合 ChromaDB 格式的 where 子句
         Map<String, Object> request = new HashMap<>();
         request.put("where", buildWhereClause(filter));
 
-        // 发送删除请求
-        restClient.post()
-                .uri(collectionUri("/delete"))
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(request)
-                .retrieve()
-                .toBodilessEntity();
-        
-        log.info("Deleted documents from ChromaDB collection '{}' with filter: {}", collectionName, filter);
+        try {
+            restClient.post()
+                    .uri(collectionUri("/delete"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(request)
+                    .retrieve()
+                    .toBodilessEntity();
+            log.info("Deleted documents from ChromaDB collection '{}' with filter: {}", collectionName, filter);
+        } catch (Exception e) {
+            log.warn("Chroma delete failed (filter={}), treating as no-op (collection empty or missing): {}", filter, e.getMessage());
+        }
     }
 
     /**

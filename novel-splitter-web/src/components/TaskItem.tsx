@@ -27,6 +27,14 @@ export function TaskItem({
     const currentMessage = task.message;
     const currentStatus = task.status;
     const taskType = task.taskType || 'SPLIT';
+    const typeLabel =
+        taskType === 'EMBED' ? '向量化' :
+        taskType === 'LOAD' ? 'Load' :
+        taskType === 'PIPELINE' ? '流水线' : '切分';
+    const typePillClass =
+        taskType === 'EMBED' ? 'bg-indigo-100 text-indigo-700' :
+        taskType === 'LOAD' ? 'bg-amber-100 text-amber-800' :
+        taskType === 'PIPELINE' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-700';
     const canDelete = currentStatus !== 'PENDING' && currentStatus !== 'PROCESSING';
     
     const cfg = STATUS_CONFIG[currentStatus as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.PENDING;
@@ -42,9 +50,9 @@ export function TaskItem({
                     {task.novelTitle || task.fileName || task.novelId}
                     <span className={cn(
                         "text-[10px] font-semibold px-1.5 py-0.5 rounded ml-1 tracking-wider uppercase",
-                        taskType === 'EMBED' ? "bg-indigo-100 text-indigo-700" : "bg-blue-100 text-blue-700"
+                        typePillClass
                     )}>
-                        {taskType === 'EMBED' ? '向量化' : '切分'}
+                        {typeLabel}
                     </span>
                     {task.version && (
                         <span className="text-[10px] font-semibold bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded ml-1">

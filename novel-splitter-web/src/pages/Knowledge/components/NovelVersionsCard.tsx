@@ -1,24 +1,64 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Loader2, Book, Trash2, AlertCircle } from "lucide-react";
+import { Link } from 'react-router-dom';
+import { Loader2, Book, Trash2, AlertCircle, FileInput } from "lucide-react";
 import { knowledgeApi } from "@/api/knowledgeApi";
 import { novelApi } from "@/api/novelApi";
 import { toast } from 'sonner';
 import { getApiErrorMessage, handleConflict409 } from "@/lib/apiError";
 import { VersionTag } from "./VersionTag";
+import { novelKnowledgePhase, type NovelKnowledgePhase } from "../novelKnowledgePhase";
+
+function accentClassForPhase(phase: NovelKnowledgePhase): string {
+    switch (phase) {
+        case 'ready':
+            return 'from-indigo-400 via-blue-400 to-cyan-400';
+        case 'awaitingSplit':
+            return 'from-amber-400 via-orange-300 to-amber-500';
+        case 'awaitingEmbed':
+            return 'from-sky-400 via-cyan-400 to-teal-400';
+        case 'processing':
+            return 'from-violet-400 via-indigo-400 to-purple-400';
+        case 'failed':
+            return 'from-red-400 via-rose-400 to-red-500';
+        default:
+            return 'from-slate-300 via-slate-400 to-slate-500';
+    }
+}
+
+function phaseBadge(phase: NovelKnowledgePhase): { label: string; className: string } {
+    switch (phase) {
+        case 'ready':
+            return { label: '可检索', className: 'bg-emerald-50 text-emerald-800 border-emerald-200' };
+        case 'awaitingSplit':
+            return { label: '等待切分', className: 'bg-amber-50 text-amber-900 border-amber-200' };
+        case 'awaitingEmbed':
+            return { label: '待向量化', className: 'bg-sky-50 text-sky-900 border-sky-200' };
+        case 'processing':
+            return { label: '处理中', className: 'bg-violet-50 text-violet-900 border-violet-200' };
+        case 'failed':
+            return { label: '失败', className: 'bg-red-50 text-red-800 border-red-200' };
+        default:
+            return { label: '未知', className: 'bg-slate-100 text-slate-700 border-slate-200' };
+    }
+}
 
 export function NovelVersionsCard({
     novelId,
     novelName,
     hasRunningTasks,
+    status,
 }: {
     novelId: string,
     novelName: string,
     hasRunningTasks: boolean,
+    status?: string | null,
 }) {
     const queryClient = useQueryClient();
     const [deleteConfirming, setDeleteConfirming] = useState(false);
+    const phase = novelKnowledgePhase(status);
+    const fetchVersions = phase !== 'awaitingSplit';
 
     useEffect(() => {
         setDeleteConfirming(false);
@@ -27,6 +67,7 @@ export function NovelVersionsCard({
     const { data: versions, isLoading, isError } = useQuery({
         queryKey: ['versions', novelId],
         queryFn: () => knowledgeApi.getVersionsByNovelId(novelId),
+        enabled: fetchVersions,
     });
 
     const deleteNovelMutation = useMutation({
@@ -37,7 +78,7 @@ export function NovelVersionsCard({
         },
         onSuccess: (cleanupTaskId) => {
             toast.success(`知识库 "${novelName}" 已删除，清理任务：${cleanupTaskId}`);
-            queryClient.invalidateQueries({ queryKey: ['novels'] });
+            queryClient.invalidateQueries({ queryKey: ['novelSummaries'] });
         },
         onError: (error: any) => {
             if (handleConflict409(error, '当前小说存在运行中任务，请等待任务完成后再删除知识库/版本')) {
@@ -66,11 +107,14 @@ export function NovelVersionsCard({
     });
 
     const versionCount = versions?.length ?? 0;
+    const badge = phaseBadge(phase);
+    const ingestLink = `/ingest?novelId=${encodeURIComponent(novelId)}`;
+    const secondaryTaskLink = '/tasks/pipeline';
 
     return (
         <Card className="relative overflow-hidden border border-slate-200 bg-white hover:border-slate-300 hover:shadow-md transition-all duration-200 group">
             {/* Top accent bar */}
-            <div className="h-0.5 w-full bg-gradient-to-r from-indigo-400 via-blue-400 to-cyan-400 opacity-60 group-hover:opacity-100 transition-opacity" />
+            <div className={`h-0.5 w-full bg-gradient-to-r ${accentClassForPhase(phase)} opacity-60 group-hover:opacity-100 transition-opacity`} />
 
             <CardHeader className="pb-3 pt-4 px-5">
                 <div className="flex items-start justify-between gap-2">
@@ -78,12 +122,19 @@ export function NovelVersionsCard({
                         <div className="p-1.5 rounded-lg bg-indigo-50 shrink-0">
                             <Book className="w-4 h-4 text-indigo-500" />
                         </div>
-                        <CardTitle
-                            className="text-base font-semibold text-slate-800 truncate leading-snug"
-                            title={novelName}
-                        >
-                            {novelName}
-                        </CardTitle>
+                        <div className="min-w-0 flex flex-col gap-1">
+                            <CardTitle
+                                className="text-base font-semibold text-slate-800 truncate leading-snug"
+                                title={novelName}
+                            >
+                                {novelName}
+                            </CardTitle>
+                            <span
+                                className={`inline-flex w-fit items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${badge.className}`}
+                            >
+                                {badge.label}
+                            </span>
+                        </div>
                     </div>
 
                     {/* Delete button — only show when not confirming */}
@@ -99,15 +150,42 @@ export function NovelVersionsCard({
                     )}
                 </div>
 
-                <CardDescription className="mt-1.5 ml-[2.375rem] text-xs text-slate-400">
-                    {isLoading ? (
-                        <span className="inline-flex items-center gap-1">
-                            <Loader2 className="w-3 h-3 animate-spin" /> 加载中…
+                <CardDescription className="mt-1.5 ml-[2.375rem] text-xs text-slate-500">
+                    {!fetchVersions ? (
+                        <span className="text-slate-500">
+                            尚未完成切分，不产生向量版本；与对话页「已就绪书目」不是同一类展示。
                         </span>
+                    ) : isLoading ? (
+                        <span className="inline-flex items-center gap-1 text-slate-400">
+                            <Loader2 className="w-3 h-3 animate-spin" /> 加载版本…
+                        </span>
+                    ) : phase === 'ready' ? (
+                        <span className="text-slate-600">{versionCount} 个向量版本</span>
                     ) : (
-                        <span>{versionCount} 个向量版本</span>
+                        <span className="text-slate-500">
+                            {versionCount > 0
+                                ? `${versionCount} 个版本（${phase === 'awaitingEmbed' ? '待写入向量库' : '处理流程中'}）`
+                                : '暂无向量版本'}
+                        </span>
                     )}
                 </CardDescription>
+                <div className="mt-2 ml-[2.375rem] flex flex-wrap gap-x-3 gap-y-1">
+                    <Link
+                        to={ingestLink}
+                        className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-800 hover:underline"
+                    >
+                        <FileInput className="w-3.5 h-3.5" />
+                        {phase === 'ready' ? '继续入库 / 维护' : '去入库处理'}
+                    </Link>
+                    {(phase === 'awaitingSplit' || phase === 'awaitingEmbed' || phase === 'failed' || phase === 'processing') && (
+                        <Link
+                            to={secondaryTaskLink}
+                            className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-800 hover:underline"
+                        >
+                            任务 / Pipeline
+                        </Link>
+                    )}
+                </div>
             </CardHeader>
 
             <CardContent className="px-5 pb-5 pt-0">
@@ -143,7 +221,11 @@ export function NovelVersionsCard({
                 )}
 
                 {/* Version list */}
-                {isLoading ? (
+                {!fetchVersions ? (
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                        完成 Load（若需要）与切分后，此处会列出可向量化的版本。
+                    </p>
+                ) : isLoading ? (
                     <div className="flex justify-center py-3">
                         <Loader2 className="w-4 h-4 animate-spin text-slate-300" />
                     </div>
@@ -166,7 +248,9 @@ export function NovelVersionsCard({
                         ))}
                     </div>
                 ) : (
-                    <p className="text-xs text-slate-400 italic">暂无版本数据</p>
+                    <p className="text-xs text-slate-400 italic">
+                        {phase === 'ready' ? '暂无版本数据' : '尚无可用版本列表'}
+                    </p>
                 )}
             </CardContent>
         </Card>

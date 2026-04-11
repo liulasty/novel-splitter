@@ -16,8 +16,8 @@ export function SplitPreviewModal({ isOpen, onClose, novelId }: SplitPreviewModa
     const scenePageSize = 200;
 
     const { data: novels } = useQuery({
-        queryKey: ['novels'],
-        queryFn: novelApi.getNovels,
+        queryKey: ['novelSummaries', 'all'],
+        queryFn: () => novelApi.getNovelSummaries('all'),
         enabled: isOpen,
     });
     const novelTitle = novels?.find(n => n.novelId === novelId)?.title;

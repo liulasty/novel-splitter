@@ -1,9 +1,11 @@
 package com.novel.splitter.interfaces.api;
 
+import com.novel.splitter.application.model.NovelSummaryListScope;
 import com.novel.splitter.application.service.novel.NovelFacadeService;
 import com.novel.splitter.application.model.command.UploadNovelCommand;
 import com.novel.splitter.application.model.dto.IngestRequest;
 import com.novel.splitter.application.model.dto.ChapterDto;
+import com.novel.splitter.application.model.dto.LoadNovelRequestDto;
 import com.novel.splitter.application.model.dto.NovelPipelineRequestDto;
 import com.novel.splitter.application.model.dto.NovelSummaryDto;
 import com.novel.splitter.application.model.dto.NovelUploadResponseDto;
@@ -15,8 +17,10 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.novel.splitter.application.model.dto.NovelStatRecordDto;
 import com.novel.splitter.domain.model.paging.PagedResult;
@@ -47,10 +51,33 @@ public class NovelController {
         return novelFacadeService.listNovels();
     }
 
-    @Operation(summary = "获取小说列表(DB)", description = "DB-first：从数据库返回小说列表（不依赖文件扫描）")
+    @Operation(summary = "获取小说摘要列表", description = "按 scope 返回 DB 中的小说摘要：all=全部未软删记录；embed_ready=仅向量化已完成(COMPLETED)，用于 RAG/对话选书")
+    @GetMapping("/summaries")
+    public List<NovelSummaryDto> listNovelSummaries(
+            @Parameter(description = "all | embed_ready", example = "all")
+            @RequestParam(value = "scope", defaultValue = "all") String scope) {
+        return novelFacadeService.listNovelSummaries(parseNovelSummaryScope(scope));
+    }
+
+    @Deprecated(since = "1.0", forRemoval = false)
+    @Operation(summary = "获取小说列表(DB)", description = "兼容别名，等价于 GET /api/novels/summaries?scope=all")
     @GetMapping("/db")
     public List<NovelSummaryDto> listNovelsFromDb() {
-        return novelFacadeService.listNovelsFromDb();
+        return novelFacadeService.listNovelSummaries(NovelSummaryListScope.ALL);
+    }
+
+    private static NovelSummaryListScope parseNovelSummaryScope(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return NovelSummaryListScope.ALL;
+        }
+        switch (raw.trim().toLowerCase()) {
+            case "all":
+                return NovelSummaryListScope.ALL;
+            case "embed_ready":
+                return NovelSummaryListScope.EMBED_READY;
+            default:
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "scope 必须是 all 或 embed_ready");
+        }
     }
 
     @Operation(summary = "软删除小说", description = "将小说标记为删除，同时软删除其 chapters/scenes；后续可由 cleanup 任务做物理清理")
@@ -72,9 +99,24 @@ public class NovelController {
             @Parameter(description = "小说标题") @RequestParam(value = "title", required = false) String title,
             @Parameter(description = "小说作者") @RequestParam(value = "author", required = false) String author,
             @Parameter(description = "小说描述") @RequestParam(value = "description", required = false) String description) throws IOException {
-        try (java.io.InputStream in = file.getInputStream()) {
-            return novelFacadeService.uploadNovel(new UploadNovelCommand(in, file.getOriginalFilename(), title, author, description));
+        if (file.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "文件为空");
         }
+        long size = file.getSize();
+        if (size == 0L) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "文件为空");
+        }
+        try (java.io.InputStream in = file.getInputStream()) {
+            return novelFacadeService.uploadNovel(new UploadNovelCommand(in, file.getOriginalFilename(), title, author, description, size));
+        }
+    }
+
+    @Operation(summary = "独立 Load", description = "仅解析原文为 chapters + parsed JSON，不自动进入切分；可选 force 强制重解析")
+    @PostMapping("/{novelId}/load")
+    public TaskSubmitResponseDto loadNovel(
+            @PathVariable("novelId") String novelId,
+            @RequestBody(required = false) LoadNovelRequestDto body) throws IOException {
+        return novelFacadeService.load(novelId, body != null ? body : new LoadNovelRequestDto());
     }
 
     /**
@@ -117,8 +159,10 @@ public class NovelController {
 
     @Operation(summary = "启动小说向量化", description = "触发已切分小说的异步向量化入库流程")
     @PostMapping("/{novelId}/embed")
-    public TaskSubmitResponseDto embedNovel(@PathVariable("novelId") String novelId) throws IOException {
-        return novelFacadeService.embed(novelId);
+    public TaskSubmitResponseDto embedNovel(
+            @PathVariable("novelId") String novelId,
+            @Parameter(description = "切分版本，默认 v1") @RequestParam(value = "version", required = false) String version) throws IOException {
+        return novelFacadeService.embed(novelId, version);
     }
 
     @Deprecated

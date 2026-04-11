@@ -30,11 +30,11 @@ public interface RagFacade {
      *
      * @param question 用户输入的自然语言问题
      * @param topK     需要检索的最相关上下文片段数量
-     * @param novel    指定查询的小说名称，用于限定检索范围
+     * @param novelId  目标小说 ID，用于限定检索范围（与向量库 metadata.novelId 一致）
      * @param version  数据版本号（如：v1，用于区分不同解析版本的数据）
      * @return 包含最终生成结果及相关溯源信息的结构化回答对象
      */
-    Answer ask(String question, int topK, String novel, String version);
+    Answer ask(String question, int topK, String novelId, String version);
 
     /**
      * RAG 流程的调试与预览模式（仅执行检索和提示词组装，不调用大语言模型）。

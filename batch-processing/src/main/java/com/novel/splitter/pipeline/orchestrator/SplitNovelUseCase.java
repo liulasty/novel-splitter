@@ -27,7 +27,7 @@ public class SplitNovelUseCase {
     private final NovelCacheRepository novelCacheRepository;
     private final SceneRepository sceneRepository;
     private final ChapterRepository chapterRepository;
-    
+
     private final SceneAssembler sceneAssembler = new SceneAssembler();
 
     @Value("${splitter.rule.min-length:50}")
@@ -38,6 +38,12 @@ public class SplitNovelUseCase {
 
     @Value("${splitter.ingestion.chunk-overlap:100}")
     private int chunkOverlap;
+
+    /**
+     * 场景落库批次大小。与 {@code splitter.ingestion.batch-size}（Embed 向量化批次）区分，避免配置语义冲突。
+     */
+    @Value("${splitter.split.scene-persist-batch-size:1000}")
+    private int scenePersistBatchSize;
 
     private List<Scene> filterByLength(List<Scene> scenes) {
         List<Scene> valid = new ArrayList<>();
@@ -53,80 +59,147 @@ public class SplitNovelUseCase {
         return valid;
     }
 
+    private int effectivePersistBatchSize() {
+        return scenePersistBatchSize < 1 ? 1000 : scenePersistBatchSize;
+    }
+
+    private int capRemaining(int maxScenes, int savedCount, int batchSize) {
+        if (maxScenes <= 0) {
+            return Integer.MAX_VALUE;
+        }
+        return Math.max(0, maxScenes - savedCount - batchSize);
+    }
+
     public List<Long> split(String taskId, String novelId, String novelTitle, int maxScenes, String version, BiConsumer<Integer, String> progressCallback) {
         log.info("=== Start Split Phase for novelId={} title={} ===", novelId, novelTitle);
-        
-        List<Scene> scenes = new ArrayList<>();
+
+        int persistBatch = effectivePersistBatchSize();
+        List<Scene> batchScenes = new ArrayList<>(persistBatch);
+        List<Long> allSavedSceneIds = new ArrayList<>();
         List<Chapter> chapters = chapterRepository.findByNovelId(novelId);
         int totalChapters = chapters.size();
         int scenesCount = 0;
-        
+        int totalValidAccepted = 0;
+        int lastProgress = IngestProgress.CHAPTER_END;
+
         if (progressCallback != null) {
-            progressCallback.accept(IngestProgress.CHAPTER_END, String.format("准备逐章切分，共 %d 章", totalChapters));
+            progressCallback.accept(lastProgress, String.format("准备逐章切分，共 %d 章", totalChapters));
         }
 
         ChunkingStrategy chunkingStrategy = new OverlapChunkingStrategy(chunkSize, chunkOverlap);
+        String finalVersion = (version != null && !version.isBlank()) ? version : "v1-ingestion";
+
+        boolean savePhaseStarted = false;
 
         for (int i = 0; i < totalChapters; i++) {
+            if (maxScenes > 0 && allSavedSceneIds.size() >= maxScenes) {
+                break;
+            }
+
             Chapter chapter = chapters.get(i);
-            
-            // Load chapter data from cache
+
             ChapterData chapterData = novelCacheRepository.loadChapter(novelId, chapter.getIndex());
-            
-            // Important: downstream metadata must use stable novelId (not chinese title).
+
             List<Scene> chapterScenes = sceneAssembler.assembleChapter(chapter, chapterData.getParagraphs(), novelId);
-            
-            // Apply fine-grained chunking immediately before DB save
+
             List<Scene> chunkedScenes = new ArrayList<>();
             for (Scene s : chapterScenes) {
+                if (s.getMetadata() != null) {
+                    s.getMetadata().setVersion(finalVersion);
+                }
                 chunkedScenes.addAll(chunkingStrategy.split(s));
             }
-            
-            scenes.addAll(chunkedScenes);
+
             scenesCount += chunkedScenes.size();
-            
-            if (progressCallback != null && (i % 10 == 0 || i == totalChapters - 1)) {
-                int progress = IngestProgress.calc(IngestProgress.SCENE_START, IngestProgress.SCENE_END, i + 1, totalChapters);
-                progressCallback.accept(progress, String.format("正在切分章节：%d/%d，已生成 %d 个场景", i + 1, totalChapters, scenesCount));
+
+            List<Scene> validScenes = filterByLength(chunkedScenes);
+
+            int cap = capRemaining(maxScenes, allSavedSceneIds.size(), batchScenes.size());
+            if (cap <= 0) {
+                break;
             }
-            
-            if (maxScenes > 0 && scenes.size() >= maxScenes) {
+            if (validScenes.size() > cap) {
+                validScenes = new ArrayList<>(validScenes.subList(0, cap));
+            }
+
+            batchScenes.addAll(validScenes);
+            totalValidAccepted += validScenes.size();
+
+            while (batchScenes.size() >= persistBatch) {
+                if (!savePhaseStarted && progressCallback != null) {
+                    lastProgress = Math.max(lastProgress, IngestProgress.SAVE_START);
+                    progressCallback.accept(lastProgress, "正在分批保存场景到本地存储...");
+                    savePhaseStarted = true;
+                }
+                List<Scene> toSave = new ArrayList<>(batchScenes.subList(0, persistBatch));
+                batchScenes.subList(0, persistBatch).clear();
+                allSavedSceneIds.addAll(sceneRepository.saveScenes(novelId, finalVersion, toSave));
+                if (progressCallback != null) {
+                    int denom = Math.max(1, Math.max(totalValidAccepted, allSavedSceneIds.size()));
+                    int p = IngestProgress.calc(IngestProgress.SAVE_START, IngestProgress.SAVE_END,
+                            allSavedSceneIds.size(), denom);
+                    if (p < lastProgress) {
+                        p = lastProgress;
+                    } else {
+                        lastProgress = p;
+                    }
+                    progressCallback.accept(p, String.format("已落盘 %d 个有效场景（预估总量约 %d）", allSavedSceneIds.size(), totalValidAccepted));
+                }
+            }
+
+            if (progressCallback != null && (i % 10 == 0 || i == totalChapters - 1)) {
+                int p = IngestProgress.calc(IngestProgress.SCENE_START, IngestProgress.SCENE_END, i + 1, totalChapters);
+                if (p < lastProgress) {
+                    p = lastProgress;
+                } else {
+                    lastProgress = p;
+                }
+                progressCallback.accept(p, String.format(
+                        "正在切分章节：%d/%d，已生成 %d 个场景片段，已落盘 %d 个有效场景",
+                        i + 1, totalChapters, scenesCount, allSavedSceneIds.size()));
+            }
+
+            if (maxScenes > 0 && scenesCount >= maxScenes) {
+                break;
+            }
+            if (maxScenes > 0 && allSavedSceneIds.size() >= maxScenes) {
                 break;
             }
         }
 
-        log.info("Generated {} scenes from novelId={} title='{}'", scenes.size(), novelId, novelTitle);
+        log.info("Generated {} scene fragments (before length filter), {} accepted for novelId={} title='{}'",
+                scenesCount, totalValidAccepted, novelId, novelTitle);
 
         if (progressCallback != null) {
-            progressCallback.accept(IngestProgress.VALIDATE_END, String.format("切分完成：共 %d 个初步场景", scenes.size()));
+            lastProgress = Math.max(lastProgress, IngestProgress.VALIDATE_END);
+            progressCallback.accept(lastProgress, String.format(
+                    "切分完成：共 %d 个有效场景（长度校验后），已落盘 %d 个",
+                    totalValidAccepted, allSavedSceneIds.size()));
         }
 
-        scenes = filterByLength(scenes);
-        if (scenes.isEmpty()) {
-            log.warn("All scenes filtered out after length validation for novelId={}", novelId);
+        if (!batchScenes.isEmpty()) {
+            if (!savePhaseStarted && progressCallback != null) {
+                lastProgress = Math.max(lastProgress, IngestProgress.SAVE_START);
+                progressCallback.accept(lastProgress, "正在保存剩余场景到本地存储...");
+            }
+            allSavedSceneIds.addAll(sceneRepository.saveScenes(novelId, finalVersion, batchScenes));
+            batchScenes.clear();
+        }
+
+        if (allSavedSceneIds.isEmpty()) {
+            log.warn("No scenes persisted after split for novelId={}", novelId);
+            if (progressCallback != null) {
+                lastProgress = Math.max(lastProgress, IngestProgress.SAVE_END);
+                progressCallback.accept(lastProgress, "无有效场景落盘");
+            }
             return new ArrayList<>();
         }
 
-        if (maxScenes > 0 && scenes.size() > maxScenes) {
-            log.warn("Limiting ingestion to first {} scenes (Total: {})", maxScenes, scenes.size());
-            scenes = scenes.subList(0, maxScenes);
+        if (progressCallback != null) {
+            lastProgress = Math.max(lastProgress, IngestProgress.SAVE_END);
+            progressCallback.accept(lastProgress, String.format("本地存储完成，共 %d 个场景", allSavedSceneIds.size()));
         }
 
-        String finalVersion = (version != null && !version.isBlank()) ? version : "v1-ingestion";
-        scenes.forEach(s -> {
-            if (s.getMetadata() != null) {
-                s.getMetadata().setVersion(finalVersion);
-            }
-        });
-
-        if (progressCallback != null) {
-            progressCallback.accept(IngestProgress.SAVE_START, "正在保存场景到本地存储...");
-        }
-        List<Long> sceneIds = sceneRepository.saveScenes(novelId, finalVersion, scenes);
-        if (progressCallback != null) {
-            progressCallback.accept(IngestProgress.SAVE_END, String.format("本地存储完成，共 %d 个场景", scenes.size()));
-        }
-        
-        return sceneIds;
+        return allSavedSceneIds;
     }
 }

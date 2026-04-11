@@ -9,6 +9,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -70,6 +71,11 @@ public class NovelStorageService {
         }
         String relativePath = rawRelativePath(novelId);
         fileStoragePort.write(relativePath, content, true);
+        long sz = Files.size(fileStoragePort.toAbsolutePath(relativePath));
+        if (sz == 0) {
+            fileStoragePort.deleteIfExists(relativePath);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "文件为空或写入失败");
+        }
         return relativePath;
     }
 

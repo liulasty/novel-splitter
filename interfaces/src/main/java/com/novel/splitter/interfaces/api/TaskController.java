@@ -1,6 +1,7 @@
 package com.novel.splitter.interfaces.api;
 
 import com.novel.splitter.application.model.dto.SplitTaskDto;
+import com.novel.splitter.application.model.dto.SplitTaskPageDto;
 import com.novel.splitter.application.model.dto.TaskProgressEventDto;
 import com.novel.splitter.application.mapper.DtoMapper;
 import com.novel.splitter.application.service.task.TaskQueryService;
@@ -35,10 +36,28 @@ public class TaskController {
         return taskQueryService.getAllTasksWithNovelTitle();
     }
 
+    /** 使用 /list 避免与 /{taskId} 路径冲突（例如 taskId=paged） */
+    @GetMapping("/list")
+    @Operation(summary = "分页查询任务（可选筛选 novelId/taskType/status/时间范围）")
+    public SplitTaskPageDto getTasksPage(
+            @RequestParam(value = "novelId", required = false) String novelId,
+            @RequestParam(value = "taskType", required = false) String taskType,
+            @RequestParam(value = "status", required = false) String status,
+            @RequestParam(value = "updatedFrom", required = false) Long updatedFrom,
+            @RequestParam(value = "updatedTo", required = false) Long updatedTo,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "50") int size) {
+        return taskQueryService.findTasksPage(novelId, taskType, status, updatedFrom, updatedTo, page, size);
+    }
+
     @GetMapping("/{taskId}")
     @Operation(summary = "获取单个切分任务状态")
     public SplitTaskDto getTask(@PathVariable("taskId") String taskId) {
-        return taskQueryService.getTaskWithNovelTitle(taskId);
+        SplitTaskDto dto = taskQueryService.getTaskWithNovelTitle(taskId);
+        if (dto == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Task not found: " + taskId);
+        }
+        return dto;
     }
 
     @DeleteMapping("/{taskId}")

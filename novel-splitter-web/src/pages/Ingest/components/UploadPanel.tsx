@@ -1,6 +1,8 @@
-import { UploadCloud, FileText, Loader2, CheckCircle, AlertCircle, DownloadCloud, Eye } from "lucide-react";
+import { UploadCloud, FileText, Loader2, CheckCircle, AlertCircle, DownloadCloud, Eye, ListChecks, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { novelApi } from '@/api/novelApi';
 import { SplitPreviewModal } from './SplitPreviewModal';
 import { TaskPollerStatus } from './TaskPollerStatus';
 import type { SplitTask } from "@/api/taskApi";
@@ -44,6 +46,8 @@ interface UploadPanelProps {
         setStrategy: (strategy: string) => void;
         setMaxTokens: (tokens: number) => void;
         setOverlapTokens: (tokens: number) => void;
+        selectNovelById: (novelId: string) => void;
+        clearSelectedNovel: () => void;
     };
 }
 
@@ -51,8 +55,59 @@ export function UploadPanel({ state, actions }: UploadPanelProps) {
     const { activeTab, selectedFile, novelName, downloadUrl, version, strategy, maxTokens, overlapTokens, currentNovelId, ingestStatus, isError, activeTasks, poller, isUploading, isSplitting, isEmbedding, isDownloading } = state;
     const [previewOpen, setPreviewOpen] = useState(false);
 
+    const { data: novelOptions = [] } = useQuery({
+        queryKey: ['novelSummaries', 'all'],
+        queryFn: () => novelApi.getNovelSummaries('all'),
+    });
+
     return (
         <div className="rounded-2xl border-2 border-dashed border-amber-200 bg-gradient-to-br from-amber-50/60 via-white to-violet-50/40 p-6 relative">
+            {/* 已登记小说：URL / 会话 / 下拉 */}
+            <div className="mb-5 rounded-xl border border-slate-200 bg-white/80 px-4 py-3 space-y-2">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+                        <ListChecks className="w-3.5 h-3.5" />
+                        当前操作的小说
+                    </span>
+                    {currentNovelId ? (
+                        <button
+                            type="button"
+                            onClick={() => actions.clearSelectedNovel()}
+                            className="text-xs text-slate-500 hover:text-red-600 inline-flex items-center gap-1"
+                        >
+                            <XCircle className="w-3.5 h-3.5" />
+                            清除选择
+                        </button>
+                    ) : null}
+                </div>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                    <select
+                        value={currentNovelId}
+                        onChange={(e) => {
+                            const v = e.target.value;
+                            if (v) actions.selectNovelById(v);
+                            else actions.clearSelectedNovel();
+                        }}
+                        className="flex-1 min-w-0 h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-800"
+                    >
+                        <option value="">— 从已登记小说中选一本（或先上传）—</option>
+                        {currentNovelId && !novelOptions.some((n) => n.novelId === currentNovelId) ? (
+                            <option value={currentNovelId}>当前会话 · {currentNovelId}</option>
+                        ) : null}
+                        {novelOptions.map((n) => (
+                            <option key={n.novelId} value={n.novelId}>
+                                {n.title || n.novelId} · {n.status ?? '?'}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+                {currentNovelId ? (
+                    <p className="text-[11px] text-slate-500 font-mono break-all">novelId: {currentNovelId}</p>
+                ) : (
+                    <p className="text-[11px] text-slate-400">支持通过地址栏 ?novelId= 或上次会话自动恢复，避免离开页面后无法切分。</p>
+                )}
+            </div>
+
             {/* Tabs */}
             <div className="flex gap-2 mb-6 p-1 bg-white/50 rounded-lg w-fit border border-gray-100">
                 <button

@@ -20,8 +20,8 @@ export default function SystemPage() {
     });
 
     const { data: novels, isLoading: isNovelsLoading } = useQuery({
-        queryKey: ['novels'],
-        queryFn: novelApi.getNovels,
+        queryKey: ['novelSummaries', 'all'],
+        queryFn: () => novelApi.getNovelSummaries('all'),
     });
 
     const { data: tasks, isLoading: isTasksLoading } = useQuery({

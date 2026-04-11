@@ -4,6 +4,7 @@ import com.novel.splitter.domain.model.Scene;
 import com.novel.splitter.domain.model.SceneMetadata;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
 
@@ -58,8 +59,8 @@ public class OverlapChunkingStrategy implements ChunkingStrategy {
             if (end == text.length()) {
                 break;
             }
-            // For overlap, also try to find a natural start if possible, but simple overlap is fine for now
-            index = end - overlap;
+            // 保证游标严格前进，避免 end 靠近 index 时 end - overlap <= index 导致死循环
+            index = Math.max(index + 1, end - overlap);
         }
         return children;
     }
@@ -106,18 +107,45 @@ public class OverlapChunkingStrategy implements ChunkingStrategy {
         child.setStartParagraphIndex(parent.getStartParagraphIndex());
         child.setEndParagraphIndex(parent.getEndParagraphIndex());
         child.setCanSplit(false);
-
-        SceneMetadata parentMeta = parent.getMetadata();
-        SceneMetadata childMeta = new SceneMetadata();
-        if (parentMeta != null) {
-            childMeta.setNovel(parentMeta.getNovel());
-            childMeta.setVersion(parentMeta.getVersion());
+        // First child: carry over overlap from the scene before the parent; later children already
+        // include textual overlap from the sliding window in {@link #split}.
+        if (childIndex == 0) {
+            child.setPrefixContext(parent.getPrefixContext());
         }
+
+        SceneMetadata childMeta = childMetadataFromParent(parent.getMetadata());
         childMeta.setParentSceneId(parent.getId());
         childMeta.setChunkType("child_chunk");
         childMeta.setSequenceNum(childIndex);
         child.setMetadata(childMeta);
 
         return child;
+    }
+
+    /**
+     * Copies parent scene metadata into a new object so child_chunk rows keep chapter / paragraph
+     * span and scores aligned with top-level columns (for RAG filters and assembly).
+     */
+    private static SceneMetadata childMetadataFromParent(SceneMetadata parentMeta) {
+        SceneMetadata childMeta = new SceneMetadata();
+        if (parentMeta == null) {
+            return childMeta;
+        }
+        childMeta.setNovel(parentMeta.getNovel());
+        childMeta.setVersion(parentMeta.getVersion());
+        childMeta.setChapterTitle(parentMeta.getChapterTitle());
+        childMeta.setChapterIndex(parentMeta.getChapterIndex());
+        childMeta.setStartParagraph(parentMeta.getStartParagraph());
+        childMeta.setEndParagraph(parentMeta.getEndParagraph());
+        childMeta.setDensityScore(parentMeta.getDensityScore());
+        childMeta.setQualityScore(parentMeta.getQualityScore());
+        childMeta.setRole(parentMeta.getRole());
+        childMeta.setCharacters(parentMeta.getCharacters());
+        childMeta.setLocation(parentMeta.getLocation());
+        childMeta.setTime(parentMeta.getTime());
+        if (parentMeta.getExtra() != null && !parentMeta.getExtra().isEmpty()) {
+            childMeta.setExtra(new HashMap<>(parentMeta.getExtra()));
+        }
+        return childMeta;
     }
 }

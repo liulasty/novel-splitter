@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { novelApi } from "@/api/novelApi";
@@ -7,8 +8,11 @@ import { downloadApi } from "@/api/downloadApi";
 import { useTaskPoller } from './useTaskPoller';
 import { getApiErrorMessage, handleConflict409 } from '@/lib/apiError';
 
+const LAST_NOVEL_SESSION_KEY = 'ingest:lastNovelId';
+
 export function useIngestTask() {
     const queryClient = useQueryClient();
+    const [searchParams, setSearchParams] = useSearchParams();
 
     // UI State
     const [activeTab, setActiveTab] = useState<'upload' | 'download'>('upload');
@@ -26,6 +30,82 @@ export function useIngestTask() {
     
     // Flow State
     const [currentNovelId, setCurrentNovelId] = useState<string>("");
+    const ingestInitRef = useRef(false);
+
+    /** 与 URL、sessionStorage 同步，便于刷新/深链后续切分 */
+    const persistCurrentNovelId = useCallback(
+        (novelId: string) => {
+            const id = novelId.trim();
+            setCurrentNovelId(id);
+            if (id) {
+                try {
+                    sessionStorage.setItem(LAST_NOVEL_SESSION_KEY, id);
+                } catch {
+                    /* ignore quota */
+                }
+                setSearchParams(
+                    (prev) => {
+                        const p = new URLSearchParams(prev);
+                        p.set('novelId', id);
+                        return p;
+                    },
+                    { replace: true }
+                );
+            }
+        },
+        [setSearchParams]
+    );
+
+    const clearCurrentNovelId = useCallback(() => {
+        setCurrentNovelId('');
+        try {
+            sessionStorage.removeItem(LAST_NOVEL_SESSION_KEY);
+        } catch {
+            /* ignore */
+        }
+        setSearchParams(
+            (prev) => {
+                const p = new URLSearchParams(prev);
+                p.delete('novelId');
+                return p;
+            },
+            { replace: true }
+        );
+    }, [setSearchParams]);
+
+    /** URL ?novelId= 优先；否则首屏从 sessionStorage 恢复并写回 URL */
+    useEffect(() => {
+        const fromUrl = searchParams.get('novelId')?.trim();
+        if (fromUrl) {
+            setCurrentNovelId(fromUrl);
+            try {
+                sessionStorage.setItem(LAST_NOVEL_SESSION_KEY, fromUrl);
+            } catch {
+                /* ignore */
+            }
+            ingestInitRef.current = true;
+            return;
+        }
+        if (!ingestInitRef.current) {
+            ingestInitRef.current = true;
+            try {
+                const fromSession = sessionStorage.getItem(LAST_NOVEL_SESSION_KEY)?.trim();
+                if (fromSession) {
+                    setCurrentNovelId(fromSession);
+                    setSearchParams(
+                        (prev) => {
+                            const p = new URLSearchParams(prev);
+                            p.set('novelId', fromSession);
+                            return p;
+                        },
+                        { replace: true }
+                    );
+                }
+            } catch {
+                /* ignore */
+            }
+        }
+    }, [searchParams, setSearchParams]);
     const [ingestStatus, setIngestStatus] = useState<string>("");
     const [isError, setIsError] = useState(false);
     const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
@@ -48,8 +128,9 @@ export function useIngestTask() {
             setIngestStatus(msg); 
             setIsError(false);
             toast.success(msg);
-            setCurrentNovelId(data.novelId);
+            persistCurrentNovelId(data.novelId);
             queryClient.invalidateQueries({ queryKey: ['novels'] });
+            queryClient.invalidateQueries({ queryKey: ['novelSummaries'] });
         },
         onError: (error: any) => {
             const msg = `上传失败：${error.response?.data?.error || error.message}`;
@@ -220,6 +301,8 @@ export function useIngestTask() {
             handleDownloadAndIngest,
             manualRefresh,
             deleteTask: (id: string) => deleteTaskMutation.mutate(id),
+            selectNovelById: persistCurrentNovelId,
+            clearSelectedNovel: clearCurrentNovelId,
         }
     };
 }

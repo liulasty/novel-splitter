@@ -26,8 +26,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class VectorRetrievalService implements RetrievalService {
 
-    // 元数据键名：小说名/ID
-    private static final String META_NOVEL = "novel";
+    /** 与 {@link com.novel.splitter.embedding.store.ChromaVectorStore} 写入的 metadata 键一致 */
+    private static final String META_NOVEL_ID = "novelId";
     // 元数据键名：小说版本
     private static final String META_VERSION = "version";
     // 元数据键名：父级场景ID（用于子块追溯）
@@ -63,8 +63,8 @@ public class VectorRetrievalService implements RetrievalService {
 
         // 2. Vector Search：构建元数据过滤条件，在向量库中查找最相似的记录
         Map<String, Object> filter = new HashMap<>();
-        if (query.getNovel() != null && !query.getNovel().isBlank()) {
-            filter.put(META_NOVEL, query.getNovel());
+        if (query.getNovelId() != null && !query.getNovelId().isBlank()) {
+            filter.put(META_NOVEL_ID, query.getNovelId());
         }
         if (query.getVersion() != null && !query.getVersion().isBlank()) {
             filter.put(META_VERSION, query.getVersion());
@@ -85,12 +85,11 @@ public class VectorRetrievalService implements RetrievalService {
         for (VectorRecord record : records) {
             Map<String, Object> meta = record.getMetadata();
             // 校验元数据完整性，缺少必要信息则跳过该记录
-            if (meta == null || !meta.containsKey(META_NOVEL) || !meta.containsKey(META_VERSION)) {
-                log.warn("Vector record {} missing metadata (novel/version), skipping hydration", record.getChunkId());
+            if (meta == null || !meta.containsKey(META_NOVEL_ID) || !meta.containsKey(META_VERSION)) {
+                log.warn("Vector record {} missing metadata (novelId/version), skipping hydration", record.getChunkId());
                 continue;
             }
-            // 使用小说名和版本构建唯一分组键
-            String key = meta.get(META_NOVEL) + KEY_SEPARATOR + meta.get(META_VERSION);
+            String key = meta.get(META_NOVEL_ID) + KEY_SEPARATOR + meta.get(META_VERSION);
             groupedRecords.computeIfAbsent(key, k -> new ArrayList<>()).add(record);
             processingOrder.add(record);
         }
@@ -116,7 +115,7 @@ public class VectorRetrievalService implements RetrievalService {
         // 遍历每个分组，装填相应的 Scene 数据
         for (Map.Entry<String, List<VectorRecord>> entry : groupedRecords.entrySet()) {
             String[] parts = entry.getKey().split(KEY_SEPARATOR, 2);
-            String novel = parts[0];
+            String novelId = parts[0];
             String version = parts.length > 1 ? parts[1] : "";
 
             try {
@@ -137,13 +136,12 @@ public class VectorRetrievalService implements RetrievalService {
                             hydratedScenes.put(targetId, s);
                         }
                     } else {
-                        log.warn("Scene {} not found in file product {}/{}", targetId, novel, version);
+                        log.warn("Scene {} not found for novelId={} version={}", targetId, novelId, version);
                     }
                 }
             } catch (Exception e) {
-                // 记录分组装配异常信息，避免单一文件损坏导致整个检索流程崩溃
-                log.error("Failed to load scenes for {}/{}", novel, version, e);
-                failedGroups.add(novel + "/" + version);
+                log.error("Failed to load scenes for novelId={} version={}", novelId, version, e);
+                failedGroups.add(novelId + "/" + version);
             }
         }
 

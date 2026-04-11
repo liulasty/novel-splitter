@@ -12,7 +12,7 @@ export interface SplitTask {
   message: string;
   createdAt: number;
   updatedAt: number;
-  taskType?: 'SPLIT' | 'EMBED';
+  taskType?: 'LOAD' | 'SPLIT' | 'PIPELINE' | 'EMBED';
   sceneCount?: number;
   embeddedCount?: number;
   logs?: string[];
@@ -41,9 +41,32 @@ export interface JobRecordDto {
   // ... other fields based on backend
 }
 
+export interface SplitTaskPage {
+  content: SplitTask[];
+  page: number;
+  size: number;
+  totalElements: number;
+}
+
 export const taskApi = {
   getAllTasks: async (): Promise<SplitTask[]> => {
     const response = await apiClient.get<ApiEnvelope<SplitTask[]>, SplitTask[]>('/tasks');
+    return response;
+  },
+
+  /** 分页筛选：必须带 page 参数（与 GET /tasks 列表区分） */
+  getTasksPage: async (params: {
+    page?: number;
+    size?: number;
+    novelId?: string;
+    taskType?: string;
+    status?: string;
+    updatedFrom?: number;
+    updatedTo?: number;
+  }): Promise<SplitTaskPage> => {
+    const response = await apiClient.get<ApiEnvelope<SplitTaskPage>, SplitTaskPage>('/tasks/list', {
+      params: { ...params, page: params.page ?? 0, size: params.size ?? 50 },
+    });
     return response;
   },
 

@@ -1,6 +1,7 @@
 package com.novel.splitter.interfaces.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.novel.splitter.application.model.NovelSummaryListScope;
 import com.novel.splitter.application.model.command.UploadNovelCommand;
 import com.novel.splitter.application.model.dto.NovelUploadResponseDto;
 import com.novel.splitter.application.service.novel.NovelFacadeService;
@@ -79,6 +80,28 @@ class NovelControllerTest {
                 .andExpect(jsonPath("$.data.novelId").value("demo_1"));
 
         verify(novelFacadeService).uploadNovel(any(UploadNovelCommand.class));
+    }
+
+    @Test
+    void shouldListNovelSummariesWithDefaultScopeAll() throws Exception {
+        when(novelFacadeService.listNovelSummaries(NovelSummaryListScope.ALL)).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/novels/summaries"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200));
+
+        verify(novelFacadeService).listNovelSummaries(NovelSummaryListScope.ALL);
+    }
+
+    @Test
+    void shouldListNovelSummariesWithEmbedReadyScope() throws Exception {
+        when(novelFacadeService.listNovelSummaries(NovelSummaryListScope.EMBED_READY)).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/novels/summaries").param("scope", "embed_ready"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200));
+
+        verify(novelFacadeService).listNovelSummaries(NovelSummaryListScope.EMBED_READY);
     }
 
     @Test

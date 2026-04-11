@@ -35,6 +35,6 @@ public class ChatController {
     @PostMapping
     public AnswerDto chat(@Valid @RequestBody ChatRequest request) {
         log.info("接收到聊天请求: {}", request);
-        return dtoMapper.toAnswerDto(ragService.ask(request.getQuestion(), request.getTopK(), request.getNovel(), request.getVersion()));
+        return dtoMapper.toAnswerDto(ragService.ask(request.getQuestion(), request.getTopK(), request.getNovelId(), request.getVersion()));
     }
 }

@@ -27,11 +27,10 @@ public class RagRequest {
     @Min(value = 1, message = "topK 必须大于 0")
     private int topK = 3;
     
-    /** 
-     * 目标小说名称 
-     * // 作为元数据过滤条件，用于将检索范围限定在特定的小说作品内 
+    /**
+     * 目标小说 ID（与 Chroma / DB 中 metadata.novelId 一致）。
      */
-    private String novel;
+    private String novelId;
     
     /** 
      * 数据版本 

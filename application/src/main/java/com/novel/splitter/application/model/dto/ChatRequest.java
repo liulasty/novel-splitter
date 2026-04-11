@@ -11,6 +11,6 @@ public class ChatRequest {
 
     @Min(value = 1, message = "topK 必须大于 0")
     private int topK = 3;
-    private String novel;
+    private String novelId;
     private String version;
 }

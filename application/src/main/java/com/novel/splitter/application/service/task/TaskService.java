@@ -1,7 +1,9 @@
 package com.novel.splitter.application.service.task;
 
 import com.novel.splitter.domain.enums.TaskType;
+import com.novel.splitter.domain.model.paging.PagedResult;
 import com.novel.splitter.domain.task.SplitTask;
+import com.novel.splitter.domain.task.SplitTaskFilter;
 import com.novel.splitter.domain.task.TaskProgressEvent;
 import com.novel.splitter.domain.repository.SplitTaskRepository;
 import com.novel.splitter.domain.repository.TaskEventRepository;
@@ -9,6 +11,7 @@ import com.novel.splitter.application.model.dto.JobStatSummaryDto;
 import com.novel.splitter.application.model.dto.JobRecordDto;
 import com.novel.splitter.application.model.dto.PollResponse;
 import com.novel.splitter.application.port.out.TaskCachePort;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +24,7 @@ import java.util.stream.Stream;
 import java.util.stream.Collectors;
 
 @Service
+@Slf4j
 public class TaskService {
     
     private final SplitTaskRepository taskRepository;
@@ -115,6 +119,11 @@ public class TaskService {
         List<SplitTask> tasks = taskRepository.findAll();
         tasks.sort(Comparator.comparing(SplitTask::getCreatedAt).reversed());
         return tasks;
+    }
+
+    @Transactional(readOnly = true)
+    public PagedResult<SplitTask> findTasksFiltered(SplitTaskFilter filter) {
+        return taskRepository.findFiltered(filter);
     }
 
     @Transactional
@@ -252,8 +261,8 @@ public class TaskService {
                     task.getStatus() != null ? task.getStatus().name() : SplitTask.TaskStatus.PENDING.name(),
                     System.currentTimeMillis()
             ));
-        } catch (RuntimeException ignored) {
-            // Do not fail main task lifecycle when event persistence fails.
+        } catch (RuntimeException ex) {
+            log.warn("task_events 写入失败 taskId={} : {}", task.getTaskId(), ex.toString());
         }
     }
 }

@@ -12,12 +12,16 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class NovelServiceImpl implements NovelService {
+
+    /** 与 DB 常见 varchar 上限对齐，避免极长文件名撑爆行 */
+    private static final int MAX_TITLE_LENGTH = 200;
 
     private final NovelRepository novelRepository;
     private final NovelStorageService novelStorageService;
@@ -31,7 +35,7 @@ public class NovelServiceImpl implements NovelService {
         String storedRelativePath = novelStorageService.rawRelativePath(novelId);
         try {
             transactionTemplate.execute(status -> {
-                saveNovelRecordWithId(novelId, storedRelativePath, title, author, description);
+                saveNovelRecordWithId(novelId, storedRelativePath, title, author, description, originalFilename);
                 return null;
             });
         } catch (RuntimeException ex) {
@@ -80,14 +84,21 @@ public class NovelServiceImpl implements NovelService {
 
     private String saveNovelRecord(String fileName, String title, String author, String description) {
         String novelId = UUID.randomUUID().toString();
-        saveNovelRecordWithId(novelId, fileName, title, author, description);
+        saveNovelRecordWithId(novelId, fileName, title, author, description, null);
         return novelId;
     }
 
-    private void saveNovelRecordWithId(String novelId, String fileName, String title, String author, String description) {
+    private void saveNovelRecordWithId(
+            String novelId,
+            String fileName,
+            String title,
+            String author,
+            String description,
+            String originalFilename) {
+        String resolvedTitle = resolveNovelTitle(title, originalFilename, fileName);
         Novel novel = Novel.builder()
                 .id(novelId)
-                .title(title != null ? title : fileName.replace(".txt", ""))
+                .title(resolvedTitle)
                 .author(author)
                 .description(description)
                 .filePath(fileName)
@@ -98,7 +109,83 @@ public class NovelServiceImpl implements NovelService {
                 .build();
 
         novelRepository.save(novel);
-        log.info("Saved novel entity to database, novelId: {}", novelId);
+        log.info("Saved novel entity to database, novelId: {}, title: {}", novelId, resolvedTitle);
+    }
+
+    /**
+     * 标题：显式 title &gt; 上传原始文件名（去扩展名）&gt; 存储路径最后一段（如 original）&gt; 兜底。
+     */
+    static String resolveNovelTitle(String explicitTitle, String originalFilename, String storedRelativePath) {
+        String fromExplicit = explicitTitle != null ? sanitizeSingleLineTitle(explicitTitle) : "";
+        if (!fromExplicit.isEmpty()) {
+            return truncateByCodePoints(fromExplicit, MAX_TITLE_LENGTH);
+        }
+        String fromUpload = stripTxtExtension(lastPathSegment(originalFilename));
+        if (!fromUpload.isEmpty()) {
+            String s = sanitizeSingleLineTitle(fromUpload);
+            if (!s.isEmpty()) {
+                return truncateByCodePoints(s, MAX_TITLE_LENGTH);
+            }
+        }
+        String fromPath = stripTxtExtension(lastPathSegment(storedRelativePath));
+        if (!fromPath.isEmpty()) {
+            String s = sanitizeSingleLineTitle(fromPath);
+            if (!s.isEmpty()) {
+                return truncateByCodePoints(s, MAX_TITLE_LENGTH);
+            }
+        }
+        return "未命名小说";
+    }
+
+    private static String lastPathSegment(String path) {
+        if (path == null) {
+            return "";
+        }
+        String n = path.replace('\\', '/').trim();
+        if (n.isEmpty()) {
+            return "";
+        }
+        int i = n.lastIndexOf('/');
+        return i >= 0 ? n.substring(i + 1) : n;
+    }
+
+    private static String stripTxtExtension(String name) {
+        if (name == null) {
+            return "";
+        }
+        String t = name.trim();
+        if (t.toLowerCase(Locale.ROOT).endsWith(".txt")) {
+            return t.substring(0, t.length() - 4).trim();
+        }
+        return t;
+    }
+
+    /** 去掉不可见控制字符，折叠空白，单行展示 */
+    private static String sanitizeSingleLineTitle(String raw) {
+        if (raw == null) {
+            return "";
+        }
+        StringBuilder b = new StringBuilder(raw.length());
+        for (int i = 0; i < raw.length(); ) {
+            int cp = raw.codePointAt(i);
+            i += Character.charCount(cp);
+            if (cp == 0 || Character.getType(cp) == Character.CONTROL) {
+                continue;
+            }
+            b.appendCodePoint(cp);
+        }
+        String s = b.toString().trim().replaceAll("\\s+", " ");
+        return s;
+    }
+
+    private static String truncateByCodePoints(String s, int maxCodePoints) {
+        if (s == null || s.isEmpty()) {
+            return "";
+        }
+        if (s.codePointCount(0, s.length()) <= maxCodePoints) {
+            return s;
+        }
+        return s.substring(0, s.offsetByCodePoints(0, maxCodePoints)).trim();
     }
 
     @Override
