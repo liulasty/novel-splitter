@@ -19,6 +19,10 @@ import java.util.Map;
 @NoArgsConstructor
 @AllArgsConstructor
 public class SceneMetadata {
+
+    /** 尚未写入真实分析结果时的哨兵值（与 0~1 有效得分区分） */
+    public static final double SCORE_NOT_COMPUTED = -1.0;
+
     // === RAG 核心字段 ===
     /** 小说名称 */
     private String novel;
@@ -50,11 +54,13 @@ public class SceneMetadata {
     /** 角色/功能，预留由 LLM 抽取 */
     private String role;
 
-    /** 信息密度得分 */
-    private Double densityScore;
+    /** 信息密度得分；未计算时为 {@link #SCORE_NOT_COMPUTED} */
+    @Builder.Default
+    private Double densityScore = SCORE_NOT_COMPUTED;
 
-    /** 质量得分 (PPL模拟) */
-    private Double qualityScore;
+    /** 质量得分 (PPL模拟)；未计算时为 {@link #SCORE_NOT_COMPUTED} */
+    @Builder.Default
+    private Double qualityScore = SCORE_NOT_COMPUTED;
 
     // === 语义分析字段 (预留) ===
     /** 出现的人物列表 */

@@ -35,7 +35,10 @@ public final class SceneQualityScoreWriter {
 
     private static double computeScore(Scene scene, int minLength, int maxLength) {
         String text = scene.getText();
-        int len = text != null ? text.length() : 0;
+        if (text == null || text.isBlank()) {
+            return SceneMetadata.SCORE_NOT_COMPUTED;
+        }
+        int len = text.length();
         double score = 1.0;
         if (len < minLength) {
             score *= Math.max(0.35, (double) len / minLength);
