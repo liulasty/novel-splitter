@@ -76,8 +76,9 @@ public class SplitNovelUseCase {
         return Math.max(0, maxScenes - savedCount - batchSize);
     }
 
-    private void assignChapterSequence(List<Scene> scenes) {
+    private void assignChapterSequence(List<Scene> scenes, int startingChunkIndex) {
         int seq = 0;
+        int chunkIndex = startingChunkIndex;
         for (Scene s : scenes) {
             SceneMetadata meta = s.getMetadata();
             if (meta == null) {
@@ -85,6 +86,8 @@ public class SplitNovelUseCase {
                 s.setMetadata(meta);
             }
             meta.setSequenceNum(seq++);
+            s.setChunkIndex(chunkIndex++);
+            s.setEmbedStatus("PENDING");
         }
     }
 
@@ -141,6 +144,8 @@ public class SplitNovelUseCase {
 
         boolean savePhaseStarted = false;
 
+        int globalChunkIndex = 0;
+
         for (int i = 0; i < totalChapters; i++) {
             if (maxScenes > 0 && allSavedSceneIds.size() >= maxScenes) {
                 break;
@@ -167,7 +172,8 @@ public class SplitNovelUseCase {
             List<Scene> validScenes = filterByLength(chunkedScenes);
 
             SceneQualityScoreWriter.apply(validScenes, minLength, maxLength);
-            assignChapterSequence(validScenes);
+            assignChapterSequence(validScenes, globalChunkIndex);
+            globalChunkIndex += validScenes.size();
 
             int cap = capRemaining(maxScenes, allSavedSceneIds.size(), batchScenes.size());
             if (cap <= 0) {

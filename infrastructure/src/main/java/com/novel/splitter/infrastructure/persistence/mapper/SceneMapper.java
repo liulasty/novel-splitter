@@ -39,6 +39,9 @@ public class SceneMapper {
                 .wordCount(entity.getWordCount())
                 .prefixContext(entity.getPrefixContext())
                 .canSplit(entity.isCanSplit())
+                .chunkIndex(entity.getChunkIndex())
+                .embedStatus(entity.getEmbedStatus())
+                .vectorId(entity.getVectorId())
                 .metadata(meta)
                 .score(null)
                 .build();
@@ -57,6 +60,9 @@ public class SceneMapper {
         entity.setWordCount(domain.getWordCount());
         entity.setPrefixContext(domain.getPrefixContext());
         entity.setCanSplit(domain.isCanSplit());
+        entity.setChunkIndex(domain.getChunkIndex());
+        entity.setEmbedStatus(domain.getEmbedStatus());
+        entity.setVectorId(domain.getVectorId());
         entity.setMetadataJson(metadataToJson(domain.getMetadata()));
         if (domain.getMetadata() != null) {
             if (domain.getMetadata().getChunkSize() != null) {

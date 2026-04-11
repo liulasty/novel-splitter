@@ -173,10 +173,10 @@ public class InMemoryVectorStore implements VectorStore {
      * @param embedding 对应的特征向量数组
      */
     @Override
-    public void save(Scene scene, float[] embedding) {
+    public String save(Scene scene, float[] embedding) {
         if (scene == null || scene.getId() == null) {
             log.warn("Cannot save null scene or scene with null ID");
-            return;
+            return null;
         }
         // 将向量存入哈希表
         vectorMap.put(scene.getId(), embedding);
@@ -184,6 +184,7 @@ public class InMemoryVectorStore implements VectorStore {
         if (scene.getMetadata() != null) {
             metadataMap.put(scene.getId(), scene.getMetadata());
         }
+        return scene.getId();
     }
 
     /**
@@ -194,14 +195,16 @@ public class InMemoryVectorStore implements VectorStore {
      * @throws IllegalArgumentException 如果场景数量与向量数量不一致
      */
     @Override
-    public void saveBatch(List<Scene> scenes, List<float[]> embeddings) {
+    public List<String> saveBatch(List<Scene> scenes, List<float[]> embeddings) {
         if (scenes.size() != embeddings.size()) {
             throw new IllegalArgumentException("Scenes and embeddings size mismatch");
         }
+        List<String> docIds = new ArrayList<>();
         // 循环逐个保存
         for (int i = 0; i < scenes.size(); i++) {
-            save(scenes.get(i), embeddings.get(i));
+            docIds.add(save(scenes.get(i), embeddings.get(i)));
         }
+        return docIds;
     }
 
     /**

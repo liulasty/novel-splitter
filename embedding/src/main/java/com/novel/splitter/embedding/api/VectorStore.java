@@ -24,8 +24,9 @@ public interface VectorStore {
      *
      * @param scene     小说场景对象，包含场景的具体文本、ID 及元数据等
      * @param embedding 由 EmbeddingService 针对该场景生成的浮点数组向量
+     * @return 保存后的文档ID
      */
-    void save(Scene scene, float[] embedding);
+    String save(Scene scene, float[] embedding);
 
     /**
      * 批量保存场景及其对应的向量
@@ -36,8 +37,9 @@ public interface VectorStore {
      * 
      * @param scenes     需要保存的小说场景对象列表
      * @param embeddings 对应场景的浮点数组向量列表（必须与 scenes 列表长度及顺序一致）
+     * @return 保存后的文档ID列表
      */
-    void saveBatch(List<Scene> scenes, List<float[]> embeddings);
+    List<String> saveBatch(List<Scene> scenes, List<float[]> embeddings);
 
     /**
      * 语义相似度检索 (Semantic Search)

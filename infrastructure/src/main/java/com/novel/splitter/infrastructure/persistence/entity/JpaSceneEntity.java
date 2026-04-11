@@ -85,6 +85,15 @@ public class JpaSceneEntity {
     @Column(name = "metadata_json", columnDefinition = "jsonb")
     private String metadataJson;
 
+    @Column(name = "chunk_index")
+    private int chunkIndex;
+
+    @Column(name = "embed_status")
+    private String embedStatus;
+
+    @Column(name = "vector_id")
+    private String vectorId;
+
     @Column(name = "is_deleted", nullable = false)
     @Builder.Default
     private boolean isDeleted = false;

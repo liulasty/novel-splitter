@@ -78,4 +78,19 @@ public class Scene {
      * 检索评分 (非持久化字段，运行时注入)
      */
     private Double score;
+
+    /**
+     * 全局排序索引，确保小说重组时的正确顺序
+     */
+    private int chunkIndex;
+
+    /**
+     * 向量化状态
+     */
+    private String embedStatus;
+
+    /**
+     * 关联的向量库文档ID
+     */
+    private String vectorId;
 }
