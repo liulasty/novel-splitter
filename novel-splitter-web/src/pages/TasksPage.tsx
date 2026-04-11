@@ -25,7 +25,7 @@ export default function TasksPage() {
     mutationFn: taskApi.deleteTask,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      toast.success('任务已删除');
+      toast.success('任务记录已删除（章节、场景与向量数据不受影响）');
     },
     onError: (error: any) => {
       if (handleConflict409(error, '任务运行中，暂不可删除，请等待任务完成后重试')) {

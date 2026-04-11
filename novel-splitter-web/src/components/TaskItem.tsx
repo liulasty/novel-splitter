@@ -4,6 +4,9 @@ import type { SplitTask } from "@/api/taskApi";
 
 import type { LucideIcon } from "lucide-react";
 
+const DELETE_TASK_CONFIRM =
+    "删除后仅移除本条任务记录与事件日志，不会删除已入库的章节、场景或向量。若需清空知识库数据，请使用「知识库 / Chroma 管理」中的清理功能。\n\n确定删除该任务记录？";
+
 const STATUS_CONFIG = {
     PENDING:    { label: 'PENDING',    pill: 'bg-gray-100 text-gray-600',    bar: 'bg-gray-400' },
     PROCESSING: { label: 'PROCESSING', pill: 'bg-blue-100 text-blue-700',    bar: 'bg-gradient-to-r from-violet-500 to-blue-500' },
@@ -74,7 +77,11 @@ export function TaskItem({
                         <ScrollText className="w-3 h-3 text-violet-500" />
                     </button>
                     <button
-                        onClick={() => onDelete(task.taskId)}
+                        onClick={() => {
+                            if (!canDelete) return;
+                            if (typeof window !== "undefined" && !window.confirm(DELETE_TASK_CONFIRM)) return;
+                            onDelete(task.taskId);
+                        }}
                         disabled={!canDelete}
                         className={cn(
                             "w-6 h-6 rounded-md flex items-center justify-center transition-colors",

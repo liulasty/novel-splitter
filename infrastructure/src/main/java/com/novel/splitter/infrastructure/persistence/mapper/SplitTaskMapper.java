@@ -22,6 +22,7 @@ public class SplitTaskMapper {
         task.setUpdatedAt(entity.getUpdatedAt());
         task.setTotalScenes(entity.getTotalScenes());
         task.getCompletedScenes().set(entity.getCompletedScenes());
+        task.setCurrentEmbedRunId(entity.getCurrentEmbedRunId());
         return task;
     }
 
@@ -41,6 +42,7 @@ public class SplitTaskMapper {
         entity.setUpdatedAt(domain.getUpdatedAt());
         entity.setTotalScenes(domain.getTotalScenes());
         entity.setCompletedScenes(domain.getCompletedScenes() != null ? domain.getCompletedScenes().get() : 0);
+        entity.setCurrentEmbedRunId(domain.getCurrentEmbedRunId());
         return entity;
     }
 }

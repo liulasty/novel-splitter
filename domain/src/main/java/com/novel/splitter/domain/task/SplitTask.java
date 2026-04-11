@@ -17,6 +17,9 @@ public class SplitTask {
     private int totalScenes;
     private java.util.concurrent.atomic.AtomicInteger completedScenes = new java.util.concurrent.atomic.AtomicInteger(0);
 
+    /** UUID for the current embed orchestration run; stale MQ messages must match this. */
+    private String currentEmbedRunId;
+
     public enum TaskStatus {
         PENDING,
         PROCESSING,
@@ -87,6 +90,9 @@ public class SplitTask {
     public void setTotalScenes(int totalScenes) { this.totalScenes = totalScenes; }
 
     public java.util.concurrent.atomic.AtomicInteger getCompletedScenes() { return completedScenes; }
+
+    public String getCurrentEmbedRunId() { return currentEmbedRunId; }
+    public void setCurrentEmbedRunId(String currentEmbedRunId) { this.currentEmbedRunId = currentEmbedRunId; }
 
     // 领域行为
     public void startProcessing(String message) {

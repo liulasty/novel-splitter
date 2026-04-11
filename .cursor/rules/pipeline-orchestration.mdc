@@ -20,7 +20,7 @@ alwaysApply: true
 ## PipelineContext
 
 - **只传 ID 与扩展参数**，不传 `chapters`、`scenes` 等大对象。
-- 各阶段自己从 DB 读所需数据；阶段之间通过 **DB** 交换数据，支持分步执行与断点重跑。
+- 各阶段自己从 DB（及已约定的持久化解析产物，如按章缓存的 JSON）读所需数据；阶段之间通过 **持久化存储** 交换，支持分步执行与断点重跑。
 - 可含：`novelId`、`taskId`、`Map<String, Object> params`（扩展预留）。
 
 ## application 层编排（唯一编排处）
@@ -28,6 +28,16 @@ alwaysApply: true
 - **单步**：`runStage(novelId, stage)` — `switch`/映射调用对应 `PipelineStage`。
 - **全量**：`runFullPipeline(novelId)` — 顺序调用各 `execute`，新增步骤只在此处加一行。
 - **断点续跑（预留）**：`resumePipeline` 等根据任务状态从失败点继续；**不要**为全量单独复制一套 UseCase。
+- **一次性入库（未来）**：与分步执行的差异**仅**在 application 层——增加 `PipelineOrchestrator` / `runFullPipeline`，按序调用既有 UseCase；底层业务**不因**「一键跑通」而新增分支或第二套实现。
+
+## 架构红线（保留未来一次性入库）
+
+分步开发与未来全量编排必须共用同一契约，开发时须遵守：
+
+- **UseCase 独立且无状态**：`LoadNovelUseCase`、`SplitNovelUseCase` 等只完成本阶段核心逻辑，**内部不得**硬编码调用下一阶段。
+- **用持久化交换，不用内存 / MQ 传大包**：上一阶段将结果**落库**（及项目已约定的落盘产物，如 parsed JSON）；下一阶段仅凭 `novelId` / `taskId` 等标识**自行读取**。**禁止**在方法返回值、进程内集合或 MQ 消息体中传递整本正文或巨大对象列表——单步与全量须走**同一套**读写路径。
+- **编排只在 application 层**：「下一步谁跑」只由 `NovelFacadeServiceImpl`、未来的 `PipelineOrchestrator` 或等价服务决定；**禁止**在领域层或 batch 模块里写死流水线分支。
+- **Worker 严禁越权串联**：Worker 完成本队列消费、更新库表与任务状态后即结束；**不**在 Worker 内自动投递下一阶段队列或调用下一 UseCase（例如 `LoadWorker` 在 Load 完成后**不**自动投递 Split——正确做法，把「是否继续」交给上层编排或用户/API 触发）。
 
 ## 任务状态机
 

@@ -7,6 +7,8 @@ import com.novel.splitter.application.mapper.DtoMapper;
 import com.novel.splitter.application.service.task.TaskQueryService;
 import com.novel.splitter.application.service.task.TaskService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -62,7 +64,11 @@ public class TaskController {
 
     @DeleteMapping("/{taskId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Operation(summary = "删除单个切分任务记录")
+    @Operation(summary = "删除单个切分任务记录", description = "仅删除任务记录与事件日志，不删除已入库章节、场景或向量。SUCCESS/FAILED 等已结束任务可删；PENDING/PROCESSING 返回 409。")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "已删除"),
+            @ApiResponse(responseCode = "409", description = "任务运行中，不可删除")
+    })
     public void deleteTask(@PathVariable("taskId") String taskId) {
         var task = taskService.getTask(taskId);
         if (task != null && (task.getStatus() == com.novel.splitter.domain.task.SplitTask.TaskStatus.PENDING

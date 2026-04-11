@@ -1,5 +1,6 @@
 package com.novel.splitter.domain.repository;
 
+import com.novel.splitter.domain.enums.EmbedStatus;
 import com.novel.splitter.domain.model.Scene;
 import com.novel.splitter.domain.model.SceneCountByProfile;
 import com.novel.splitter.domain.model.SceneSplitProfile;
@@ -7,6 +8,7 @@ import com.novel.splitter.domain.model.paging.PagedResult;
 import com.novel.splitter.domain.model.paging.PageQuery;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Scene 存储仓库接口
@@ -42,6 +44,8 @@ public interface SceneRepository {
 
     List<Scene> findByProfile(String novelId, String version, int chunkSize, int chunkOverlap);
 
+    List<Long> listPersistenceIdsByProfile(String novelId, String version, int chunkSize, int chunkOverlap);
+
     long countByProfile(String novelId, String version, int chunkSize, int chunkOverlap);
 
     /** 同一 business version 下所有 chunk 分区的场景总数 */
@@ -59,4 +63,22 @@ public interface SceneRepository {
      * 统计：按 novelId、version、chunk 分组后的场景数量。
      */
     List<SceneCountByProfile> countScenesByNovelVersionAndChunk();
+
+    /**
+     * 新一轮向量化前：将 profile 内场景标为待嵌入并绑定 run id。
+     */
+    int resetEmbedStateForRun(String novelId, String version, int chunkSize, int chunkOverlap, String embedRunId);
+
+    void updateEmbedOutcome(Long persistenceId, String embedRunId, EmbedStatus status, String embedError);
+
+    long countEmbedByRunAndStatus(String novelId, String version, int chunkSize, int chunkOverlap,
+                                  String embedRunId, EmbedStatus status);
+
+    List<Long> listPersistenceIdsForEmbedResume(String novelId, String version, int chunkSize, int chunkOverlap,
+                                                String embedRunId);
+
+    /**
+     * Infer (chunkSize, chunkOverlap) from any scene row participating in an embed run (for resume when task row has no chunk columns).
+     */
+    Optional<int[]> resolveChunkProfileForEmbedRun(String novelId, String version, String embedRunId);
 }

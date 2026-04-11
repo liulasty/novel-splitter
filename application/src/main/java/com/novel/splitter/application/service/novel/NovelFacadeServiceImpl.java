@@ -10,12 +10,13 @@ import com.novel.splitter.application.model.dto.NovelSummaryDto;
 import com.novel.splitter.application.mapper.DtoMapper;
 import com.novel.splitter.application.service.download.DownloadService;
 import com.novel.splitter.application.service.task.TaskService;
+import com.novel.splitter.application.orchestration.EmbedPipelineOrchestrator;
 import com.novel.splitter.application.port.out.TaskQueuePort;
 import com.novel.splitter.domain.enums.NovelStatus;
 import com.novel.splitter.domain.enums.TaskType;
-import com.novel.splitter.domain.task.EmbedTaskMessage;
 import com.novel.splitter.application.model.dto.DownloadAndIngestRequest;
 import com.novel.splitter.application.model.dto.IngestRequest;
+import com.novel.splitter.domain.model.Novel;
 import com.novel.splitter.domain.model.SceneCountByProfile;
 import com.novel.splitter.domain.model.paging.PageQuery;
 import com.novel.splitter.domain.model.paging.PagedResult;
@@ -54,6 +55,14 @@ import java.util.Locale;
 import java.util.regex.PatternSyntaxException;
 import java.util.stream.Collectors;
 
+/**
+ * 小说侧编排门面：上传、Load、场景切分、向量化、流水线等。
+ * <p>
+ * <strong>场景切分与小说状态：</strong>当 {@link NovelStatus#EMBEDDING} 时禁止再投递 Split 队列（会删场景与向量侧数据），
+ * 统一在 {@link #startSceneSplitTask} 入口校验，返回 HTTP 409 Conflict，避免与向量化并发读写冲突。
+ * （是否同时拦截 {@link NovelStatus#SPLITTING} 可后续与产品约定，一期仅拦 EMBEDDING。）
+ * </p>
+ */
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -71,6 +80,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
     private final NovelCacheRepository novelCacheRepository;
     private final TaskService taskService;
     private final TaskQueuePort taskQueuePort;
+    private final EmbedPipelineOrchestrator embedPipelineOrchestrator;
     private final DownloadService downloadService;
     private final SceneRepository sceneRepository;
     private final ChapterRepository chapterRepository;
@@ -335,12 +345,11 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         String taskId = UUID.randomUUID().toString();
         taskService.createEmbedTaskWithNovelAdmission(taskId, nid, v, chunkSize, chunkOverlap);
 
-        EmbedTaskMessage message = new EmbedTaskMessage(taskId, nid, v, chunkSize, chunkOverlap);
-        taskQueuePort.sendEmbed(message);
-        log.info("Sent taskId {} to embed queue", taskId);
+        embedPipelineOrchestrator.startNewEmbedRun(taskId, nid, v, chunkSize, chunkOverlap);
+        log.info("Embed orchestration started taskId {}", taskId);
 
         return TaskSubmitResponseDto.builder()
-                .message("向量化任务已提交到队列")
+                .message("向量化任务已提交（编排已启动）")
                 .taskId(taskId)
                 .build();
     }
@@ -580,6 +589,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
             boolean triggerEmbed,
             Integer chunkSize,
             Integer chunkOverlap) throws IOException {
+        assertSceneSplitAllowed(novelId);
         String taskId = UUID.randomUUID().toString();
         TaskType recordType = triggerEmbed ? TaskType.PIPELINE : TaskType.SCENE_SPLIT;
         taskService.createTaskWithNovelAdmission(taskId, recordType, novelId, maxScenes, version);
@@ -591,6 +601,18 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
                 .taskId(taskId)
                 .message(triggerEmbed ? "场景切分任务已提交（完成后自动向量化）" : "场景切分任务已提交（Split 队列）")
                 .build();
+    }
+
+    /**
+     * 在投递 Split 队列前校验：向量化进行中时不允许再发起场景切分（避免删场景与 Embed 并发冲突）。
+     */
+    private void assertSceneSplitAllowed(String novelId) {
+        Novel n = novelService.getNovelById(novelId);
+        if (n != null && n.getStatus() == NovelStatus.EMBEDDING) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "该小说正在向量化（EMBEDDING），为避免与场景数据冲突，请等待向量化完成后再发起场景切分。");
+        }
     }
 
     private String normalizeNovelId(String fileName) {

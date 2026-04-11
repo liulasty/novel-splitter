@@ -93,6 +93,26 @@
 
     <build>
         <plugins>
+            <!-- 将 MapStruct 生成目录登记为源码根，避免 Eclipse 等 IDE 未把生成代码纳入 ECJ 编译而出现“带编译错误的 DtoMapperImpl.class” -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.5.0</version>
+                <executions>
+                    <execution>
+                        <id>add-mapstruct-sources</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>${project.build.directory}/generated-sources/annotations</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <!-- 核心修复：添加 maven-compiler-plugin + -parameters 参数 -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -102,6 +122,7 @@
                     <source>21</source>
                     <target>21</target>
                     <encoding>UTF-8</encoding>
+                    <generatedSourcesDirectory>${project.build.directory}/generated-sources/annotations</generatedSourcesDirectory>
                     <annotationProcessorPaths>
                         <path>
                             <groupId>org.mapstruct</groupId>

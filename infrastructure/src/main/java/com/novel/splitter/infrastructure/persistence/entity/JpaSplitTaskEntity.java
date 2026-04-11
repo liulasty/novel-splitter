@@ -65,6 +65,9 @@ public class JpaSplitTaskEntity {
     @Column(name = "completed_scenes")
     private int completedScenes;
 
+    @Column(name = "current_embed_run_id", length = 36)
+    private String currentEmbedRunId;
+
     @Override
     public final boolean equals(Object o) {
         if (this == o) return true;

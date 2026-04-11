@@ -1,6 +1,7 @@
 package com.novel.splitter.application.worker;
 
 import com.novel.splitter.application.config.RabbitConfig;
+import com.novel.splitter.application.orchestration.EmbedPipelineOrchestrator;
 import com.novel.splitter.domain.task.SplitTask;
 import com.novel.splitter.domain.task.SplitTaskMessage;
 import com.novel.splitter.domain.task.EnrichTaskMessage;
@@ -30,6 +31,7 @@ public class SplitWorker {
     private final SplitNovelUseCase splitNovelUseCase;
     private final TaskService taskService;
     private final RabbitTemplate rabbitTemplate;
+    private final EmbedPipelineOrchestrator embedPipelineOrchestrator;
 
     private final NovelService novelService;
     private final SceneRepository sceneRepository;
@@ -142,17 +144,13 @@ public class SplitWorker {
                             Integer.MAX_VALUE,
                             message.getVersion()
                     );
-                    rabbitTemplate.convertAndSend(
-                            RabbitConfig.EXCHANGE_NAME,
-                            "embed",
-                            new com.novel.splitter.domain.task.EmbedTaskMessage(
-                                    embedTaskId,
-                                    message.getNovelId(),
-                                    message.getVersion(),
-                                    chunkParams.chunkSize(),
-                                    chunkParams.chunkOverlap())
-                    );
-                    log.info("任务 {} 已自动串联 EMBED 阶段，embedTaskId={}", taskId, embedTaskId);
+                    embedPipelineOrchestrator.startNewEmbedRun(
+                            embedTaskId,
+                            message.getNovelId(),
+                            message.getVersion(),
+                            chunkParams.chunkSize(),
+                            chunkParams.chunkOverlap());
+                    log.info("任务 {} 已自动串联 EMBED 阶段（编排），embedTaskId={}", taskId, embedTaskId);
                 }
                 // 预留: 发送消息到 ENRICH_TASK_QUEUE 进行 AI 语义增强
                 if (enrichEnabled) {

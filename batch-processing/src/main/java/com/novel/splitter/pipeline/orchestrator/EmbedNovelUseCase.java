@@ -11,6 +11,10 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * 批量写入向量库。场景行 embed 状态由应用层消费者在向量写入之后更新；
+ * 顺序为：先 Chroma saveBatch，再 DB 标记 SUCCESS（先 DB 后向量失败时可能不一致，可二期收紧事务/补偿）。
+ */
 @Service
 @Slf4j
 @RequiredArgsConstructor

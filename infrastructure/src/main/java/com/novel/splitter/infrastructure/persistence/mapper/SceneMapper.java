@@ -1,5 +1,6 @@
 package com.novel.splitter.infrastructure.persistence.mapper;
 
+import com.novel.splitter.domain.enums.EmbedStatus;
 import com.novel.splitter.domain.model.Scene;
 import com.novel.splitter.domain.model.SceneMetadata;
 import com.novel.splitter.infrastructure.persistence.entity.JpaSceneEntity;
@@ -41,6 +42,9 @@ public class SceneMapper {
                 .canSplit(entity.isCanSplit())
                 .metadata(meta)
                 .score(null)
+                .embedStatus(entity.getEmbedStatus())
+                .embedError(entity.getEmbedError())
+                .embedRunId(entity.getEmbedRunId())
                 .build();
     }
 
@@ -66,6 +70,9 @@ public class SceneMapper {
                 entity.setChunkOverlap(domain.getMetadata().getChunkOverlap());
             }
         }
+        entity.setEmbedStatus(domain.getEmbedStatus());
+        entity.setEmbedError(domain.getEmbedError());
+        entity.setEmbedRunId(domain.getEmbedRunId());
         // novel/chapter/version/isDeleted/legacyNovelName are handled by repository layer.
         return entity;
     }

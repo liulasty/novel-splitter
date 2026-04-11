@@ -1,5 +1,6 @@
 package com.novel.splitter.infrastructure.persistence.entity;
 
+import com.novel.splitter.domain.enums.EmbedStatus;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -88,6 +89,16 @@ public class JpaSceneEntity {
     @Column(name = "is_deleted", nullable = false)
     @Builder.Default
     private boolean isDeleted = false;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "embed_status")
+    private EmbedStatus embedStatus;
+
+    @Column(name = "embed_error", columnDefinition = "TEXT")
+    private String embedError;
+
+    @Column(name = "embed_run_id", length = 36)
+    private String embedRunId;
 
     @Override
     public final boolean equals(Object o) {

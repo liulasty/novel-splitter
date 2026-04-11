@@ -60,10 +60,30 @@ export interface NovelChapterDto {
 /** @deprecated 使用 NovelChapterDto */
 export type ChapterTreeDto = NovelChapterDto;
 
-export interface ScenePreviewDto {
-  sceneId: string;
-  content: string;
-  tokens: number;
+/** 与后端 SceneDto JSON 对齐（章节下切分片段） */
+export interface SceneDto {
+  id: string;
+  chapterTitle: string;
+  chapterIndex: number;
+  startParagraphIndex: number;
+  endParagraphIndex: number;
+  text: string;
+  wordCount: number;
+  prefixContext?: string | null;
+  canSplit: boolean;
+  metadata?: Record<string, unknown> | null;
+  score?: number | null;
+}
+
+/**
+ * 与后端 domain PagedResult 对齐（非 Spring Data Page）。
+ * 部分接口仍返回 Spring Page，请用 {@link PageResponse}。
+ */
+export interface DomainPagedResult<T> {
+  content: T[];
+  page: number;
+  size: number;
+  totalElements: number;
 }
 
 export interface PageResponse<T> {
@@ -233,8 +253,8 @@ export const novelApi = {
     return response;
   },
 
-  getScenes: async (novelId: string, chapterId: string, page = 0, size = 200): Promise<PageResponse<ScenePreviewDto>> => {
-    const response = await apiClient.get<ApiEnvelope<PageResponse<ScenePreviewDto>>, PageResponse<ScenePreviewDto>>(
+  getScenes: async (novelId: string, chapterId: string, page = 0, size = 200): Promise<DomainPagedResult<SceneDto>> => {
+    const response = await apiClient.get<ApiEnvelope<DomainPagedResult<SceneDto>>, DomainPagedResult<SceneDto>>(
       `/novels/${novelId}/chapters/${chapterId}/scenes`,
       { params: { page, size } }
     );

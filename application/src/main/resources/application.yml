@@ -53,6 +53,7 @@ llm:
     api-key: ${COZE_API_KEY}
     bot-id: ${COZE_BOT_ID}
     user-id: ${COZE_USER_ID:user_default}
+    # 仅作用于 CozeLlmClient 等远程 Coze API；向量化见 splitter.ingestion.embedding-rate-limit
     rate-limit:
       enabled: true
       max-requests: 2
@@ -113,12 +114,27 @@ splitter:
       initial-interval-ms: 1000
       multiplier: 2.0
       max-interval-ms: 10000
+
+  embed:
+    # 编排层 fan-out 时每批发送条数（单次 List 传给 TaskQueuePort）
+    scene-publish-batch-size: 200
+    # 细粒度队列批量监听 batch size（与 RabbitConfig.embedSceneBatchListenerContainerFactory 一致）
+    scene-listener:
+      batch-size: 50
+    progress-interval-ms: 5000
+    progress-scheduler-enabled: true
   
   ingestion:
     batch-size: 10
     chunk-size: 350
     chunk-overlap: 65
-    
+    # 向量化（ONNX + Chroma）每「批」调度限流；与 llm.coze.rate-limit 无关。默认关闭。
+    embedding-rate-limit:
+      enabled: false
+      # 每 duration-seconds 窗口内最多处理多少批 embedBatch；0 表示不限制（需 enabled=true 且 >0 才生效）
+      max-batches: 0
+      duration-seconds: 60
+
   rule:
     target-length: 350
     min-length: 50

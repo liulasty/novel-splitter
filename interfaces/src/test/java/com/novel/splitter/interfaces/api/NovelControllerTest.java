@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.novel.splitter.application.model.NovelSummaryListScope;
 import com.novel.splitter.application.model.command.UploadNovelCommand;
 import com.novel.splitter.application.model.dto.NovelUploadResponseDto;
+import com.novel.splitter.application.model.dto.SceneSplitRequestDto;
 import com.novel.splitter.application.service.novel.NovelFacadeService;
 import com.novel.splitter.interfaces.common.GlobalExceptionHandler;
 import com.novel.splitter.interfaces.common.GlobalResponseAdvice;
@@ -13,7 +14,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
@@ -23,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -112,5 +116,21 @@ class NovelControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400))
                 .andExpect(jsonPath("$.message").value("文件名不能为空"));
+    }
+
+    @Test
+    void sceneSplitReturns409WhenNovelEmbedding() throws Exception {
+        when(novelFacadeService.sceneSplit(eq("n1"), any(SceneSplitRequestDto.class)))
+                .thenThrow(new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "该小说正在向量化（EMBEDDING），为避免与场景数据冲突，请等待向量化完成后再发起场景切分。"));
+
+        mockMvc.perform(post("/api/novels/n1/scene-split")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value(409));
+
+        verify(novelFacadeService).sceneSplit(eq("n1"), any(SceneSplitRequestDto.class));
     }
 }

@@ -18,7 +18,7 @@ import org.mapstruct.Mapping;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.List;
 
-@Mapper(componentModel = "spring")
+@Mapper
 public interface DtoMapper {
     @Mapping(
             target = "paragraphCount",

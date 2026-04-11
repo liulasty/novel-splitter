@@ -6,7 +6,7 @@ import { novelApi } from "@/api/novelApi";
 import { taskApi } from "@/api/taskApi";
 import { downloadApi } from "@/api/downloadApi";
 import { useTaskPoller } from './useTaskPoller';
-import { getApiErrorMessage, handleConflict409 } from '@/lib/apiError';
+import { getApiErrorMessage, handleConflict409, isHttpConflict409 } from '@/lib/apiError';
 
 const LAST_NOVEL_SESSION_KEY = 'ingest:lastNovelId';
 
@@ -212,7 +212,17 @@ export function useIngestTask() {
             queryClient.invalidateQueries({ queryKey: ['tasks'] });
         },
         onError: (error: any) => {
-            const msg = `场景切分失败：${error.response?.data?.error || error.message}`;
+            if (isHttpConflict409(error)) {
+                const msg = getApiErrorMessage(
+                    error,
+                    '该小说正在向量化（EMBEDDING），请结束后再发起场景切分，避免与向量化读写冲突。'
+                );
+                setIngestStatus(`场景切分未提交：${msg}`);
+                setIsError(true);
+                toast.error(msg);
+                return;
+            }
+            const msg = `场景切分失败：${getApiErrorMessage(error, error.message)}`;
             setIngestStatus(msg);
             setIsError(true);
             toast.error(msg);
@@ -260,7 +270,7 @@ export function useIngestTask() {
         mutationFn: taskApi.deleteTask,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['tasks'] });
-            toast.success("任务已删除");
+            toast.success("任务记录已删除（章节、场景与向量数据不受影响）");
         },
         onError: (error: any) => {
             if (handleConflict409(error, "任务运行中，暂不可删除，请等待任务完成后重试")) {

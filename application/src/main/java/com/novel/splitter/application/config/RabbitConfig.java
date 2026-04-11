@@ -34,12 +34,17 @@ public class RabbitConfig {
     @Value("${splitter.rabbitmq.retry.max-interval-ms:10000}")
     private long retryMaxIntervalMs;
 
+    @Value("${splitter.embed.scene-listener.batch-size:50}")
+    private int embedSceneBatchSize;
 
     public static final String EXCHANGE_NAME = "novel.task.exchange";
 
     public static final String LOAD_TASK_QUEUE = "novel.task.load";
     public static final String SPLIT_TASK_QUEUE = "novel.task.split";
     public static final String EMBED_TASK_QUEUE = "novel.task.embed";
+    /** 细粒度：单场景向量化子任务 */
+    public static final String EMBED_SCENE_TASK_QUEUE = "novel.task.embed.scene";
+    public static final String EMBED_SCENE_ROUTING_KEY = "embed.scene";
     public static final String CLEANUP_TASK_QUEUE = "novel.task.cleanup";
     public static final String ENRICH_TASK_QUEUE = "novel.task.enrich";
     public static final String DLX_EXCHANGE_NAME = "novel.task.dlx";
@@ -79,6 +84,14 @@ public class RabbitConfig {
     @Bean
     public Queue embedTaskQueue() {
         return new Queue(EMBED_TASK_QUEUE, true, false, false, Map.of(
+                "x-dead-letter-exchange", DLX_EXCHANGE_NAME,
+                "x-dead-letter-routing-key", "embed.dlq"
+        ));
+    }
+
+    @Bean
+    public Queue embedSceneTaskQueue() {
+        return new Queue(EMBED_SCENE_TASK_QUEUE, true, false, false, Map.of(
                 "x-dead-letter-exchange", DLX_EXCHANGE_NAME,
                 "x-dead-letter-routing-key", "embed.dlq"
         ));
@@ -138,6 +151,11 @@ public class RabbitConfig {
     @Bean
     public Binding embedBinding(Queue embedTaskQueue, DirectExchange taskExchange) {
         return BindingBuilder.bind(embedTaskQueue).to(taskExchange).with("embed");
+    }
+
+    @Bean
+    public Binding embedSceneBinding(Queue embedSceneTaskQueue, DirectExchange taskExchange) {
+        return BindingBuilder.bind(embedSceneTaskQueue).to(taskExchange).with(EMBED_SCENE_ROUTING_KEY);
     }
 
     @Bean
@@ -217,6 +235,26 @@ public class RabbitConfig {
         factory.setMessageConverter(jsonMessageConverter);
         factory.setDefaultRequeueRejected(false);
         factory.setAdviceChain(rabbitRetryInterceptor);
+        return factory;
+    }
+
+    /**
+     * 细粒度 embed 批量消费（与全局 {@link #rabbitListenerContainerFactory} 隔离，避免 batch 影响其它队列）。
+     */
+    @Bean
+    public SimpleRabbitListenerContainerFactory embedSceneBatchListenerContainerFactory(
+            ConnectionFactory connectionFactory,
+            MessageConverter jsonMessageConverter,
+            RetryOperationsInterceptor rabbitRetryInterceptor
+    ) {
+        SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
+        factory.setConnectionFactory(connectionFactory);
+        factory.setMessageConverter(jsonMessageConverter);
+        factory.setDefaultRequeueRejected(false);
+        factory.setAdviceChain(rabbitRetryInterceptor);
+        factory.setConsumerBatchEnabled(true);
+        factory.setBatchListener(true);
+        factory.setBatchSize(Math.max(1, embedSceneBatchSize));
         return factory;
     }
 }

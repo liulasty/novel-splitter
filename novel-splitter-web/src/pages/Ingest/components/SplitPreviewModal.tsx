@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { novelApi } from '@/api/novelApi';
 import { Loader2, FileText, X, ChevronRight, BookOpen } from 'lucide-react';
@@ -34,6 +34,15 @@ export function SplitPreviewModal({ isOpen, onClose, novelId }: SplitPreviewModa
         enabled: isOpen && !!novelId && !!selectedChapterId,
     });
     const scenes = scenesPageData?.content ?? [];
+
+    const scenePageMeta = useMemo(() => {
+        if (!scenesPageData) return null;
+        const { page, size, totalElements } = scenesPageData;
+        const totalPages = Math.max(1, Math.ceil(totalElements / Math.max(size, 1)));
+        const isFirst = page <= 0;
+        const isLast = (page + 1) * size >= totalElements;
+        return { totalPages, isFirst, isLast, displayPage: page + 1 };
+    }, [scenesPageData]);
 
     if (!isOpen) return null;
 
@@ -103,9 +112,9 @@ export function SplitPreviewModal({ isOpen, onClose, novelId }: SplitPreviewModa
                     <div className="w-2/3 bg-slate-50 flex flex-col relative">
                         <div className="p-4 border-b border-gray-100 bg-white flex justify-between items-center">
                             <h3 className="text-sm font-semibold text-gray-700">切分片段 (Scenes)</h3>
-                            {scenesPageData && (
+                            {scenesPageData && scenePageMeta && (
                                 <span className="text-xs text-gray-500">
-                                    共 {scenesPageData.totalElements} 个片段 · 第 {scenesPageData.number + 1}/{Math.max(scenesPageData.totalPages, 1)} 页
+                                    共 {scenesPageData.totalElements} 个片段 · 第 {scenePageMeta.displayPage}/{scenePageMeta.totalPages} 页
                                 </span>
                             )}
                         </div>
@@ -123,17 +132,17 @@ export function SplitPreviewModal({ isOpen, onClose, novelId }: SplitPreviewModa
                                 <div className="text-center py-8 text-sm text-gray-500">该章节暂无切分片段。</div>
                             ) : (
                                 scenes?.map((scene, idx) => (
-                                    <div key={scene.sceneId} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                                    <div key={scene.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                                         <div className="flex items-center justify-between px-4 py-2 bg-gray-50/80 border-b border-gray-100">
-                                            <span className="text-xs font-semibold text-gray-500">Scene #{idx + 1}</span>
+                                            <span className="text-xs font-semibold text-gray-500">片段 #{idx + 1}</span>
                                             <div className="flex items-center gap-2">
                                                 <span className="px-2 py-0.5 rounded text-[10px] font-medium tracking-wide bg-blue-100 text-blue-700">
-                                                    Tokens: {scene.tokens}
+                                                    字数: {scene.wordCount}
                                                 </span>
                                             </div>
                                         </div>
                                         <div className="p-4 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
-                                            {scene.content}
+                                            {scene.text}
                                         </div>
                                     </div>
                                 ))
@@ -141,18 +150,18 @@ export function SplitPreviewModal({ isOpen, onClose, novelId }: SplitPreviewModa
                         </div>
                     </div>
                 </div>
-                {!!selectedChapterId && !!scenesPageData && scenesPageData.totalPages > 1 && (
+                {!!selectedChapterId && !!scenesPageData && scenePageMeta && scenePageMeta.totalPages > 1 && (
                     <div className="flex items-center justify-end gap-2 px-6 py-3 border-t border-gray-100 bg-white">
                         <button
                             className="px-3 py-1.5 text-sm rounded border border-gray-200 disabled:opacity-50"
-                            disabled={scenesPageData.first}
+                            disabled={scenePageMeta.isFirst}
                             onClick={() => setScenePage((p) => Math.max(0, p - 1))}
                         >
                             上一页
                         </button>
                         <button
                             className="px-3 py-1.5 text-sm rounded border border-gray-200 disabled:opacity-50"
-                            disabled={scenesPageData.last}
+                            disabled={scenePageMeta.isLast}
                             onClick={() => setScenePage((p) => p + 1)}
                         >
                             下一页

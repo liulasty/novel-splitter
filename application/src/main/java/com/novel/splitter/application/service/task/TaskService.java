@@ -134,6 +134,40 @@ public class TaskService {
         }
     }
 
+    /**
+     * 向量化编排开始时：绑定 embed run、总场景数、进入 PROCESSING。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void beginEmbedRun(String taskId, String embedRunId, int totalScenes, String message) {
+        SplitTask task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new IllegalArgumentException("Task not found: " + taskId));
+        task.setCurrentEmbedRunId(embedRunId);
+        task.setTotalScenes(totalScenes);
+        task.getCompletedScenes().set(0);
+        task.startProcessing(message);
+        taskRepository.save(task);
+        appendTaskEvent(task);
+        taskCachePort.put(taskId, toPollResponse(task));
+    }
+
+    /**
+     * 定时任务聚合向量化进度时更新任务行（不写终态）。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void updateEmbedProcessingProgress(String taskId, long successCount, long failedCount, int totalScenes) {
+        SplitTask task = taskRepository.findById(taskId).orElse(null);
+        if (task == null || task.getStatus() != SplitTask.TaskStatus.PROCESSING) {
+            return;
+        }
+        task.getCompletedScenes().set((int) Math.min(successCount, totalScenes));
+        int progress = totalScenes <= 0 ? 0 : (int) Math.min(99, (successCount * 100L) / totalScenes);
+        String msg = String.format("向量化：%d/%d（失败 %d）", successCount, totalScenes, failedCount);
+        task.updateProgress(progress, msg);
+        taskRepository.save(task);
+        appendTaskEvent(task);
+        taskCachePort.put(taskId, toPollResponse(task));
+    }
+
     private void persistNewTask(SplitTask task) {
         taskRepository.save(task);
         appendTaskEvent(task);

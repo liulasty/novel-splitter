@@ -16,6 +16,8 @@ import com.novel.splitter.application.model.dto.TaskSubmitResponseDto;
 import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -156,7 +158,12 @@ public class NovelController {
         return novelFacadeService.reparseChapters(novelId, body != null ? body : new ReparseChaptersRequestDto());
     }
 
-    @Operation(summary = "场景切分（SCENE_SPLIT）", description = "投递 Split 队列：需已完成章节解析。每次任务会生成多条 Scene；按 version 分区落库，任务前会删除该小说同名 version 的旧场景与向量。chunk 规则不会自动改变 version，不同滑窗策略并存请使用不同 version。")
+    @Operation(summary = "场景切分（SCENE_SPLIT）", description = "投递 Split 队列：需已完成章节解析。每次任务会生成多条 Scene；按 version 分区落库，任务前会删除该小说同名 version 的旧场景与向量。chunk 规则不会自动改变 version，不同滑窗策略并存请使用不同 version。"
+            + " 若小说状态为 EMBEDDING（向量化进行中），拒绝提交并返回 409，避免与向量化并发冲突。")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "任务已提交"),
+            @ApiResponse(responseCode = "409", description = "小说正在向量化（EMBEDDING），暂不可发起场景切分")
+    })
     @PostMapping("/{novelId}/scene-split")
     public TaskSubmitResponseDto sceneSplitNovel(
             @PathVariable("novelId") String novelId,
@@ -164,13 +171,22 @@ public class NovelController {
         return novelFacadeService.sceneSplit(novelId, request != null ? request : new SceneSplitRequestDto());
     }
 
-    @Operation(summary = "重试场景切分（跳过章节解析）", description = "当 SplitWorker 失败时可重试；要求 chapters 与 chapter JSON 均已存在")
+    @Operation(summary = "重试场景切分（跳过章节解析）", description = "当 SplitWorker 失败时可重试；要求 chapters 与 chapter JSON 均已存在。若小说为 EMBEDDING，返回 409。")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "任务已提交"),
+            @ApiResponse(responseCode = "409", description = "小说正在向量化（EMBEDDING），暂不可发起场景切分")
+    })
     @PostMapping("/{novelId}/split/retry")
     public TaskSubmitResponseDto retrySplitNovel(@PathVariable("novelId") String novelId, @RequestBody SplitRetryRequestDto request) throws IOException {
         return novelFacadeService.retrySplit(novelId, request);
     }
 
-    @Operation(summary = "触发小说处理流水线", description = "stages 含 SPLIT 时默认仅章节解析（Load）；场景切分请用 /scene-split。stages 仅 EMBED 时向量化。splitEntry=SCENE_ONLY 时直接场景切分。")
+    @Operation(summary = "触发小说处理流水线", description = "stages 含 SPLIT 时默认仅章节解析（Load）；场景切分请用 /scene-split。stages 仅 EMBED 时向量化。splitEntry=SCENE_ONLY 时直接场景切分。"
+            + " 当 splitEntry=SCENE_ONLY 且小说为 EMBEDDING 时返回 409。")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "任务已提交"),
+            @ApiResponse(responseCode = "409", description = "（仅 splitEntry=SCENE_ONLY 场景切分时）小说正在向量化（EMBEDDING），暂不可发起场景切分")
+    })
     @PostMapping("/{novelId}/pipeline")
     public TaskSubmitResponseDto triggerPipeline(@PathVariable("novelId") String novelId, @Valid @RequestBody NovelPipelineRequestDto request) throws IOException {
         return novelFacadeService.pipeline(novelId, request);

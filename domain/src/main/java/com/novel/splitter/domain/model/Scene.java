@@ -1,5 +1,6 @@
 package com.novel.splitter.domain.model;
 
+import com.novel.splitter.domain.enums.EmbedStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -78,4 +79,9 @@ public class Scene {
      * 检索评分 (非持久化字段，运行时注入)
      */
     private Double score;
+
+    private EmbedStatus embedStatus;
+    private String embedError;
+    /** Which embed run last wrote this row (audit / resume filter). */
+    private String embedRunId;
 }

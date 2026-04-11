@@ -1,5 +1,6 @@
 package com.novel.splitter.infrastructure.persistence.repository.impl;
 
+import com.novel.splitter.domain.enums.EmbedStatus;
 import com.novel.splitter.domain.model.Scene;
 import com.novel.splitter.domain.model.SceneCountByProfile;
 import com.novel.splitter.domain.model.SceneMetadata;
@@ -29,6 +30,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -167,6 +169,11 @@ public class SceneRepositoryJpaImpl implements SceneRepository {
     }
 
     @Override
+    public List<Long> listPersistenceIdsByProfile(String novelId, String version, int chunkSize, int chunkOverlap) {
+        return jpaSceneRepository.findPersistenceIdsByProfile(novelId, version, chunkSize, chunkOverlap);
+    }
+
+    @Override
     @Transactional
     public void deleteAll() {
         jpaSceneRepository.deleteAll();
@@ -223,6 +230,49 @@ public class SceneRepositoryJpaImpl implements SceneRepository {
     @Override
     public List<SceneCountByProfile> countScenesByNovelVersionAndChunk() {
         return jpaSceneRepository.countScenesByNovelVersionAndChunk();
+    }
+
+    @Override
+    @Transactional
+    public int resetEmbedStateForRun(String novelId, String version, int chunkSize, int chunkOverlap, String embedRunId) {
+        return jpaSceneRepository.resetEmbedStateForRun(
+                novelId, version, chunkSize, chunkOverlap, embedRunId, EmbedStatus.PENDING);
+    }
+
+    @Override
+    @Transactional
+    public void updateEmbedOutcome(Long persistenceId, String embedRunId, EmbedStatus status, String embedError) {
+        String err = embedError != null && embedError.length() > 4000 ? embedError.substring(0, 4000) : embedError;
+        jpaSceneRepository.updateEmbedOutcome(persistenceId, embedRunId, status, err);
+    }
+
+    @Override
+    public long countEmbedByRunAndStatus(
+            String novelId, String version, int chunkSize, int chunkOverlap, String embedRunId, EmbedStatus status) {
+        return jpaSceneRepository.countByProfileRunAndStatus(
+                novelId, version, chunkSize, chunkOverlap, embedRunId, status);
+    }
+
+    @Override
+    public List<Long> listPersistenceIdsForEmbedResume(
+            String novelId, String version, int chunkSize, int chunkOverlap, String embedRunId) {
+        return jpaSceneRepository.findIdsByProfileAndRunAndEmbedStatusIn(
+                novelId, version, chunkSize, chunkOverlap, embedRunId, List.of(EmbedStatus.PENDING, EmbedStatus.FAILED));
+    }
+
+    @Override
+    public Optional<int[]> resolveChunkProfileForEmbedRun(String novelId, String version, String embedRunId) {
+        List<Object[]> rows = jpaSceneRepository.findChunkRowsByEmbedRun(novelId, version, embedRunId);
+        if (rows == null || rows.isEmpty()) {
+            return Optional.empty();
+        }
+        Object[] row = rows.get(0);
+        if (row == null || row.length < 2 || row[0] == null || row[1] == null) {
+            return Optional.empty();
+        }
+        int cs = ((Number) row[0]).intValue();
+        int co = ((Number) row[1]).intValue();
+        return Optional.of(new int[] {cs, co});
     }
 
     private Pageable toPageable(PageQuery pageQuery) {
