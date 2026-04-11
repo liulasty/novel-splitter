@@ -125,6 +125,20 @@ class ChapterRecognizerTest {
         assertTrue(lines.get(off).contains("正文"));
     }
 
+    @Test
+    void chapterTitleMatchesWhenLineHasUtf8Bom() {
+        assertTrue(ChapterRecognizer.isChapterTitleLine(
+                "\uFEFF第1章 神仙眷侣", ChapterRecognizer.DEFAULT_CHAPTER_PATTERN));
+        assertTrue(ChapterRecognizer.isChapterTitleLine(
+                "\uFEFF    第1章 神仙眷侣", ChapterRecognizer.DEFAULT_CHAPTER_PATTERN));
+    }
+
+    @Test
+    void chapterTitleMatchesFullWidthDigit() {
+        assertTrue(ChapterRecognizer.isChapterTitleLine(
+                "第１章 神仙眷侣", ChapterRecognizer.DEFAULT_CHAPTER_PATTERN));
+    }
+
     private List<RawParagraph> toParagraphs(List<String> lines) {
         ParagraphSplitter splitter = new ParagraphSplitter();
         return splitter.split(lines);

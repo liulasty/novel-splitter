@@ -8,7 +8,9 @@ import type { RagDebugResponse, ChatRequest } from '@/types/api';
 import { estimateTokens } from '@/utils/tokenEstimator';
 import { toast } from 'sonner';
 import { CollapseCard } from '@/components/ui/collapse-card';
-import { Copy, Filter, ArrowDownAZ, ArrowUpZA } from 'lucide-react';
+import { SelectMenu, type SelectMenuOption } from '@/components/ui/select-menu';
+import { cn } from '@/lib/utils';
+import { Copy, Filter, ArrowDownAZ, ArrowUpZA, BugPlay } from 'lucide-react';
 import type { NovelSummaryDto } from '@/api/novelApi';
 
 const TABS = [
@@ -17,7 +19,7 @@ const TABS = [
   { id: 'prompt', label: '最终提示词 (Prompt)' }
 ];
 
-export default function RagDebugPage() {
+function RagDebugPage() {
   const [novels, setNovels] = useState<Array<Pick<NovelSummaryDto, 'novelId' | 'title'>>>([]);
   const [splitProfiles, setSplitProfiles] = useState<SceneSplitProfileDto[]>([]);
   const [selectedProfileIndex, setSelectedProfileIndex] = useState(0);
@@ -193,6 +195,23 @@ export default function RagDebugPage() {
     return list;
   }, [result?.contextBlocks, contextFilter, contextSortAsc]);
 
+  const novelOptions: SelectMenuOption[] = useMemo(
+    () => novels.map((n) => ({ value: n.novelId, label: n.title })),
+    [novels]
+  );
+
+  const profileOptions: SelectMenuOption[] = useMemo(
+    () =>
+      splitProfiles.map((p, i) => ({
+        value: String(i),
+        label: splitProfileLabel(p),
+      })),
+    [splitProfiles]
+  );
+
+  const inputClass =
+    'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm transition-colors placeholder:text-slate-400 hover:border-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/25 focus-visible:border-indigo-400';
+
   const renderTabContent = () => {
     if (!result) return null;
 
@@ -200,8 +219,8 @@ export default function RagDebugPage() {
       case 'retrieval':
         return (
           <div className="space-y-4">
-            <div className="flex justify-between items-center mb-4 sticky top-0 bg-white z-10 py-2 border-b">
-              <h2 className="text-xl font-bold">
+            <div className="flex justify-between items-center mb-4 sticky top-0 z-10 border-b border-slate-200/80 bg-white/95 py-2 backdrop-blur-sm">
+              <h2 className="text-xl font-bold text-slate-900">
                 检索结果 (Raw Retrieval) - {result.retrievedScenes.length} 条
                 {result.retrievedScenes.length < topK && (
                   <span className="ml-2 text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded font-normal">
@@ -215,14 +234,15 @@ export default function RagDebugPage() {
                   <input 
                     type="text" 
                     placeholder="按关键词过滤..." 
-                    className="pl-8 pr-2 py-1 border rounded text-sm w-48 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className={cn('pl-8 pr-2 py-1.5 w-48', inputClass)}
                     value={retrievalFilter}
                     onChange={e => setRetrievalFilter(e.target.value)}
                   />
                 </div>
                 <button 
+                  type="button"
                   onClick={() => setRetrievalSortAsc(!retrievalSortAsc)}
-                  className="flex items-center gap-1 px-3 py-1 border rounded text-sm hover:bg-gray-50 transition-colors"
+                  className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
                   title="按分数排序"
                 >
                   {retrievalSortAsc ? <ArrowDownAZ className="w-4 h-4" /> : <ArrowUpZA className="w-4 h-4" />}
@@ -256,22 +276,23 @@ export default function RagDebugPage() {
       case 'context':
         return (
           <div className="space-y-4">
-            <div className="flex justify-between items-center mb-4 sticky top-0 bg-white z-10 py-2 border-b">
-              <h2 className="text-xl font-bold">上下文组装 (Assembled Context) - {result.contextBlocks.length} 块</h2>
+            <div className="flex justify-between items-center mb-4 sticky top-0 z-10 border-b border-slate-200/80 bg-white/95 py-2 backdrop-blur-sm">
+              <h2 className="text-xl font-bold text-slate-900">上下文组装 (Assembled Context) - {result.contextBlocks.length} 块</h2>
               <div className="flex items-center gap-3">
                 <div className="relative">
                   <Filter className="w-4 h-4 absolute left-2 top-2 text-gray-400" />
                   <input 
                     type="text" 
                     placeholder="按关键词过滤..." 
-                    className="pl-8 pr-2 py-1 border rounded text-sm w-48 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className={cn('pl-8 pr-2 py-1.5 w-48', inputClass)}
                     value={contextFilter}
                     onChange={e => setContextFilter(e.target.value)}
                   />
                 </div>
                 <button 
+                  type="button"
                   onClick={() => setContextSortAsc(!contextSortAsc)}
-                  className="flex items-center gap-1 px-3 py-1 border rounded text-sm hover:bg-gray-50 transition-colors"
+                  className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
                   title="按分数排序"
                 >
                   {contextSortAsc ? <ArrowDownAZ className="w-4 h-4" /> : <ArrowUpZA className="w-4 h-4" />}
@@ -308,16 +329,17 @@ export default function RagDebugPage() {
       case 'prompt':
         return (
           <div className="space-y-6">
-            <div className="flex justify-between items-center mb-4 sticky top-0 bg-white z-10 py-2 border-b">
-              <h2 className="text-xl font-bold">最终提示词载荷 (Final Prompt Payload)</h2>
+            <div className="flex justify-between items-center mb-4 sticky top-0 z-10 border-b border-slate-200/80 bg-white/95 py-2 backdrop-blur-sm">
+              <h2 className="text-xl font-bold text-slate-900">最终提示词载荷 (Final Prompt Payload)</h2>
               <div className="flex gap-3 items-center">
                  <div className="px-3 py-1 text-xs bg-gray-100 text-gray-700 rounded border border-gray-200 flex items-center shadow-sm">
                     <span className="font-bold mr-1">预估 Token:</span> 
                     {estimateTokens(generateFullPrompt())}
                  </div>
                  <button
+                   type="button"
                    onClick={() => copyText(generateFullPrompt(), '已复制完整 Prompt')}
-                   className="flex items-center gap-1 px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors shadow-sm"
+                   className="flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700"
                  >
                    <Copy className="w-4 h-4" /> 复制完整 Prompt
                  </button>
@@ -435,122 +457,162 @@ export default function RagDebugPage() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50 overflow-hidden">
-      {/* 顶部固定区域: 查询配置 */}
-      <div className="flex-none bg-white border-b shadow-sm z-20 sticky top-0 px-4 py-3">
-        <div className="flex flex-col md:flex-row gap-4 max-w-7xl mx-auto items-start md:items-center justify-between">
-          <div className="flex items-center gap-4 flex-none">
-             <h1 className="text-2xl font-bold text-gray-800 tracking-tight">RAG Debug</h1>
-             {loading && <span className="flex h-3 w-3 relative"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span><span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span></span>}
-          </div>
-          
-          <div className="flex-1 flex flex-col md:flex-row gap-4 items-center w-full">
-            <div className="flex gap-2 w-full md:w-auto">
-              <select 
-                className="w-full md:w-32 p-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none"
-                value={selectedNovel}
-                onChange={(e) => setSelectedNovel(e.target.value)}
-              >
-                <option value="">选择小说...</option>
-                {novels.map(n => <option key={n.novelId} value={n.novelId}>{n.title}</option>)}
-              </select>
-              <select 
-                className="w-full md:w-48 p-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none"
-                value={splitProfiles.length ? String(selectedProfileIndex) : ''}
-                onChange={(e) => setSelectedProfileIndex(Number(e.target.value))}
-                disabled={!selectedNovel || !splitProfiles.length}
-              >
-                <option value="">数据集...</option>
-                {splitProfiles.map((p, i) => (
-                  <option key={`${p.version}-${p.chunkSize}-${p.chunkOverlap}`} value={String(i)}>
-                    {splitProfileLabel(p)}
-                  </option>
-                ))}
-              </select>
+    <div className="flex h-screen flex-col overflow-hidden bg-slate-50">
+      <header className="z-20 flex-none border-b border-slate-200/80 bg-white/90 px-4 py-4 shadow-sm shadow-slate-200/40 backdrop-blur-md">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100">
+                <BugPlay className="h-5 w-5 text-indigo-600" aria-hidden />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">RAG Debug</h1>
+                <p className="text-xs text-slate-500 sm:text-sm">检索 → 上下文 → 提示词，逐步对照</p>
+              </div>
+              {loading && (
+                <span className="relative flex h-3 w-3" aria-hidden>
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-400 opacity-75" />
+                  <span className="relative inline-flex h-3 w-3 rounded-full bg-indigo-500" />
+                </span>
+              )}
             </div>
-            
-            <div className="flex-1 w-full">
-              <input 
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,11rem)_minmax(0,14rem)_1fr_auto] lg:items-end">
+            <div className="space-y-1.5">
+              <span className="block text-xs font-medium text-slate-500">小说</span>
+              <SelectMenu
+                value={selectedNovel}
+                onValueChange={setSelectedNovel}
+                options={novelOptions}
+                placeholder="选择已向量化的小说…"
+                className="w-full min-w-0 lg:min-w-[11rem]"
+                emptyMessage={novels.length ? '暂无可选' : '加载中或暂无书目'}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <span className="block text-xs font-medium text-slate-500">数据集 / 滑窗</span>
+              <SelectMenu
+                value={splitProfiles.length ? String(selectedProfileIndex) : ''}
+                onValueChange={(v) => setSelectedProfileIndex(Number(v))}
+                options={profileOptions}
+                placeholder={selectedNovel ? '选择切片配置…' : '请先选择小说'}
+                disabled={!selectedNovel || !splitProfiles.length}
+                className="w-full min-w-0 lg:min-w-[14rem]"
+                emptyMessage="该书暂无切片配置"
+              />
+            </div>
+            <div className="space-y-1.5 min-w-0 lg:col-span-1">
+              <label htmlFor="rag-debug-question" className="block text-xs font-medium text-slate-500">
+                问题
+              </label>
+              <input
+                id="rag-debug-question"
                 type="text"
-                className="w-full p-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none shadow-inner"
+                className={inputClass}
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
-                placeholder="在此输入问题..."
+                placeholder="输入要向量化库查询的问题…"
                 onKeyDown={(e) => e.key === 'Enter' && handleDebug()}
               />
             </div>
-            
-            <div className="flex items-center gap-2 w-full md:w-auto">
-              <label className="text-sm text-gray-600 whitespace-nowrap">Top K:</label>
-              <input 
-                type="number"
-                className="w-16 p-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none"
-                value={topK}
-                onChange={(e) => setTopK(parseInt(e.target.value))}
-                min={1}
-                max={50}
-              />
-              <button 
-                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-sm whitespace-nowrap"
+            <div className="flex flex-wrap items-end gap-2 lg:flex-nowrap">
+              <div className="space-y-1.5">
+                <label htmlFor="rag-debug-topk" className="block text-xs font-medium text-slate-500">
+                  Top K
+                </label>
+                <input
+                  id="rag-debug-topk"
+                  type="number"
+                  className={cn(inputClass, 'w-[4.5rem] text-center tabular-nums')}
+                  value={topK}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value, 10);
+                    if (Number.isNaN(v)) setTopK(5);
+                    else setTopK(Math.min(50, Math.max(1, v)));
+                  }}
+                  min={1}
+                  max={50}
+                />
+              </div>
+              <button
+                type="button"
+                className="inline-flex h-[42px] shrink-0 items-center justify-center rounded-lg bg-indigo-600 px-5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={handleDebug}
                 disabled={loading || !question}
               >
-                {loading ? '调试中...' : '开始调试'}
+                {loading ? '调试中…' : '开始调试'}
               </button>
             </div>
           </div>
-        </div>
-        {error && <div className="text-red-500 text-sm mt-2 max-w-7xl mx-auto font-medium bg-red-50 p-2 rounded border border-red-100">{error}</div>}
-      </div>
 
-      {/* 下方区域: 左右分栏 */}
-      <div className="flex-1 flex overflow-hidden max-w-7xl mx-auto w-full p-4 gap-6">
-        {/* 左侧: Tab 列表 */}
-        <div className="w-56 flex-none flex flex-col gap-2 overflow-y-auto pr-2 pb-4">
-          <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-2">模块导航</div>
-          {TABS.map(tab => (
+          {error && (
+            <div
+              role="alert"
+              className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700"
+            >
+              {error}
+            </div>
+          )}
+        </div>
+      </header>
+
+      <div className="mx-auto flex w-full max-w-7xl flex-1 gap-6 overflow-hidden p-4">
+        <aside className="flex w-56 flex-none flex-col gap-2 overflow-y-auto pb-4 pr-1">
+          <div className="mb-1 px-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+            模块导航
+          </div>
+          {TABS.map((tab) => (
             <button
               key={tab.id}
-              className={`w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
-                activeTab === tab.id 
-                  ? 'bg-blue-600 text-white shadow-md transform scale-[1.02]' 
-                  : 'bg-white hover:bg-gray-100 text-gray-600 border border-gray-200'
-              } ${!result ? 'opacity-50 cursor-not-allowed' : ''}`}
+              type="button"
+              className={cn(
+                'w-full rounded-xl px-4 py-3 text-left text-sm font-medium transition-all duration-200',
+                activeTab === tab.id
+                  ? 'scale-[1.02] bg-indigo-600 text-white shadow-md shadow-indigo-600/25'
+                  : 'border border-slate-200/80 bg-white text-slate-600 shadow-sm hover:border-slate-300 hover:bg-slate-50',
+                !result && 'cursor-not-allowed opacity-45 hover:bg-white'
+              )}
               onClick={() => result && setActiveTab(tab.id)}
               disabled={!result}
             >
               {tab.label}
             </button>
           ))}
-          
+
           {!result && !loading && (
-            <div className="mt-8 p-4 bg-blue-50 border border-blue-100 rounded-lg text-sm text-blue-800">
-              <p className="font-bold mb-1">使用提示</p>
-              <p className="opacity-80 leading-relaxed">请在顶部选择小说、版本，输入问题并点击“开始调试”按钮查看 RAG 各个环节的数据。</p>
+            <div className="mt-6 rounded-xl border border-indigo-100 bg-indigo-50/80 p-4 text-sm text-indigo-900">
+              <p className="mb-1 font-semibold">使用提示</p>
+              <p className="leading-relaxed text-indigo-800/90">
+                选择小说与数据集，输入问题后点击「开始调试」即可查看检索、上下文与最终 Prompt。
+              </p>
             </div>
           )}
-        </div>
+        </aside>
 
-        {/* 右侧: Tab 内容 (具有内部滚动条) */}
-        <div className="flex-1 flex flex-col overflow-hidden relative">
+        <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
           {result ? (
-            <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-4">
+            <div className="custom-scrollbar flex flex-1 flex-col gap-4 overflow-y-auto">
               {renderDiagnosticsAndStats()}
-              <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <div className="flex-1 rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm shadow-slate-200/30">
                 {renderTabContent()}
               </div>
             </div>
           ) : (
-            <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-200 flex items-center justify-center flex-col text-gray-400 p-6">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                <Filter className="w-8 h-8 text-gray-300" />
+            <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white/80 p-8 text-slate-400 shadow-sm">
+              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100">
+                <Filter className="h-8 w-8 text-slate-300" aria-hidden />
               </div>
-              <p className="text-lg font-medium text-gray-500">等待调试结果...</p>
-              <p className="text-sm mt-2">执行调试后，结果将在此处展示。</p>
+              <p className="text-lg font-medium text-slate-600">等待调试结果</p>
+              <p className="mt-2 max-w-sm text-center text-sm text-slate-500">
+                提交查询后，统计与分栏内容会显示在这里。
+              </p>
             </div>
           )}
-        </div>
+        </main>
       </div>
     </div>
   );
 }
+
+export default RagDebugPage;

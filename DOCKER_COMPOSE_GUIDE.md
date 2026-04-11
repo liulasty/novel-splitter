@@ -169,6 +169,24 @@ docker-compose down
 docker-compose down -v
 ```
 
+### 6.2.1 一键重置基础设施数据（Windows）
+
+开发/本机使用 **绑定挂载**（`DOCKER_DATA_PATH` 下的 `postgres`、`rabbitmq`、`chromadb`）时，`docker-compose down -v` **不会**清空这些主机目录。可改用脚本：
+
+**PowerShell（在项目根执行）**
+```powershell
+.\scripts\reset-infra-data.ps1
+```
+
+常用参数：
+
+- `-Env prod`：使用 `config/.env.prod` 与生产 compose。
+- `-Force`：不询问确认（适合自动化）。
+- `-IncludeNovelStorage`：同时清空 `APP_DATA_PATH/data/novel-storage` 并重建空目录。
+- `-StartInfra`：清理结束后自动执行与 `start-infra.ps1` 相同的 `up -d postgres rabbitmq chromadb`。
+
+也可运行 `.\scripts\reset-infra-data.bat`，并将参数原样传给 PowerShell。
+
 ### 6.3 释放系统磁盘空间（清理废弃镜像和缓存）
 由于经常 `build`，Docker 会产生很多悬空（dangling）的废弃镜像和构建缓存。定期执行此命令可回收大量 C 盘空间：
 

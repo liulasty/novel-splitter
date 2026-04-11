@@ -16,8 +16,9 @@ public class ChapterRecognizer {
     /**
      * 默认：匹配 "第1章"、"第一章"、"第100回"、"Chapter 1" 等。
      */
+    /** 含 ASCII 数字与全角数字（０-９），避免「第１章」等无法匹配 */
     public static final Pattern DEFAULT_CHAPTER_PATTERN = Pattern.compile(
-            "^\\s*第\\s*[0-9零一二三四五六七八九十百千两]+\\s*[章回节卷].*|^\\s*Chapter\\s*\\d+.*");
+            "^\\s*第\\s*[0-9\\uFF10-\\uFF19零一二三四五六七八九十百千两]+\\s*[章回节卷].*|^\\s*Chapter\\s*\\d+.*");
 
     private static final Pattern DECORATIVE_RULE_LINE = Pattern.compile("^[-=*_]{4,}$");
     private static final int MAX_TITLE_LENGTH = 50;
@@ -136,12 +137,26 @@ public class ChapterRecognizer {
         if (content == null || content.isEmpty()) {
             return false;
         }
-        String trimmed = content.trim();
+        String trimmed = stripLeadingUtf8Bom(content.trim());
         if (trimmed.length() > MAX_TITLE_LENGTH) {
             return false;
         }
         Pattern p = pattern != null ? pattern : DEFAULT_CHAPTER_PATTERN;
         return p.matcher(trimmed).matches();
+    }
+
+    /**
+     * UTF-8 BOM（\uFEFF）在章节标题行首时，{@link String#trim()} 无法去掉，会导致整行匹配失败。
+     */
+    public static String stripLeadingUtf8Bom(String s) {
+        if (s == null || s.isEmpty()) {
+            return s == null ? "" : s;
+        }
+        String t = s;
+        while (t.startsWith("\uFEFF")) {
+            t = t.substring(1);
+        }
+        return t;
     }
 
     public List<Chapter> recognize(List<RawParagraph> paragraphs) {

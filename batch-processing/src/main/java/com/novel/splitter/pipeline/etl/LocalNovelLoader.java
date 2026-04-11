@@ -7,12 +7,11 @@ import com.novel.splitter.domain.model.Novel;
 import com.novel.splitter.domain.model.RawParagraph;
 import com.novel.splitter.domain.model.ChapterData;
 import com.novel.splitter.domain.repository.NovelCacheRepository;
+import com.novel.splitter.infrastructure.io.FileUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -51,7 +50,7 @@ public class LocalNovelLoader {
             }
         }
 
-        List<String> rawLines = Files.readAllLines(path, StandardCharsets.UTF_8);
+        List<String> rawLines = FileUtils.readLinesAutoDetectEncoding(path);
         int lineOffset = ChapterRecognizer.skipLeadingTableOfContents(rawLines, pattern);
         if (lineOffset > 0) {
             log.info("Skipped {} leading lines as table-of-contents / decorative block", lineOffset);
@@ -65,7 +64,7 @@ public class LocalNovelLoader {
 
         for (int lineIndex = lineOffset; lineIndex < rawLines.size(); lineIndex++) {
             String line = rawLines.get(lineIndex);
-            String content = line.trim();
+            String content = ChapterRecognizer.stripLeadingUtf8Bom(line).trim();
             if (NovelLineNoiseFilter.shouldSkipParagraphLine(content)) {
                 continue;
             }
@@ -99,6 +98,23 @@ public class LocalNovelLoader {
             if (!isEmpty) {
                 currentWordCount += content.replaceAll("\\s+", "").length();
             }
+        }
+
+        if (currentChapterBuilder == null && !currentChapterParagraphs.isEmpty()) {
+            RawParagraph first = currentChapterParagraphs.get(0);
+            RawParagraph last = currentChapterParagraphs.get(currentChapterParagraphs.size() - 1);
+            Chapter synthetic = Chapter.builder()
+                    .index(1)
+                    .title("全文")
+                    .startParagraphIndex(first.getIndex())
+                    .endParagraphIndex(last.getIndex())
+                    .wordCount(currentWordCount)
+                    .build();
+            chapters.add(synthetic);
+            if (novelId != null) {
+                novelCacheRepository.saveChapter(novelId, 1, new ChapterData(synthetic, new ArrayList<>(currentChapterParagraphs)));
+            }
+            log.info("No chapter headings matched; saved as single chapter \"全文\" ({} paragraphs)", currentChapterParagraphs.size());
         }
 
         if (currentChapterBuilder != null) {
