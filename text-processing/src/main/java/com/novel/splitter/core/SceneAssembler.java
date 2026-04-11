@@ -141,8 +141,7 @@ public class SceneAssembler {
         // 防止结束索引越界
         end = Math.min(end, allParagraphs.size() - 1);
         // 提取当前章节对应的段落子列表
-        List<RawParagraph> chapterParagraphs = allParagraphs.subList(start, end + 1);
-        // 调用核心逻辑进行切分
+        List<RawParagraph> chapterParagraphs = new ArrayList<>(allParagraphs.subList(start, end + 1));
         return splitChapterParagraphsToScenes(chapter, chapterParagraphs, novelName);
     }
 
@@ -156,6 +155,24 @@ public class SceneAssembler {
      */
     public List<Scene> assembleChapter(Chapter chapter, List<RawParagraph> chapterParagraphs, String novelName) {
         return splitChapterParagraphsToScenes(chapter, chapterParagraphs, novelName);
+    }
+
+    /**
+     * {@link com.novel.splitter.core.ChapterRecognizer} 将章节标题行算入章节段落范围，此处从正文流中去掉与 {@code chapter.title} 重复的首段，避免标题再进入 Scene.text。
+     */
+    private static void stripLeadingChapterTitleParagraph(Chapter chapter, List<RawParagraph> chapterParagraphs) {
+        if (chapterParagraphs == null || chapterParagraphs.isEmpty()) {
+            return;
+        }
+        String title = chapter.getTitle() != null ? chapter.getTitle().trim() : "";
+        if (title.isEmpty()) {
+            return;
+        }
+        RawParagraph first = chapterParagraphs.get(0);
+        String head = first.getContent() != null ? first.getContent().trim() : "";
+        if (head.equals(title)) {
+            chapterParagraphs.remove(0);
+        }
     }
 
     /**
@@ -174,15 +191,21 @@ public class SceneAssembler {
             return chapterScenes;
         }
 
+        List<RawParagraph> workParagraphs = new ArrayList<>(chapterParagraphs);
+        stripLeadingChapterTitleParagraph(chapter, workParagraphs);
+        if (workParagraphs.isEmpty()) {
+            return chapterScenes;
+        }
+
         // 步骤 1 & 2：利用构建器将原始段落合并为语义段 (SemanticSegment)
         // 这一步通常会将对话及其相关的叙述动作合并，形成不可分割的最小语义单元
-        List<SemanticSegment> segments = segmentBuilder.build(chapterParagraphs);
+        List<SemanticSegment> segments = segmentBuilder.build(workParagraphs);
 
         // 步骤 3：基于规则引擎对语义段进行切分，组装成最终的 Scene
         List<SemanticSegment> buffer = new ArrayList<>(); // 用于暂存当前正在构建的场景的语义段
         int currentLength = 0; // 当前缓冲区的文本总长度
-        int start = chapterParagraphs.get(0).getIndex();
-        int sceneStartParaIdx = start; // 记录当前正在构建的 Scene 的起始段落索引
+        int start = workParagraphs.get(0).getIndex();
+        int sceneStartParaIdx = start; // 记录当前正在构建的 Scene 的起始段落索引（已剔除章节标题行）
         String previousContext = ""; // 记录上一个 Scene 的上下文尾部，用于 RAG 上下文重叠 (Phase 3 需求)
 
         for (SemanticSegment seg : segments) {
