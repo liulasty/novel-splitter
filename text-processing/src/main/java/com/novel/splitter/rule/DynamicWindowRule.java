@@ -15,10 +15,10 @@ import java.util.List;
  */
 public class DynamicWindowRule implements SplitRule {
 
-    private static final int BASE_TARGET_LENGTH = 1200;  // 基础目标切分长度
-    private static final int HIGH_DENSITY_TARGET = 800;  // 高密度内容的目标切分长度（例如代码、公式等），切分粒度更细
-    private static final int LOW_DENSITY_TARGET = 1500;  // 低密度内容的目标切分长度（例如对话、流水账叙事等），切分粒度更粗
-    private static final int ABSOLUTE_MAX_LENGTH = 3000; // 绝对的最大允许切分长度，超过此长度将强制触发切分
+    private static final int BASE_TARGET_LENGTH = 350;
+    private static final int HIGH_DENSITY_TARGET = 220;
+    private static final int LOW_DENSITY_TARGET = 420;
+    private static final int ABSOLUTE_MAX_LENGTH = 900;
     
     private final SemanticDensityAnalyzer densityAnalyzer;
 

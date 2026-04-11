@@ -26,14 +26,18 @@ export function TaskItem({
     const currentProgress = task.progress;
     const currentMessage = task.message;
     const currentStatus = task.status;
-    const taskType = task.taskType || 'SPLIT';
+    const taskType = task.taskType || 'SCENE_SPLIT';
     const typeLabel =
         taskType === 'EMBED' ? '向量化' :
         taskType === 'LOAD' ? 'Load' :
-        taskType === 'PIPELINE' ? '流水线' : '切分';
+        taskType === 'CHAPTER_PARSE' ? '章节解析' :
+        taskType === 'SCENE_SPLIT' ? '场景切分' :
+        taskType === 'PIPELINE' ? '场景+向量' : '任务';
     const typePillClass =
         taskType === 'EMBED' ? 'bg-indigo-100 text-indigo-700' :
         taskType === 'LOAD' ? 'bg-amber-100 text-amber-800' :
+        taskType === 'CHAPTER_PARSE' ? 'bg-orange-100 text-orange-800' :
+        taskType === 'SCENE_SPLIT' ? 'bg-sky-100 text-sky-800' :
         taskType === 'PIPELINE' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-700';
     const canDelete = currentStatus !== 'PENDING' && currentStatus !== 'PROCESSING';
     

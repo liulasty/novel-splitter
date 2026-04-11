@@ -33,7 +33,7 @@ public class ChromaAdminServiceImpl implements ChromaAdminService {
     private String collectionName;
 
     @Override
-    public StreamingResponseBody exportData(String novelName, String version) {
+    public StreamingResponseBody exportData(String novelName, String version, Integer chunkSize, Integer chunkOverlap) {
         return outputStream -> {
             try (JsonGenerator jsonGenerator = objectMapper.getFactory().createGenerator(outputStream)) {
                 jsonGenerator.writeStartArray();
@@ -42,9 +42,15 @@ public class ChromaAdminServiceImpl implements ChromaAdminService {
                     throw new IllegalArgumentException("novelName must not be blank");
                 }
                 String novelId = resolveNovelId(novelName);
-                List<com.novel.splitter.domain.model.Scene> scenes = (version != null && !version.isBlank())
-                        ? sceneRepository.findByNovelIdAndVersion(novelId, version)
-                        : sceneRepository.findAllByNovelId(novelId);
+                List<com.novel.splitter.domain.model.Scene> scenes;
+                if (version != null && !version.isBlank()
+                        && chunkSize != null && chunkOverlap != null) {
+                    scenes = sceneRepository.findByProfile(novelId, version, chunkSize, chunkOverlap);
+                } else if (version != null && !version.isBlank()) {
+                    scenes = sceneRepository.findAllByNovelIdAndVersion(novelId, version);
+                } else {
+                    scenes = sceneRepository.findAllByNovelId(novelId);
+                }
                 
                 for (com.novel.splitter.domain.model.Scene scene : scenes) {
                     try {
@@ -129,9 +135,11 @@ public class ChromaAdminServiceImpl implements ChromaAdminService {
     }
 
     @Override
-    public ChromaVersionDiagnosticDto getVersionDiagnostics(String novel, String version) {
+    public ChromaVersionDiagnosticDto getVersionDiagnostics(String novel, String version, Integer chunkSize, Integer chunkOverlap) {
         String novelId = resolveNovelId(novel);
-        long dbCount = sceneRepository.countByNovelIdAndVersion(novelId, version);
+        long dbCount = (chunkSize != null && chunkOverlap != null)
+                ? sceneRepository.countByProfile(novelId, version, chunkSize, chunkOverlap)
+                : sceneRepository.countAllByNovelIdAndVersion(novelId, version);
         long chromaCount = 0;
         List<String> metadataKeys = new ArrayList<>();
 
@@ -151,10 +159,14 @@ public class ChromaAdminServiceImpl implements ChromaAdminService {
             }
 
             if (collectionId != null) {
-                Map<String, Object> where = Map.of("$and", List.of(
-                        Map.of("novelId", Map.of("$eq", novelId)),
-                        Map.of("version", Map.of("$eq", version))
-                ));
+                List<Map<String, Object>> andClauses = new ArrayList<>();
+                andClauses.add(Map.of("novelId", Map.of("$eq", novelId)));
+                andClauses.add(Map.of("version", Map.of("$eq", version)));
+                if (chunkSize != null && chunkOverlap != null) {
+                    andClauses.add(Map.of("chunkSize", Map.of("$eq", chunkSize)));
+                    andClauses.add(Map.of("chunkOverlap", Map.of("$eq", chunkOverlap)));
+                }
+                Map<String, Object> where = Map.of("$and", andClauses);
 
                 // Get count
                 Map<String, Object> countBody = Map.of(

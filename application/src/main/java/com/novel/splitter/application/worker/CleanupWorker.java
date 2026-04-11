@@ -59,18 +59,36 @@ public class CleanupWorker {
         }
 
         try {
-            if ("VERSION".equals(message.getTargetType())) {
+            if ("VERSION".equals(message.getTargetType()) || "VERSION_BY_NOVEL_ID".equals(message.getTargetType())) {
                 String novelId = firstNonBlank(message.getNovelId(), null);
                 String novelName = firstNonBlank(message.getNovelName(), message.getTargetId());
                 String version = message.getVersion();
 
+                java.util.Map<String, Object> filterByNovelId = new java.util.HashMap<>();
                 if (novelId != null) {
-                    log.info("Physically deleting ChromaDB vectors for novelId={} version={}", novelId, version);
-                    vectorStore.delete(Map.of("novelId", novelId, "version", version));
+                    filterByNovelId.put("novelId", novelId);
                 }
-                if (novelName != null) {
+                if (version != null) {
+                    filterByNovelId.put("version", version);
+                }
+                if (message.getChunkSize() != null && message.getChunkOverlap() != null) {
+                    filterByNovelId.put("chunkSize", message.getChunkSize());
+                    filterByNovelId.put("chunkOverlap", message.getChunkOverlap());
+                }
+                if (novelId != null && version != null) {
+                    log.info("Physically deleting ChromaDB vectors for novelId={} version={} filter={}", novelId, version, filterByNovelId);
+                    vectorStore.delete(filterByNovelId);
+                }
+                if (novelName != null && version != null) {
+                    java.util.Map<String, Object> filterByName = new java.util.HashMap<>();
+                    filterByName.put("novel", novelName);
+                    filterByName.put("version", version);
+                    if (message.getChunkSize() != null && message.getChunkOverlap() != null) {
+                        filterByName.put("chunkSize", message.getChunkSize());
+                        filterByName.put("chunkOverlap", message.getChunkOverlap());
+                    }
                     log.info("Physically deleting ChromaDB vectors for novel='{}' version={}", novelName, version);
-                    vectorStore.delete(Map.of("novel", novelName, "version", version));
+                    vectorStore.delete(filterByName);
                 }
             } else if ("NOVEL".equals(message.getTargetType())) {
                 String novelName = firstNonBlank(message.getNovelName(), message.getTargetId());

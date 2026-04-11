@@ -1,0 +1,58 @@
+---
+description: 流水线编排——UseCase 独立、DB 交换数据、编排仅在 application 层
+alwaysApply: true
+---
+
+# 流水线与编排（Novel Splitter）
+
+## 核心原则
+
+- **接口契约先定死，实现可分步到位**：每个功能可单独跑，未来一键全跑，差异只在**编排层**，各功能模块尽量不改。
+- 每个 UseCase **无状态、可独立调用**。
+- 中间产物 **持久化到 DB**，不依赖进程内大对象传递。
+- 流水线串联逻辑 **只写在 application 层**，**不下沉**到各模块或 Worker。
+
+## pipeline-core（或等价层）：阶段接口
+
+- 每个 UseCase 只做一件事；入参通过上下文标识小说/任务，结果写库。
+- 推荐形态：`PipelineStage` + `execute(PipelineContext)`，实现类如 `LoadNovelUseCase`、`SplitNovelUseCase`、`EmbedNovelUseCase` 等各自独立。
+
+## PipelineContext
+
+- **只传 ID 与扩展参数**，不传 `chapters`、`scenes` 等大对象。
+- 各阶段自己从 DB 读所需数据；阶段之间通过 **DB** 交换数据，支持分步执行与断点重跑。
+- 可含：`novelId`、`taskId`、`Map<String, Object> params`（扩展预留）。
+
+## application 层编排（唯一编排处）
+
+- **单步**：`runStage(novelId, stage)` — `switch`/映射调用对应 `PipelineStage`。
+- **全量**：`runFullPipeline(novelId)` — 顺序调用各 `execute`，新增步骤只在此处加一行。
+- **断点续跑（预留）**：`resumePipeline` 等根据任务状态从失败点继续；**不要**为全量单独复制一套 UseCase。
+
+## 任务状态机
+
+- 状态枚举应 **一次性覆盖全链路**（即使部分状态暂未使用），便于进度、重试、续跑，避免后期改枚举与库表语义。
+- 示例语义链：`PENDING` → `LOADING` / `LOAD_DONE` / `LOAD_FAILED` → `SPLITTING` / `SPLIT_DONE` / `SPLIT_FAILED` → `EMBEDDING` / `EMBED_DONE` / `EMBED_FAILED`；可辅以 `before(other)` 这类序比较（按约定顺序）。
+
+## MQ 消息体预留
+
+- 消息应包含：`novelId`、`taskId`、`stageType`（当前单步如 SPLIT/EMBED；未来可 `FULL_PIPELINE`）。
+- 预留 `autoAdvance`：全量链式触发时，当前 stage 完成后投递下一阶段，**不**把「下一阶段调用谁」写死在 Worker 业务分支里替代编排设计。
+
+## 禁止事项
+
+- ❌ 在 `SplitWorker`（或任意 Worker）里 **直接调用** 下一阶段的 UseCase（编排下沉，后续难拆）。
+- ❌ UseCase 之间用 **返回值传递大对象**（异步/分布式下会断）。
+- ❌ 为「全量模式」**再写一套** 重复 UseCase（易不一致）。
+
+## 一句话
+
+**UseCase 各做各事并写库；编排只集中在 `PipelineOrchestrator`（或同等 application 服务）。** 单步用 `runStage`，全量用 `runFullPipeline`，业务模块不因编排方式切换而大改。
+
+## 与当前实现对齐（快照）
+
+- **章节解析**（`TaskType.CHAPTER_PARSE` 等）经 **Load 队列**，由 `LoadWorker` 消费；完成后**只**落库章节与解析产物，**不**自动向 Split 队列投递下一阶段（与上文「禁止 Worker 串联下一阶段」一致）。
+- **场景切分**（`SCENE_SPLIT` / 带 `triggerEmbed` 的 `PIPELINE`）经 **Split 队列**；调用方通过 `POST .../scene-split` 或 pipeline 的 `splitEntry` 等 **在 application 层**（如 `NovelFacadeServiceImpl`）决定投递哪条队列，而不是在 Worker 里硬编码「下一步」。
+- **MQ 载荷**：`SplitTaskMessage` 含 `novelId`、`taskId`、`forceReload`、`chapterTitleRegex`、滑窗参数等；扩展字段继续走 DTO/消息体，不把编排分支塞进 batch 模块。
+- **场景 version**：`Scene` / 向量按 `(novelId, version)` 分区；`SplitWorker` 先 `deleteVersionByNovelId` 再写入，故单次任务会落**多条** Scene。`chunkSize`/`chunkOverlap` **不**自动编码进 version——若不同切分规则要**同时保留**，调用方必须为每种规则指定**不同**的 `version` 字符串。
+- 未来若引入显式 `PipelineOrchestrator`，应**替换/收敛**上述 facade 中的 `switch`，而不是在 Worker 里新增「自动续跑」分支。

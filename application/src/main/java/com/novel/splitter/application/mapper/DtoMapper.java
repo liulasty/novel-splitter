@@ -13,12 +13,17 @@ import com.novel.splitter.domain.model.embedding.VectorRecord;
 import com.novel.splitter.domain.task.SplitTask;
 import com.novel.splitter.domain.task.TaskProgressEvent;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.List;
 
 @Mapper(componentModel = "spring")
 public interface DtoMapper {
+    @Mapping(
+            target = "paragraphCount",
+            expression = "java(chapter.getEndParagraphIndex() >= chapter.getStartParagraphIndex() "
+                    + "? chapter.getEndParagraphIndex() - chapter.getStartParagraphIndex() + 1 : 0)")
     ChapterDto toChapterDto(Chapter chapter);
     List<ChapterDto> toChapterDtos(List<Chapter> chapters);
 

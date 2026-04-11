@@ -23,9 +23,9 @@ export default function IngestPage() {
                     <span className="inline-flex items-center gap-1 bg-teal-100 text-teal-700 text-xs font-medium px-2 py-0.5 rounded-full mr-1">
                         <Database className="w-3 h-3" /> ChromaDB
                     </span>
-                    上传后在库中登记小说；切分与向量化完成后，向量才会进入 Chroma 供检索。当前书可通过下拉、
-                    <span className="text-gray-600 font-medium">地址栏 ?novelId=</span>
-                    或上次会话恢复，避免离开页面后无法继续处理。
+                    上传后在库中登记小说。<strong className="text-gray-700">章节解析</strong>与<strong className="text-gray-700">场景切分</strong>已拆成两步（独立 API / 队列），向量化在场景落库后进行。「书库列表」与「需要上传小说」分工选书 / 拉原文。亦支持
+                    <span className="text-gray-600 font-medium"> 地址栏 ?novelId= </span>
+                    与上次会话恢复。
                 </p>
             </div>
 

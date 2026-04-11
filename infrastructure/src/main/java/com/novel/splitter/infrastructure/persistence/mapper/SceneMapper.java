@@ -3,17 +3,33 @@ package com.novel.splitter.infrastructure.persistence.mapper;
 import com.novel.splitter.domain.model.Scene;
 import com.novel.splitter.domain.model.SceneMetadata;
 import com.novel.splitter.infrastructure.persistence.entity.JpaSceneEntity;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import org.springframework.stereotype.Component;
 
 @Component
 public class SceneMapper {
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper = new ObjectMapper()
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     public Scene toDomain(JpaSceneEntity entity) {
         if (entity == null) return null;
+        SceneMetadata meta = jsonToMetadata(entity.getMetadataJson());
+        if (meta == null) {
+            meta = new SceneMetadata();
+        }
+        if (entity.getChunkSize() != null) {
+            meta.setChunkSize(entity.getChunkSize());
+        }
+        if (entity.getChunkOverlap() != null) {
+            meta.setChunkOverlap(entity.getChunkOverlap());
+        }
+        if (entity.getVersion() != null) {
+            meta.setVersion(entity.getVersion());
+        }
         return Scene.builder()
+                .persistenceId(entity.getId())
                 .id(entity.getSceneId())
                 .chapterTitle(entity.getChapterTitle())
                 .chapterIndex(entity.getChapterIndex())
@@ -23,7 +39,7 @@ public class SceneMapper {
                 .wordCount(entity.getWordCount())
                 .prefixContext(entity.getPrefixContext())
                 .canSplit(entity.isCanSplit())
-                .metadata(jsonToMetadata(entity.getMetadataJson()))
+                .metadata(meta)
                 .score(null)
                 .build();
     }
@@ -42,6 +58,14 @@ public class SceneMapper {
         entity.setPrefixContext(domain.getPrefixContext());
         entity.setCanSplit(domain.isCanSplit());
         entity.setMetadataJson(metadataToJson(domain.getMetadata()));
+        if (domain.getMetadata() != null) {
+            if (domain.getMetadata().getChunkSize() != null) {
+                entity.setChunkSize(domain.getMetadata().getChunkSize());
+            }
+            if (domain.getMetadata().getChunkOverlap() != null) {
+                entity.setChunkOverlap(domain.getMetadata().getChunkOverlap());
+            }
+        }
         // novel/chapter/version/isDeleted/legacyNovelName are handled by repository layer.
         return entity;
     }

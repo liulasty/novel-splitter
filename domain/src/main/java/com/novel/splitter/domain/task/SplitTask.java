@@ -34,7 +34,7 @@ public class SplitTask {
     public SplitTask(String taskId, TaskType taskType, String novelId, String fileName, int maxScenes, String version) {
         this();
         this.taskId = taskId;
-        this.taskType = taskType != null ? taskType : TaskType.SPLIT;
+        this.taskType = taskType != null ? taskType : TaskType.SCENE_SPLIT;
         this.novelId = novelId;
         this.fileName = fileName;
         this.maxScenes = maxScenes;

@@ -27,9 +27,9 @@ public class JpaSplitTaskEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "task_type", nullable = false)
-    @ColumnDefault("'SPLIT'")
+    @ColumnDefault("'SCENE_SPLIT'")
     @Builder.Default
-    private com.novel.splitter.domain.enums.TaskType taskType = com.novel.splitter.domain.enums.TaskType.SPLIT;
+    private com.novel.splitter.domain.enums.TaskType taskType = com.novel.splitter.domain.enums.TaskType.SCENE_SPLIT;
 
     @Column(name = "novel_id")
     private String novelId;

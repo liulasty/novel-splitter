@@ -17,7 +17,6 @@ import com.novel.splitter.pipeline.orchestrator.LoadNovelUseCase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Files;
@@ -35,7 +34,6 @@ public class LoadWorker {
     private final LoadNovelUseCase loadNovelUseCase;
     private final TaskService taskService;
     private final NovelCacheRepository novelCacheRepository;
-    private final RabbitTemplate rabbitTemplate;
     private final FileStoragePort fileStoragePort;
     private final NovelService novelService;
     private final ChapterService chapterService;
@@ -45,7 +43,7 @@ public class LoadWorker {
         String taskId = message.getTaskId();
         String novelId = message.getNovelId();
         log.info("LoadWorker 接收到加载任务, taskId: {}", taskId);
-        
+
         try {
             SplitTask task = taskService.getTask(taskId);
             if (task == null) {
@@ -53,10 +51,12 @@ public class LoadWorker {
                 return;
             }
 
-            TaskType taskType = task.getTaskType() != null ? task.getTaskType() : TaskType.SPLIT;
+            TaskType taskType = task.getTaskType() != null ? task.getTaskType() : TaskType.CHAPTER_PARSE;
             if (novelId == null || novelId.isBlank()) {
                 throw new IllegalArgumentException("novelId must not be blank");
             }
+
+            boolean chapterPhaseOnly = taskType == TaskType.LOAD || taskType == TaskType.CHAPTER_PARSE;
 
             boolean hasDbChapters = chapterService.hasChapters(novelId);
             Path parsedDir = novelCacheRepository.parsedDirPath(novelId);
@@ -69,26 +69,22 @@ public class LoadWorker {
             boolean completeArtifacts = hasDbChapters && hasParsedFiles;
             boolean force = message.isForceReload();
 
-            // 幂等短路：完整产物且非强制
+            // 幂等短路：完整产物且非强制（仅章节阶段任务在此结束，不再自动投递 Split 队列）
             if (completeArtifacts && !force) {
-                if (taskType == TaskType.LOAD) {
+                if (chapterPhaseOnly) {
                     taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, 15,
                             "检测到已完整结构化产物，跳过解析（force=true 可强制重解析）");
                     novelService.updateNovelStatus(novelId, NovelStatus.PARSED);
-                    taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.SUCCESS, 100, "Load 完成（幂等跳过）");
-                    log.info("任务 {} LOAD 幂等跳过", taskId);
+                    taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.SUCCESS, 100, "章节解析完成（幂等跳过）");
+                    log.info("任务 {} 章节解析幂等跳过", taskId);
                     return;
                 }
-                if (taskType == TaskType.SPLIT || taskType == TaskType.PIPELINE) {
-                    taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, 15,
-                            "检测到已完整结构化产物，跳过解析，进入切分阶段");
-                    rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "split", message);
-                    log.info("任务 {} 已完整结构化，已直接发送至 Split 队列", taskId);
-                    return;
-                }
+                log.warn("任务 {} 类型 {} 在 Load 队列上且产物已完整，按章节阶段处理并结束", taskId, taskType);
+                novelService.updateNovelStatus(novelId, NovelStatus.PARSED);
+                taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.SUCCESS, 100, "章节产物已就绪（请单独调用场景切分）");
+                return;
             }
 
-            // 强制重解析或不完整：清理半残
             if (force && completeArtifacts) {
                 taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, 8, "强制重解析：清理旧结构化产物...");
                 novelCacheRepository.removeParsedArtifacts(novelId);
@@ -111,10 +107,10 @@ public class LoadWorker {
             if (!Files.exists(rawPath)) {
                 Files.copy(uploadPath, rawPath, StandardCopyOption.REPLACE_EXISTING);
             }
-            
+
             Novel novel = loadNovelUseCase.load(novelId, rawPath, (progress, info) -> {
                 taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, progress, info);
-            });
+            }, message.getChapterTitleRegex());
 
             Novel novelEntity = novelService.getNovelById(novelId);
             List<Chapter> chapterEntities = novel.getChapters().stream()
@@ -130,16 +126,11 @@ public class LoadWorker {
             chapterService.saveChapters(chapterEntities);
             log.info("任务 {} 成功将 {} 个章节保存至数据库", taskId, chapterEntities.size());
 
-            if (taskType == TaskType.LOAD) {
-                taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.SUCCESS, 100, "Load 完成：章节与解析产物已就绪");
-                novelService.updateNovelStatus(novelId, NovelStatus.PARSED);
-                log.info("任务 {} 独立 LOAD 完成，不进入 Split 队列", taskId);
-                return;
-            }
+            novelService.updateNovelStatus(novelId, NovelStatus.PARSED);
+            taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.SUCCESS, 100,
+                    "章节解析完成：已落库 " + chapterEntities.size() + " 章，请调用场景切分接口继续流水线");
+            log.info("任务 {} Load 完成，不再自动投递 Split（解耦章节/场景）", taskId);
 
-            rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "split", message);
-            log.info("任务 {} Load 阶段完成，已发送至 Split 队列", taskId);
-            
         } catch (Exception e) {
             log.error("处理任务 {} 时发生异常", taskId, e);
             String failMsg = TaskFailureFormatter.format("LOAD",

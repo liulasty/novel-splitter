@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Link } from 'react-router-dom';
 import { Loader2, Book, Trash2, AlertCircle, FileInput } from "lucide-react";
-import { knowledgeApi } from "@/api/knowledgeApi";
+import { knowledgeApi, splitProfileLabel, type SceneSplitProfileDto } from "@/api/knowledgeApi";
 import { novelApi } from "@/api/novelApi";
 import { toast } from 'sonner';
 import { getApiErrorMessage, handleConflict409 } from "@/lib/apiError";
@@ -64,9 +64,9 @@ export function NovelVersionsCard({
         setDeleteConfirming(false);
     }, [novelId]);
 
-    const { data: versions, isLoading, isError } = useQuery({
-        queryKey: ['versions', novelId],
-        queryFn: () => knowledgeApi.getVersionsByNovelId(novelId),
+    const { data: splitProfiles, isLoading, isError } = useQuery({
+        queryKey: ['splitProfiles', novelId],
+        queryFn: () => knowledgeApi.listSplitProfilesByNovelId(novelId),
         enabled: fetchVersions,
     });
 
@@ -92,21 +92,30 @@ export function NovelVersionsCard({
     });
 
     const deleteVersionMutation = useMutation({
-        mutationFn: (version: string) => knowledgeApi.deleteVersionByNovelId(novelId, version),
-        onSuccess: (_, version) => {
-            toast.success(`版本 "${version}" 已删除`);
-            queryClient.invalidateQueries({ queryKey: ['versions', novelId] });
+        mutationFn: (p: SceneSplitProfileDto) => {
+            if (p.chunkSize == null || p.chunkOverlap == null) {
+                return Promise.reject(new Error("legacy_missing_chunk"));
+            }
+            return knowledgeApi.deleteVersionByNovelId(novelId, p.version, p.chunkSize, p.chunkOverlap);
+        },
+        onSuccess: (_, p) => {
+            toast.success(`数据集 "${splitProfileLabel(p)}" 已删除`);
+            queryClient.invalidateQueries({ queryKey: ['splitProfiles', novelId] });
         },
         onError: (error: any) => {
+            if (error?.message === 'legacy_missing_chunk') {
+                toast.error('该版本缺少滑窗元数据，无法按分区删除；请重新切分入库或联系管理员处理旧数据。');
+                return;
+            }
             if (handleConflict409(error, '当前小说存在运行中任务，请等待任务完成后再删除版本')) {
                 queryClient.invalidateQueries({ queryKey: ['tasks'] });
                 return;
             }
-            toast.error(`删除版本失败: ${getApiErrorMessage(error, '删除版本失败')}`);
+            toast.error(`删除数据集失败: ${getApiErrorMessage(error, '删除失败')}`);
         },
     });
 
-    const versionCount = versions?.length ?? 0;
+    const versionCount = splitProfiles?.length ?? 0;
     const badge = phaseBadge(phase);
     const ingestLink = `/ingest?novelId=${encodeURIComponent(novelId)}`;
     const secondaryTaskLink = '/tasks/pipeline';
@@ -234,15 +243,15 @@ export function NovelVersionsCard({
                         <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                         获取版本列表失败
                     </div>
-                ) : versions && versions.length > 0 ? (
+                ) : splitProfiles && splitProfiles.length > 0 ? (
                     <div className="flex flex-col gap-2">
-                        {versions.map((v) => (
+                        {splitProfiles.map((p) => (
                             <VersionTag
-                                key={v}
-                                version={v}
-                                onDelete={() => deleteVersionMutation.mutate(v)}
+                                key={`${p.version}-${p.chunkSize ?? 'x'}-${p.chunkOverlap ?? 'x'}`}
+                                version={splitProfileLabel(p)}
+                                onDelete={() => deleteVersionMutation.mutate(p)}
                                 isPending={deleteVersionMutation.isPending}
-                                disabled={hasRunningTasks}
+                                disabled={hasRunningTasks || p.chunkSize == null || p.chunkOverlap == null}
                                 stat={undefined}
                             />
                         ))}

@@ -143,6 +143,8 @@ public class InMemoryVectorStore implements VectorStore {
                 // 简单的字段映射：目前仅支持对 novel 和 version 字段的过滤
                 if ("novelId".equals(key) || "novel".equals(key)) actual = meta.getNovel();
                 else if ("version".equals(key)) actual = meta.getVersion();
+                else if ("chunkSize".equals(key)) actual = meta.getChunkSize();
+                else if ("chunkOverlap".equals(key)) actual = meta.getChunkOverlap();
                 
                 if (!Objects.equals(actual, expected)) {
                     match = false;
@@ -244,6 +246,8 @@ public class InMemoryVectorStore implements VectorStore {
                     // Simple field mapping (简单的字段映射，提取实际值用于比较)
                     if ("novelId".equals(key) || "novel".equals(key)) actual = meta.getNovel();
                     else if ("version".equals(key)) actual = meta.getVersion();
+                    else if ("chunkSize".equals(key)) actual = meta.getChunkSize();
+                    else if ("chunkOverlap".equals(key)) actual = meta.getChunkOverlap();
                     
                     if (!Objects.equals(actual, expected)) {
                         match = false;
@@ -264,6 +268,8 @@ public class InMemoryVectorStore implements VectorStore {
             if (meta != null) {
                 if (meta.getNovel() != null) metaMap.put("novelId", meta.getNovel());
                 if (meta.getVersion() != null) metaMap.put("version", meta.getVersion());
+                if (meta.getChunkSize() != null) metaMap.put("chunkSize", meta.getChunkSize());
+                if (meta.getChunkOverlap() != null) metaMap.put("chunkOverlap", meta.getChunkOverlap());
             }
 
             // 维护最小堆：如果堆未满则直接加入，如果当前相似度大于堆顶元素的相似度，则替换堆顶

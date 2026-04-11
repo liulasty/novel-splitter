@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { novelApi } from '@/api/novelApi';
-import { knowledgeApi } from '@/api/knowledgeApi';
+import { knowledgeApi, splitProfileLabel, type SceneSplitProfileDto } from '@/api/knowledgeApi';
 import { ragApi } from '@/api/ragApi';
 import { chromaAdminApi } from '@/api/chromaAdminApi';
 import type { ChromaCollection } from '@/api/chromaAdminApi';
@@ -19,10 +19,10 @@ const TABS = [
 
 export default function RagDebugPage() {
   const [novels, setNovels] = useState<Array<Pick<NovelSummaryDto, 'novelId' | 'title'>>>([]);
-  const [versions, setVersions] = useState<string[]>([]);
-  
+  const [splitProfiles, setSplitProfiles] = useState<SceneSplitProfileDto[]>([]);
+  const [selectedProfileIndex, setSelectedProfileIndex] = useState(0);
+
   const [selectedNovel, setSelectedNovel] = useState<string>(''); // novelId
-  const [selectedVersion, setSelectedVersion] = useState<string>('');
   const [question, setQuestion] = useState<string>('');
   const [topK, setTopK] = useState<number>(5);
   
@@ -52,10 +52,16 @@ export default function RagDebugPage() {
 
   useEffect(() => {
     if (selectedNovel) {
-      knowledgeApi.getVersionsByNovelId(selectedNovel).then(setVersions).catch(console.error);
-      setSelectedVersion('');
+      knowledgeApi
+        .listSplitProfilesByNovelId(selectedNovel)
+        .then((list) => {
+          setSplitProfiles(list);
+          setSelectedProfileIndex(list.length ? list.length - 1 : 0);
+        })
+        .catch(console.error);
     } else {
-      setVersions([]);
+      setSplitProfiles([]);
+      setSelectedProfileIndex(0);
     }
   }, [selectedNovel]);
 
@@ -70,11 +76,19 @@ export default function RagDebugPage() {
     setVersionRecordCount(null);
     
     try {
+      const profile = splitProfiles[selectedProfileIndex];
+      if (!profile?.version) {
+        setError('请选择有效的数据集（版本 / 滑窗）');
+        setLoading(false);
+        return;
+      }
       const request: ChatRequest = {
         question,
         novelId: selectedNovel,
-        version: selectedVersion,
-        topK
+        version: profile.version,
+        topK,
+        chunkSize: profile.chunkSize ?? undefined,
+        chunkOverlap: profile.chunkOverlap ?? undefined,
       };
       
       const [data] = await Promise.all([
@@ -88,12 +102,18 @@ export default function RagDebugPage() {
               const count = await chromaAdminApi.countDocuments(collection.id);
               setCollectionCount(count);
               
-              if (selectedNovel && selectedVersion) {
+              const prof = splitProfiles[selectedProfileIndex];
+              if (selectedNovel && prof?.version) {
+                const where: Record<string, string | number> = {
+                  novelId: selectedNovel,
+                  version: prof.version,
+                };
+                if (prof.chunkSize != null && prof.chunkOverlap != null) {
+                  where.chunkSize = prof.chunkSize;
+                  where.chunkOverlap = prof.chunkOverlap;
+                }
                 const records = await chromaAdminApi.getRecords(collection.id, {
-                  where: {
-                    novelId: selectedNovel,
-                    version: selectedVersion
-                  },
+                  where,
                   limit: 1,
                   include: ["metadatas", "documents"]
                 });
@@ -435,13 +455,17 @@ export default function RagDebugPage() {
                 {novels.map(n => <option key={n.novelId} value={n.novelId}>{n.title}</option>)}
               </select>
               <select 
-                className="w-full md:w-32 p-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none"
-                value={selectedVersion}
-                onChange={(e) => setSelectedVersion(e.target.value)}
-                disabled={!selectedNovel}
+                className="w-full md:w-48 p-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                value={splitProfiles.length ? String(selectedProfileIndex) : ''}
+                onChange={(e) => setSelectedProfileIndex(Number(e.target.value))}
+                disabled={!selectedNovel || !splitProfiles.length}
               >
-                <option value="">选择版本...</option>
-                {versions.map(v => <option key={v} value={v}>{v}</option>)}
+                <option value="">数据集...</option>
+                {splitProfiles.map((p, i) => (
+                  <option key={`${p.version}-${p.chunkSize}-${p.chunkOverlap}`} value={String(i)}>
+                    {splitProfileLabel(p)}
+                  </option>
+                ))}
               </select>
             </div>
             

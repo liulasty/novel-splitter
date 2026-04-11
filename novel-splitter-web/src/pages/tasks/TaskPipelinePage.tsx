@@ -52,7 +52,9 @@ export default function TaskPipelinePage() {
       </Link>
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Pipeline</h1>
-        <p className="text-sm text-gray-500 mt-1">POST /api/novels/&#123;novelId&#125;/pipeline</p>
+        <p className="text-sm text-gray-500 mt-1">
+          POST /api/novels/&#123;novelId&#125;/pipeline — stages 含 SPLIT 时仅提交<strong>章节解析</strong>；场景切分请用 /scene-split。
+        </p>
       </div>
 
       <div className="rounded-2xl border border-gray-200 bg-white p-5 space-y-4 shadow-sm">
@@ -65,11 +67,11 @@ export default function TaskPipelinePage() {
         <div className="flex gap-4 text-sm">
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={stages.includes('SPLIT')} onChange={() => toggleStage('SPLIT')} />
-            SPLIT
+            SPLIT（章节解析）
           </label>
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={stages.includes('EMBED')} onChange={() => toggleStage('EMBED')} />
-            EMBED
+            EMBED（向量化）
           </label>
         </div>
         <label className="block text-sm font-medium text-gray-700">version</label>
@@ -78,7 +80,7 @@ export default function TaskPipelinePage() {
           value={version}
           onChange={(e) => setVersion(e.target.value)}
         />
-        <label className="block text-sm font-medium text-gray-700">maxScenes（仅 SPLIT 时有效）</label>
+        <label className="block text-sm font-medium text-gray-700">maxScenes（场景切分请用 /scene-split）</label>
         <input
           type="number"
           className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"

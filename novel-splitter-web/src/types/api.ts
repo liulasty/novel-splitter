@@ -11,6 +11,9 @@ export interface ChatRequest {
   novelId: string;
   version: string;
   topK?: number;
+  /** 与后端 Scene 分区一致；同一 version 多数据集时建议始终发送 */
+  chunkSize?: number | null;
+  chunkOverlap?: number | null;
 }
 
 export interface Citation {
@@ -37,6 +40,10 @@ export interface DownloadAndIngestRequest {
   version: string;
   maxScenes: number; // 0 for all
   stages?: Array<'SPLIT' | 'EMBED'>;
+  splitEntry?: 'FULL' | 'CHAPTER_RELOAD' | 'SCENE_ONLY';
+  chunkSize?: number;
+  chunkOverlap?: number;
+  chapterTitleRegex?: string;
 }
 
 export interface NovelUploadResponse {

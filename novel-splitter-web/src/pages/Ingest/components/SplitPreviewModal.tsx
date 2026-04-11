@@ -71,16 +71,18 @@ export function SplitPreviewModal({ isOpen, onClose, novelId }: SplitPreviewModa
                             ) : chapters?.length === 0 ? (
                                 <div className="text-center py-8 text-sm text-gray-500">暂无章节数据，请确认是否已完成切分任务。</div>
                             ) : (
-                                chapters?.map((chapter) => (
+                                chapters?.map((chapter) => {
+                                    const cid = String(chapter.id);
+                                    return (
                                     <button
-                                        key={chapter.chapterId}
+                                        key={cid}
                                         onClick={() => {
-                                            setSelectedChapterId(chapter.chapterId);
+                                            setSelectedChapterId(cid);
                                             setScenePage(0);
                                         }}
                                         className={cn(
                                             "w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center justify-between group",
-                                            selectedChapterId === chapter.chapterId 
+                                            selectedChapterId === cid
                                                 ? "bg-indigo-50 text-indigo-700" 
                                                 : "text-gray-600 hover:bg-gray-50"
                                         )}
@@ -88,10 +90,11 @@ export function SplitPreviewModal({ isOpen, onClose, novelId }: SplitPreviewModa
                                         <span className="truncate flex-1 pr-2">{chapter.title}</span>
                                         <ChevronRight className={cn(
                                             "w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity",
-                                            selectedChapterId === chapter.chapterId ? "opacity-100 text-indigo-500" : "text-gray-400"
+                                            selectedChapterId === cid ? "opacity-100 text-indigo-500" : "text-gray-400"
                                         )} />
                                     </button>
-                                ))
+                                    );
+                                })
                             )}
                         </div>
                     </div>

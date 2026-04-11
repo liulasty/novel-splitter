@@ -12,7 +12,9 @@ import com.novel.splitter.domain.model.paging.PagedResult;
 import com.novel.splitter.domain.repository.CleanupTaskRepository;
 import com.novel.splitter.domain.repository.NovelRepository;
 import com.novel.splitter.domain.repository.SceneRepository;
+import com.novel.splitter.application.model.dto.SceneSplitProfileDto;
 import com.novel.splitter.application.model.dto.VectorPreviewRecordDto;
+import com.novel.splitter.domain.model.SceneSplitProfile;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -93,7 +95,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
 
     @Override
     @Transactional
-    public Long deleteVersion(String novelName, String version) {
+    public Long deleteVersion(String novelName, String version, int chunkSize, int chunkOverlap) {
         String normalizedNovelName = normalizeNovelName(novelName);
         String novelId = novelRepository.findByTitle(normalizedNovelName)
                 .map(n -> n.getId())
@@ -102,8 +104,8 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Novel has running tasks; cannot delete version right now.");
         }
 
-        log.info("Logical deleting version: novelId={}/{}", novelId, version);
-        sceneRepository.deleteVersionByNovelId(novelId, version);
+        log.info("Logical deleting split profile: novelId={} version={} chunk={}/{}", novelId, version, chunkSize, chunkOverlap);
+        sceneRepository.deleteByProfile(novelId, version, chunkSize, chunkOverlap);
         
         CleanupTask task = CleanupTask.builder()
                 .targetId(novelId)
@@ -120,6 +122,8 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                 .version(version)
                 .novelId(novelId)
                 .novelName(normalizedNovelName)
+                .chunkSize(chunkSize)
+                .chunkOverlap(chunkOverlap)
                 .build();
         
         rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "cleanup", message);
@@ -201,7 +205,10 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         String novelId = novelRepository.findByTitle(normalizedNovelName)
                 .map(n -> n.getId())
                 .orElseThrow(() -> new IllegalArgumentException("novel not found by title: " + normalizedNovelName));
-        return sceneRepository.listVersionsByNovelId(novelId);
+        return sceneRepository.listSplitProfilesByNovelId(novelId).stream()
+                .map(KnowledgeBaseServiceImpl::toProfileDto)
+                .map(SceneSplitProfileDto::getLabel)
+                .toList();
     }
 
     @Override
@@ -210,12 +217,26 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         if (normalizedNovelId == null || normalizedNovelId.isEmpty()) {
             throw new IllegalArgumentException("novelId must not be blank");
         }
-        return sceneRepository.listVersionsByNovelId(normalizedNovelId);
+        return sceneRepository.listSplitProfilesByNovelId(normalizedNovelId).stream()
+                .map(KnowledgeBaseServiceImpl::toProfileDto)
+                .map(SceneSplitProfileDto::getLabel)
+                .toList();
+    }
+
+    @Override
+    public List<SceneSplitProfileDto> listSplitProfilesByNovelId(String novelId) {
+        String normalizedNovelId = novelId != null ? novelId.trim() : null;
+        if (normalizedNovelId == null || normalizedNovelId.isEmpty()) {
+            throw new IllegalArgumentException("novelId must not be blank");
+        }
+        return sceneRepository.listSplitProfilesByNovelId(normalizedNovelId).stream()
+                .map(KnowledgeBaseServiceImpl::toProfileDto)
+                .toList();
     }
 
     @Override
     @Transactional
-    public Long deleteVersionByNovelId(String novelId, String version) {
+    public Long deleteSplitProfileByNovelId(String novelId, String version, int chunkSize, int chunkOverlap) {
         String normalizedNovelId = novelId != null ? novelId.trim() : null;
         if (normalizedNovelId == null || normalizedNovelId.isEmpty()) {
             throw new IllegalArgumentException("novelId must not be blank");
@@ -228,8 +249,8 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         }
 
         String trimmedVersion = version.trim();
-        log.info("Logical deleting version by novelId: {}/{}", normalizedNovelId, trimmedVersion);
-        sceneRepository.deleteVersionByNovelId(normalizedNovelId, trimmedVersion);
+        log.info("Logical deleting split profile by novelId: {} version={} chunk={}/{}", normalizedNovelId, trimmedVersion, chunkSize, chunkOverlap);
+        sceneRepository.deleteByProfile(normalizedNovelId, trimmedVersion, chunkSize, chunkOverlap);
 
         String novelName = novelRepository.findById(normalizedNovelId)
                 .map(n -> n.getTitle() != null && !n.getTitle().isBlank() ? n.getTitle() : n.getId())
@@ -250,11 +271,21 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                 .novelId(normalizedNovelId)
                 .novelName(novelName)
                 .version(trimmedVersion)
+                .chunkSize(chunkSize)
+                .chunkOverlap(chunkOverlap)
                 .build();
 
         rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "cleanup", message);
-        log.info("Sent cleanup task {} to MQ for novelId {} version {}", savedTask.getId(), normalizedNovelId, trimmedVersion);
+        log.info("Sent cleanup task {} to MQ for novelId {} profile {}", savedTask.getId(), normalizedNovelId, trimmedVersion);
         return savedTask.getId();
+    }
+
+    private static SceneSplitProfileDto toProfileDto(SceneSplitProfile p) {
+        return SceneSplitProfileDto.builder()
+                .version(p.version())
+                .chunkSize(p.chunkSize())
+                .chunkOverlap(p.chunkOverlap())
+                .build();
     }
 
     private String normalizeNovelName(String novelName) {

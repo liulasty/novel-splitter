@@ -52,7 +52,7 @@ class NovelFacadeServiceTest {
         ArgumentCaptor<String> versionCaptor = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<SplitTaskMessage> messageCaptor = ArgumentCaptor.forClass(SplitTaskMessage.class);
 
-        verify(taskService).createTask(taskIdCaptor.capture(), org.mockito.Mockito.eq(TaskType.SPLIT), novelIdCaptor.capture(), org.mockito.Mockito.eq("demo.txt"),
+        verify(taskService).createTask(taskIdCaptor.capture(), org.mockito.Mockito.eq(TaskType.CHAPTER_PARSE), novelIdCaptor.capture(), org.mockito.Mockito.eq("demo.txt"),
                 maxScenesCaptor.capture(), versionCaptor.capture());
         
         verify(taskQueuePort).sendLoad(messageCaptor.capture());

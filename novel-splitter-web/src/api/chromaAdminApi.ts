@@ -45,12 +45,12 @@ export interface ChromaQueryRequest {
   query_texts?: string[];
 }
 
+/** 与后端 ChromaVersionDiagnosticDto 对齐 */
 export interface ChromaVersionDiagnosticDto {
-  localDbCount: number;
+  dbCount: number;
   chromaCount: number;
-  isConsistent: boolean;
-  sampleDataValid: boolean;
-  message?: string;
+  consistent: boolean;
+  metadataKeys?: string[];
 }
 
 export const chromaAdminApi = {
@@ -111,8 +111,17 @@ export const chromaAdminApi = {
   },
 
   // Diagnostics & Rebuild
-  getDiagnostics: async (novel: string, version: string): Promise<ChromaVersionDiagnosticDto> => {
-    const response = await apiClient.get<ApiEnvelope<ChromaVersionDiagnosticDto>, ChromaVersionDiagnosticDto>(`/admin/chroma/diagnostics?novel=${encodeURIComponent(novel)}&version=${encodeURIComponent(version)}`);
+  getDiagnostics: async (
+    novel: string,
+    version: string,
+    chunkSize?: number | null,
+    chunkOverlap?: number | null
+  ): Promise<ChromaVersionDiagnosticDto> => {
+    let url = `/admin/chroma/diagnostics?novel=${encodeURIComponent(novel)}&version=${encodeURIComponent(version)}`;
+    if (chunkSize != null && chunkOverlap != null) {
+      url += `&chunkSize=${encodeURIComponent(String(chunkSize))}&chunkOverlap=${encodeURIComponent(String(chunkOverlap))}`;
+    }
+    const response = await apiClient.get<ApiEnvelope<ChromaVersionDiagnosticDto>, ChromaVersionDiagnosticDto>(url);
     return response;
   },
   rebuildCollection: async (): Promise<{ message: string }> => {
@@ -121,6 +130,15 @@ export const chromaAdminApi = {
   },
   deleteVersion: async (novel: string, version: string): Promise<{ message: string }> => {
     const response = await apiClient.delete<ApiEnvelope<{ message: string }>, { message: string }>(`/admin/chroma/collections/versions?novel=${encodeURIComponent(novel)}&version=${encodeURIComponent(version)}`);
+    return response;
+  },
+
+  /** 按 metadata 过滤删除 Chroma 文档（与 CleanupWorker / 向量写入字段一致） */
+  deleteByMetadataFilter: async (filter: Record<string, unknown>): Promise<{ message: string }> => {
+    const response = await apiClient.post<ApiEnvelope<{ message: string }>, { message: string }>(
+      '/admin/chroma/delete',
+      filter
+    );
     return response;
   },
 };

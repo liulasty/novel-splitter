@@ -1,14 +1,14 @@
 interface ChatSidebarProps {
     state: {
         novels: Array<{ novelId: string; title: string }> | undefined;
-        versions: string[] | undefined;
+        profileOptions: { index: number; label: string }[];
         selectedNovel: string; // novelId
-        selectedVersion: string;
+        selectedProfileIndex: number;
         topK: number;
     };
     actions: {
         setSelectedNovel: (val: string) => void;
-        setSelectedVersion: (val: string) => void;
+        setSelectedProfileIndex: (val: number) => void;
         setTopK: (val: number) => void;
     };
 }
@@ -38,17 +38,19 @@ export function ChatSidebar({ state, actions }: ChatSidebarProps) {
                         </select>
                     </div>
 
-                    {/* Version select */}
+                    {/* Split profile (version + chunk / overlap) */}
                     <div className="space-y-1.5">
-                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">版本号</label>
+                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">数据集（版本 / 滑窗）</label>
                         <select
                             className="w-full h-9 rounded-lg border border-gray-200 bg-gray-50 px-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-400 disabled:opacity-50"
-                            value={state.selectedVersion}
-                            onChange={(e) => actions.setSelectedVersion(e.target.value)}
-                            disabled={!state.selectedNovel || !state.versions?.length}
+                            value={state.profileOptions.length ? String(state.selectedProfileIndex) : ""}
+                            onChange={(e) => actions.setSelectedProfileIndex(Number(e.target.value))}
+                            disabled={!state.selectedNovel || !state.profileOptions?.length}
                         >
                             <option value="" disabled>-- 请选择 --</option>
-                            {Array.isArray(state.versions) && state.versions.map(v => <option key={v} value={v}>{v}</option>)}
+                            {state.profileOptions.map((o) => (
+                                <option key={o.index} value={String(o.index)}>{o.label}</option>
+                            ))}
                         </select>
                     </div>
 

@@ -24,13 +24,15 @@ export function useIngestTask() {
 
     // Split Config
     const [version, setVersion] = useState("v1");
-    const [strategy, setStrategy] = useState("semantic");
     const [maxTokens, setMaxTokens] = useState(512);
     const [overlapTokens, setOverlapTokens] = useState(64);
     
     // Flow State
     const [currentNovelId, setCurrentNovelId] = useState<string>("");
     const ingestInitRef = useRef(false);
+    const [chapterReviewAck, setChapterReviewAck] = useState(false);
+    const [chapterTitleRegex, setChapterTitleRegex] = useState('');
+    const chapterParseWasRunningRef = useRef(false);
 
     /** 与 URL、sessionStorage 同步，便于刷新/深链后续切分 */
     const persistCurrentNovelId = useCallback(
@@ -106,6 +108,7 @@ export function useIngestTask() {
             }
         }
     }, [searchParams, setSearchParams]);
+
     const [ingestStatus, setIngestStatus] = useState<string>("");
     const [isError, setIsError] = useState(false);
     const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
@@ -119,6 +122,28 @@ export function useIngestTask() {
     // Task Poller
     const { addActiveTask, polledTasks, poller, manualRefresh } = useTaskPoller(tasks, currentNovelId);
     const activeTasks = polledTasks;
+
+    useEffect(() => {
+        setChapterReviewAck(false);
+    }, [currentNovelId]);
+
+    useEffect(() => {
+        if (!currentNovelId) {
+            chapterParseWasRunningRef.current = false;
+            return;
+        }
+        const running = tasks.some(
+            (t) =>
+                t.novelId === currentNovelId &&
+                (t.taskType === 'CHAPTER_PARSE' || t.taskType === 'LOAD') &&
+                (t.status === 'PENDING' || t.status === 'PROCESSING')
+        );
+        const wasRunning = chapterParseWasRunningRef.current;
+        chapterParseWasRunningRef.current = running;
+        if (wasRunning && !running) {
+            setChapterReviewAck(false);
+        }
+    }, [tasks, currentNovelId]);
 
     // Mutations
     const uploadMutation = useMutation({
@@ -140,22 +165,54 @@ export function useIngestTask() {
         },
     });
 
-    const splitMutation = useMutation({
+    /** 章节解析（Load 队列，CHAPTER_PARSE） */
+    const chapterParseMutation = useMutation({
         mutationFn: (novelId: string) =>
-            novelApi.triggerPipeline(novelId, {
-                stages: ['SPLIT'],
+            novelApi.splitNovel(novelId, {
                 version,
                 maxScenes: 0,
+                ...(chapterTitleRegex.trim() !== '' ? { chapterTitleRegex: chapterTitleRegex.trim() } : {}),
             }),
         onSuccess: (data) => {
-            const msg = `切分任务已提交：${data.message}`;
+            const msg = `章节解析已提交：${data.message}`;
             setIngestStatus(msg);
             setIsError(false);
             toast.success(msg);
             if (data.taskId) addActiveTask(data.taskId);
+            queryClient.invalidateQueries({ queryKey: ['novelSummaries'] });
+            queryClient.invalidateQueries({ queryKey: ['tasks'] });
         },
         onError: (error: any) => {
-            const msg = `切分失败：${error.response?.data?.error || error.message}`;
+            const msg = `章节解析失败：${error.response?.data?.error || error.message}`;
+            setIngestStatus(msg);
+            setIsError(true);
+            toast.error(msg);
+        },
+    });
+
+    /** 场景切分（Split 队列，SCENE_SPLIT / PIPELINE） */
+    const sceneSplitMutation = useMutation({
+        mutationFn: (args: { novelId: string; triggerEmbed: boolean }) =>
+            novelApi.sceneSplit(args.novelId, {
+                version,
+                maxScenes: 0,
+                chunkSize: maxTokens,
+                chunkOverlap: overlapTokens,
+                triggerEmbed: args.triggerEmbed,
+            }),
+        onSuccess: (data, variables) => {
+            const msg = variables.triggerEmbed
+                ? `场景切分+向量化已提交：${data.message}`
+                : `场景切分已提交：${data.message}`;
+            setIngestStatus(msg);
+            setIsError(false);
+            toast.success(msg);
+            if (data.taskId) addActiveTask(data.taskId);
+            queryClient.invalidateQueries({ queryKey: ['novelSummaries'] });
+            queryClient.invalidateQueries({ queryKey: ['tasks'] });
+        },
+        onError: (error: any) => {
+            const msg = `场景切分失败：${error.response?.data?.error || error.message}`;
             setIngestStatus(msg);
             setIsError(true);
             toast.error(msg);
@@ -163,17 +220,14 @@ export function useIngestTask() {
     });
 
     const embedMutation = useMutation({
-        mutationFn: (novelId: string) =>
-            novelApi.triggerPipeline(novelId, {
-                stages: ['EMBED'],
-                version,
-            }),
+        mutationFn: (novelId: string) => novelApi.embedNovel(novelId, version),
         onSuccess: (data) => {
             const msg = `向量化入库任务已提交：${data.message}`;
             setIngestStatus(msg);
             setIsError(false);
             toast.success(msg);
             if (data.taskId) addActiveTask(data.taskId);
+            queryClient.invalidateQueries({ queryKey: ['novelSummaries'] });
         },
         onError: (error: any) => {
             const msg = `入库失败：${error.response?.data?.error || error.message}`;
@@ -186,12 +240,13 @@ export function useIngestTask() {
     const downloadAndIngestMutation = useMutation({
         mutationFn: downloadApi.downloadAndIngest,
         onSuccess: (data) => {
-            const msg = `下载入库成功：${data.message}`;
+            const msg = `下载已登记：${data.message}（当前仅提交章节解析；完成后请再场景切分/向量化）`;
             setIngestStatus(msg);
             setIsError(false);
             toast.success(msg);
             setDownloadUrl("");
             if (data.taskId) addActiveTask(data.taskId);
+            queryClient.invalidateQueries({ queryKey: ['novelSummaries'] });
         },
         onError: (error: any) => {
             const msg = `下载入库失败：${error.response?.data?.error || error.message}`;
@@ -231,13 +286,44 @@ export function useIngestTask() {
         }
     };
 
-    const handleSplit = () => {
+    const handleChapterParse = () => {
         if (!currentNovelId) {
             setIngestStatus("请先上传文件或选择小说");
             setIsError(true);
             return;
         }
-        splitMutation.mutate(currentNovelId);
+        chapterParseMutation.mutate(currentNovelId);
+    };
+
+    const handleSceneSplit = (triggerEmbed: boolean) => {
+        if (!currentNovelId) {
+            setIngestStatus("请先选择小说并完成章节解析");
+            setIsError(true);
+            return;
+        }
+        sceneSplitMutation.mutate({ novelId: currentNovelId, triggerEmbed });
+    };
+
+    const handleForceReparseChapters = () => {
+        if (!currentNovelId) {
+            setIngestStatus("请先选择小说");
+            setIsError(true);
+            return;
+        }
+        novelApi
+            .loadNovel(currentNovelId, {
+                force: true,
+                version,
+                ...(chapterTitleRegex.trim() !== '' ? { chapterTitleRegex: chapterTitleRegex.trim() } : {}),
+            })
+            .then((data) => {
+                toast.success(data.message || "强制重解析已提交");
+                if (data.taskId) addActiveTask(data.taskId);
+                queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            })
+            .catch((error: any) => {
+                toast.error(error.response?.data?.error || error.message || "提交失败");
+            });
     };
 
     const handleEmbed = () => {
@@ -259,7 +345,11 @@ export function useIngestTask() {
             url: downloadUrl,
             name: novelName,
             version,
-            maxScenes: 0 // backward compatibility for download api
+            maxScenes: 0,
+            chunkSize: maxTokens,
+            chunkOverlap: overlapTokens,
+            stages: ['SPLIT', 'EMBED'],
+            ...(chapterTitleRegex.trim() !== '' ? { chapterTitleRegex: chapterTitleRegex.trim() } : {}),
         });
     };
 
@@ -270,10 +360,11 @@ export function useIngestTask() {
             novelName,
             downloadUrl,
             version,
-            strategy,
             maxTokens,
             overlapTokens,
             currentNovelId,
+            chapterReviewAck,
+            chapterTitleRegex,
             ingestStatus,
             isError,
             tasks,
@@ -281,28 +372,33 @@ export function useIngestTask() {
             poller,
             selectedTaskId,
             isUploading: uploadMutation.isPending,
-            isSplitting: splitMutation.isPending,
+            isChapterParsing: chapterParseMutation.isPending,
+            isSceneSplitting: sceneSplitMutation.isPending,
             isEmbedding: embedMutation.isPending,
             isDownloading: downloadAndIngestMutation.isPending,
         },
         actions: {
             setActiveTab,
             setVersion,
-            setStrategy,
             setMaxTokens,
             setOverlapTokens,
             setNovelName,
             setSelectedTaskId,
             setDownloadUrl,
+            setChapterTitleRegex,
+            acknowledgeChapterReview: () => setChapterReviewAck(true),
             handleFileChange,
             handleUpload,
-            handleSplit,
+            handleChapterParse,
+            handleSceneSplit,
+            handleForceReparseChapters,
             handleEmbed,
             handleDownloadAndIngest,
             manualRefresh,
             deleteTask: (id: string) => deleteTaskMutation.mutate(id),
             selectNovelById: persistCurrentNovelId,
             clearSelectedNovel: clearCurrentNovelId,
+            addActiveTask,
         }
     };
 }

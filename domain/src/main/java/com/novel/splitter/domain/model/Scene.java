@@ -18,6 +18,11 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class Scene {
     /**
+     * 数据库主键（向量化等批量任务使用）；与 {@link #id}（业务 sceneId）不同。
+     */
+    private Long persistenceId;
+
+    /**
      * 唯一标识 (UUID 或 Hash)
      */
     private String id;

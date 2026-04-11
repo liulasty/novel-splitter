@@ -36,13 +36,9 @@ public class RagOrchestrationService implements RagFacade {
 
     @Override
     public Answer ask(com.novel.splitter.retrieval.dto.RagRequest request) {
-        return ask(request.getQuestion(), request.getTopK(), request.getNovelId(), request.getVersion());
-    }
-
-    @Override
-    public Answer ask(String question, int topK, String novelId, String version) {
         long startTime = System.currentTimeMillis();
         StopWatch stopWatch = new StopWatch("RAG Request");
+        String question = request.getQuestion();
 
         AnswerType answerType = ragRetrievalService.classify(question);
         if (answerType == AnswerType.UNSUPPORTED) {
@@ -55,21 +51,16 @@ public class RagOrchestrationService implements RagFacade {
 
         try {
             stopWatch.start("1. Retrieval");
-            com.novel.splitter.retrieval.dto.RagRequest retrievalRequest = new com.novel.splitter.retrieval.dto.RagRequest();
-            retrievalRequest.setQuestion(question);
-            retrievalRequest.setTopK(topK);
-            retrievalRequest.setNovelId(novelId);
-            retrievalRequest.setVersion(version);
-            List<Scene> scenes = ragRetrievalService.retrieve(retrievalRequest);
+            List<Scene> scenes = ragRetrievalService.retrieve(request);
             stopWatch.stop();
 
             stopWatch.start("2. Context Assembly");
-            List<ContextBlock> contextBlocks = contextAssembler.assemble(question, scenes, assemblerConfig);
+            List<ContextBlock> contextBlocks = contextAssembler.assemble(request.getQuestion(), scenes, assemblerConfig);
             stopWatch.stop();
 
             Prompt prompt = Prompt.builder()
                     .systemInstruction(ragProperties.getSystemInstruction())
-                    .userQuestion(question)
+                    .userQuestion(request.getQuestion())
                     .contextBlocks(contextBlocks)
                     .outputConstraint(ragProperties.getOutputConstraint())
                     .build();
@@ -95,6 +86,16 @@ public class RagOrchestrationService implements RagFacade {
         } finally {
             log.info("RAG request completed in {} ms. Details:\n{}", System.currentTimeMillis() - startTime, stopWatch.prettyPrint());
         }
+    }
+
+    @Override
+    public Answer ask(String question, int topK, String novelId, String version) {
+        com.novel.splitter.retrieval.dto.RagRequest r = new com.novel.splitter.retrieval.dto.RagRequest();
+        r.setQuestion(question);
+        r.setTopK(topK);
+        r.setNovelId(novelId);
+        r.setVersion(version);
+        return ask(r);
     }
 
     @Override

@@ -4,6 +4,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Loader2, Server, Database, Activity, Clock, ShieldCheck, Stethoscope, AlertTriangle, DownloadCloud } from "lucide-react";
 import { chromaAdminApi } from "@/api/chromaAdminApi";
 import { novelApi } from "@/api/novelApi";
+import { parseSplitProfileLabel } from "@/api/knowledgeApi";
 
 import { cn } from "@/lib/utils";
 import { toast } from 'sonner';
@@ -139,25 +140,30 @@ function CollectionsTab() {
 
 // --- Diagnostics Tab ---
 function DiagnosticsTab() {
-  const [selectedNovel, setSelectedNovel] = useState('');
-  const [selectedVersion, setSelectedVersion] = useState('');
+  const [selectedNovelId, setSelectedNovelId] = useState('');
+  const [selectedVersionLabel, setSelectedVersionLabel] = useState('');
   const [confirmRebuild, setConfirmRebuild] = useState('');
   const [showRebuildModal, setShowRebuildModal] = useState(false);
 
   const { data: stats } = useQuery({ queryKey: ['novelStats'], queryFn: novelApi.getNovelStats });
 
-  const uniqueNovels = Array.from(new Set(stats?.map(s => s.novelName) || []));
-  const availableVersions = stats?.find(s => s.novelName === selectedNovel)?.versions || [];
-
+  const novelRows = stats?.filter((s) => s.novelId) ?? [];
+  const novelOptions = Array.from(
+    new Map(novelRows.map((s) => [s.novelId as string, s.novelName])).entries()
+  ).map(([id, title]) => ({ id, title }));
+  const availableVersions = stats?.find((s) => s.novelId === selectedNovelId)?.versions || [];
   const { data: diagnostic, isLoading: diagLoading, refetch: runDiag } = useQuery({
-    queryKey: ['chroma-diag', selectedNovel, selectedVersion],
-    queryFn: () => chromaAdminApi.getDiagnostics(selectedNovel, selectedVersion),
+    queryKey: ['chroma-diag', selectedNovelId, selectedVersionLabel],
+    queryFn: () => {
+      const p = parseSplitProfileLabel(selectedVersionLabel);
+      return chromaAdminApi.getDiagnostics(selectedNovelId, p.version, p.chunkSize, p.chunkOverlap);
+    },
     enabled: false,
   });
 
   const handleDiagnostic = () => {
-    if (!selectedNovel || !selectedVersion) {
-      toast.error('请先选择小说和版本');
+    if (!selectedNovelId || !selectedVersionLabel) {
+      toast.error('请先选择小说和数据集');
       return;
     }
     runDiag();
@@ -176,9 +182,20 @@ function DiagnosticsTab() {
   });
 
   const deleteVersionMutation = useMutation({
-    mutationFn: () => chromaAdminApi.deleteVersion(selectedNovel, selectedVersion),
+    mutationFn: () => {
+      const p = parseSplitProfileLabel(selectedVersionLabel);
+      const filter: Record<string, unknown> = {
+        novelId: selectedNovelId,
+        version: p.version,
+      };
+      if (p.chunkSize != null && p.chunkOverlap != null) {
+        filter.chunkSize = p.chunkSize;
+        filter.chunkOverlap = p.chunkOverlap;
+      }
+      return chromaAdminApi.deleteByMetadataFilter(filter);
+    },
     onSuccess: (data) => {
-      toast.success(data?.message || `已成功删除 ${selectedNovel} - ${selectedVersion}`);
+      toast.success(data?.message || `已按过滤条件删除 Chroma 向量`);
     },
     onError: (err: any) => {
       if (handleConflict409(err, '当前版本存在运行中任务或被占用，请等待相关任务完成后再删除')) {
@@ -197,12 +214,12 @@ function DiagnosticsTab() {
   };
 
   const handleDeleteVersion = () => {
-    if (!selectedNovel || !selectedVersion) {
-      toast.error('请先选择小说和版本');
+    if (!selectedNovelId || !selectedVersionLabel) {
+      toast.error('请先选择小说和数据集');
       return;
     }
-    toast("确定要删除此版本的向量数据吗？", {
-      description: "此操作将从 ChromaDB 中永久删除该版本的所有向量。",
+    toast("确定要删除此数据集的向量吗？", {
+      description: "此操作将从 ChromaDB 中永久删除匹配过滤条件的向量（本地 JPA 场景不受影响）。",
       action: {
         label: "确定删除",
         onClick: () => deleteVersionMutation.mutate(),
@@ -229,19 +246,19 @@ function DiagnosticsTab() {
           <div className="flex gap-4 items-end">
             <div className="flex-1">
               <label className="block text-sm font-medium text-gray-700 mb-1">小说</label>
-              <select className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" value={selectedNovel} onChange={e => { setSelectedNovel(e.target.value); setSelectedVersion(''); }}>
+              <select className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" value={selectedNovelId} onChange={e => { setSelectedNovelId(e.target.value); setSelectedVersionLabel(''); }}>
                 <option value="">-- 选择小说 --</option>
-                {uniqueNovels.map(n => <option key={n} value={n}>{n}</option>)}
+                {novelOptions.map((n) => <option key={n.id} value={n.id}>{n.title}</option>)}
               </select>
             </div>
             <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-1">版本</label>
-              <select className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" value={selectedVersion} onChange={e => setSelectedVersion(e.target.value)} disabled={!selectedNovel}>
-                <option value="">-- 选择版本 --</option>
+              <label className="block text-sm font-medium text-gray-700 mb-1">数据集（版本 / 滑窗）</label>
+              <select className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" value={selectedVersionLabel} onChange={e => setSelectedVersionLabel(e.target.value)} disabled={!selectedNovelId}>
+                <option value="">-- 选择数据集 --</option>
                 {availableVersions.map(v => <option key={v} value={v}>{v}</option>)}
               </select>
             </div>
-            <button onClick={handleDiagnostic} disabled={!selectedNovel || !selectedVersion || diagLoading} className="bg-blue-600 text-white px-6 py-2 rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+            <button onClick={handleDiagnostic} disabled={!selectedNovelId || !selectedVersionLabel || diagLoading} className="bg-blue-600 text-white px-6 py-2 rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
               {diagLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "开始诊断"}
             </button>
           </div>
@@ -251,22 +268,23 @@ function DiagnosticsTab() {
               <div className="grid grid-cols-2 gap-6">
                 <div>
                   <p className="text-sm text-gray-500 mb-1">本地数据库记录数</p>
-                  <p className="text-2xl font-bold">{diagnostic.localDbCount}</p>
+                  <p className="text-2xl font-bold">{diagnostic.dbCount}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500 mb-1">ChromaDB 记录数</p>
                   <p className="text-2xl font-bold">{diagnostic.chromaCount}</p>
                 </div>
               </div>
-              <div className="mt-4 pt-4 border-t border-gray-200 flex items-center gap-4">
-                <span className={cn("px-3 py-1 rounded-full text-xs font-medium", diagnostic.isConsistent ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700")}>
-                  {diagnostic.isConsistent ? "✓ 数量一致" : "✗ 数量不一致"}
+              <div className="mt-4 pt-4 border-t border-gray-200 flex items-center gap-4 flex-wrap">
+                <span className={cn("px-3 py-1 rounded-full text-xs font-medium", diagnostic.consistent ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700")}>
+                  {diagnostic.consistent ? "✓ 数量一致" : "✗ 数量不一致"}
                 </span>
-                <span className={cn("px-3 py-1 rounded-full text-xs font-medium", diagnostic.sampleDataValid ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700")}>
-                  {diagnostic.sampleDataValid ? "✓ 元数据完整" : "✗ 元数据异常"}
-                </span>
+                {diagnostic.metadataKeys && diagnostic.metadataKeys.length > 0 && (
+                  <span className="text-xs text-gray-500">
+                    样例 metadata 键：{diagnostic.metadataKeys.join(', ')}
+                  </span>
+                )}
               </div>
-              {diagnostic.message && <p className="mt-3 text-sm text-gray-600">{diagnostic.message}</p>}
             </div>
           )}
         </CardContent>
@@ -298,7 +316,7 @@ function DiagnosticsTab() {
             </div>
             <button
               onClick={handleDeleteVersion}
-              disabled={!selectedNovel || !selectedVersion || deleteVersionMutation.isPending}
+              disabled={!selectedNovelId || !selectedVersionLabel || deleteVersionMutation.isPending}
               className="bg-red-100 text-red-700 hover:bg-red-200 px-4 py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-50"
             >
               {deleteVersionMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "删除版本"}

@@ -21,6 +21,11 @@ public interface NovelRepository {
     Optional<Novel> findById(String id);
 
     /**
+     * 根据 ID 查找并加悲观写锁（用于与任务创建/删除等同事务串行化，避免并发下的检查-提交竞态）。
+     */
+    Optional<Novel> findByIdForUpdate(String id);
+
+    /**
      * 根据标题查找小说（用于兼容 legacy novelName 入口）
      */
     Optional<Novel> findByTitle(String title);

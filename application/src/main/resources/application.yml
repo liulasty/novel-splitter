@@ -11,6 +11,8 @@ logging:
   level:
     root: INFO
     com.novel.splitter: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE
 
 spring:
   datasource:
@@ -114,11 +116,11 @@ splitter:
   
   ingestion:
     batch-size: 10
-    chunk-size: 500
-    chunk-overlap: 100
+    chunk-size: 350
+    chunk-overlap: 65
     
   rule:
-    target-length: 1200
+    target-length: 350
     min-length: 50
     max-length: 3000
     ignore-empty-lines: true

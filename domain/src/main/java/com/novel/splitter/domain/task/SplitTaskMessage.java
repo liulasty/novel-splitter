@@ -9,9 +9,23 @@ public class SplitTaskMessage {
     /** true：忽略“已完整结构化”短路，强制清理并重新解析 */
     private boolean forceReload;
     /**
-     * 服务重启后 Worker 可能需重建任务行：与 DB 中 task_type 一致（SPLIT / PIPELINE）。
+     * 服务重启后 Worker 可能需重建任务行：与 DB 中 task_type 一致（CHAPTER_PARSE / SCENE_SPLIT / PIPELINE 等）。
      */
     private String taskTypeForRecovery;
+
+    /**
+     * 可选：场景滑窗切分的块大小（字/字符数）。未设置时由 Worker 使用全局配置。
+     */
+    private Integer chunkSize;
+    /**
+     * 可选：相邻块重叠字数。须小于 chunkSize；未设置时使用全局配置。
+     */
+    private Integer chunkOverlap;
+
+    /**
+     * 可选：章节标题行匹配的 Java 正则（整行）；空则使用默认规则。
+     */
+    private String chapterTitleRegex;
 
     public SplitTaskMessage() {}
 
@@ -56,5 +70,29 @@ public class SplitTaskMessage {
 
     public void setTaskTypeForRecovery(String taskTypeForRecovery) {
         this.taskTypeForRecovery = taskTypeForRecovery;
+    }
+
+    public Integer getChunkSize() {
+        return chunkSize;
+    }
+
+    public void setChunkSize(Integer chunkSize) {
+        this.chunkSize = chunkSize;
+    }
+
+    public Integer getChunkOverlap() {
+        return chunkOverlap;
+    }
+
+    public void setChunkOverlap(Integer chunkOverlap) {
+        this.chunkOverlap = chunkOverlap;
+    }
+
+    public String getChapterTitleRegex() {
+        return chapterTitleRegex;
+    }
+
+    public void setChapterTitleRegex(String chapterTitleRegex) {
+        this.chapterTitleRegex = chapterTitleRegex;
     }
 }

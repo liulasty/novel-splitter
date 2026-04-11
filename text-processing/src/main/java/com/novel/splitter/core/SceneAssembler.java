@@ -41,7 +41,8 @@ public class SceneAssembler {
     /**
      * 目标场景长度（软限制）- 这里的常量仅作为回退 (fallback) 或参考 (reference) 标准
      */
-    private static final int TARGET_SCENE_LENGTH = 1200;
+    /** 单层 Scene 目标尺度参考（与滑动窗口 chunk-size 同量级） */
+    private static final int TARGET_SCENE_LENGTH = 400;
 
     /**
      * 默认构造函数
@@ -292,32 +293,19 @@ public class SceneAssembler {
         }
         int wordCount = text.length();
 
-        // Phase 4 特性：Evolution (自我进化) - 引入启发式 (Heuristic) 反馈机制
-        // 通过密度分析器计算对话比例，作为该场景语义密度的参考指标
         double densityScore = densityAnalyzer.calculateDensityScore(segments);
 
-        // 计算质量得分 (简单的 PPL [困惑度] 模拟评估)
-        // 检查场景的文本结尾是否完整（是否以标点符号结束）
-        double qualityScore = 1.0;
-        if (text.length() >= 2) {
-            char lastChar = text.charAt(text.length() - 2); // 取倒数第二个字符（排除最后的换行符）
-            // 如果结尾不是常见的结束标点，认为句子可能被截断，降低质量得分
-            if (lastChar != '。' && lastChar != '”' && lastChar != '！' && lastChar != '？' && lastChar != '.' && lastChar != '}') {
-                qualityScore = 0.7; // 结尾不完整，实施降权惩罚
-            }
-        }
-
-        // 构建适用于 RAG 检索的元数据 (Metadata)
         SceneMetadata metadata = SceneMetadata.builder()
                 .novel(novelName)
                 .chapterTitle(chapter.getTitle())
                 .chapterIndex(chapter.getIndex())
                 .startParagraph(startIdx)
                 .endParagraph(endIdx)
-                .chunkType("scene")      // 标记 chunk 的层级为 scene
-                .role("narration")       // 默认角色标记为叙述
-                .densityScore(densityScore) // 记录语义密度得分
-                .qualityScore(qualityScore) // 记录内容质量得分
+                .role(null)
+                .time(null)
+                .location(null)
+                .characters(null)
+                .densityScore(densityScore)
                 .build();
 
         // 标记该场景是否过长，提示后续流程可能需要进行二次拆分（软限制判断）

@@ -17,4 +17,6 @@ public class ChapterDto {
     private int startParagraphIndex;
     private int endParagraphIndex;
     private int wordCount;
+    /** 该章在原文行范围内的段落行数（含空行占位） */
+    private int paragraphCount;
 }

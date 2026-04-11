@@ -1,6 +1,7 @@
 package com.novel.splitter.interfaces.api;
 
 import com.novel.splitter.retrieval.api.RagFacade;
+import com.novel.splitter.retrieval.dto.RagRequest;
 import com.novel.splitter.application.model.dto.AnswerDto;
 import com.novel.splitter.application.mapper.DtoMapper;
 import com.novel.splitter.application.model.dto.ChatRequest;
@@ -35,6 +36,13 @@ public class ChatController {
     @PostMapping
     public AnswerDto chat(@Valid @RequestBody ChatRequest request) {
         log.info("接收到聊天请求: {}", request);
-        return dtoMapper.toAnswerDto(ragService.ask(request.getQuestion(), request.getTopK(), request.getNovelId(), request.getVersion()));
+        RagRequest ragRequest = new RagRequest();
+        ragRequest.setQuestion(request.getQuestion());
+        ragRequest.setTopK(request.getTopK());
+        ragRequest.setNovelId(request.getNovelId());
+        ragRequest.setVersion(request.getVersion());
+        ragRequest.setChunkSize(request.getChunkSize());
+        ragRequest.setChunkOverlap(request.getChunkOverlap());
+        return dtoMapper.toAnswerDto(ragService.ask(ragRequest));
     }
 }

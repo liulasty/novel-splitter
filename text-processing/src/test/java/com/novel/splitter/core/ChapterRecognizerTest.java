@@ -6,7 +6,9 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
 import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ChapterRecognizerTest {
 
@@ -97,6 +99,30 @@ class ChapterRecognizerTest {
         // 中间的句子应该归属到第一章
         assertEquals(0, chapters.get(0).getStartParagraphIndex());
         assertEquals(2, chapters.get(0).getEndParagraphIndex());
+    }
+
+    @Test
+    void skipsConsecutiveChapterLinesAsTableOfContents() {
+        List<RawParagraph> paragraphs = Arrays.asList(
+                RawParagraph.builder().index(0).content("第1章 目录项").isEmpty(false).build(),
+                RawParagraph.builder().index(1).content("第2章 目录项").isEmpty(false).build(),
+                RawParagraph.builder().index(2).content("").isEmpty(true).build(),
+                RawParagraph.builder().index(3).content("第1章 正文开始").isEmpty(false).build(),
+                RawParagraph.builder().index(4).content("正文一段").isEmpty(false).build()
+        );
+        List<Chapter> chapters = recognizer.recognize(paragraphs);
+        assertEquals(1, chapters.size());
+        assertEquals("第1章 正文开始", chapters.get(0).getTitle());
+        assertEquals(3, chapters.get(0).getStartParagraphIndex());
+        assertEquals(4, chapters.get(0).getEndParagraphIndex());
+    }
+
+    @Test
+    void skipLeadingTableOfContents_lineOffset() {
+        List<String> lines = Arrays.asList("第1章 A", "第2章 B", "", "正文前言一句", "第1章 真");
+        int off = ChapterRecognizer.skipLeadingTableOfContents(lines);
+        assertEquals(3, off);
+        assertTrue(lines.get(off).contains("正文"));
     }
 
     private List<RawParagraph> toParagraphs(List<String> lines) {

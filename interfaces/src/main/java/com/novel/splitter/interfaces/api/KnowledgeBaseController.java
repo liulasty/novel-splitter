@@ -2,6 +2,7 @@ package com.novel.splitter.interfaces.api;
 
 import com.novel.splitter.application.service.knowledge.KnowledgeBaseService;
 import com.novel.splitter.application.model.dto.SceneDto;
+import com.novel.splitter.application.model.dto.SceneSplitProfileDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -50,16 +51,30 @@ public class KnowledgeBaseController {
         return knowledgeBaseService.listVersionsByNovelId(novelId);
     }
 
-    @Operation(summary = "删除指定小说的特定版本")
-    @DeleteMapping("/{novelName}/versions/{version}")
-    public Long deleteVersion(@PathVariable("novelName") String novelName, @PathVariable("version") String version) {
-        return knowledgeBaseService.deleteVersion(novelName, version);
+    @Operation(summary = "按 novelId 获取结构化切分数据集（version + chunk 参数）")
+    @GetMapping("/id/{novelId}/split-profiles")
+    public List<SceneSplitProfileDto> listSplitProfilesByNovelId(@PathVariable("novelId") String novelId) {
+        return knowledgeBaseService.listSplitProfilesByNovelId(novelId);
     }
 
-    @Operation(summary = "按 novelId 删除指定版本")
+    @Operation(summary = "删除指定小说的特定切分数据集（version + chunk 参数）")
+    @DeleteMapping("/{novelName}/versions/{version}")
+    public Long deleteVersion(
+            @PathVariable("novelName") String novelName,
+            @PathVariable("version") String version,
+            @RequestParam int chunkSize,
+            @RequestParam int chunkOverlap) {
+        return knowledgeBaseService.deleteVersion(novelName, version, chunkSize, chunkOverlap);
+    }
+
+    @Operation(summary = "按 novelId 删除指定切分数据集")
     @DeleteMapping("/id/{novelId}/versions/{version}")
-    public Long deleteVersionByNovelId(@PathVariable("novelId") String novelId, @PathVariable("version") String version) {
-        return knowledgeBaseService.deleteVersionByNovelId(novelId, version);
+    public Long deleteSplitProfileByNovelId(
+            @PathVariable("novelId") String novelId,
+            @PathVariable("version") String version,
+            @RequestParam int chunkSize,
+            @RequestParam int chunkOverlap) {
+        return knowledgeBaseService.deleteSplitProfileByNovelId(novelId, version, chunkSize, chunkOverlap);
     }
 
     @Operation(summary = "按 novelId 删除整部小说的知识库")

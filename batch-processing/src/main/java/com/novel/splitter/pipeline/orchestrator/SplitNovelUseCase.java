@@ -10,6 +10,9 @@ import com.novel.splitter.domain.strategy.OverlapChunkingStrategy;
 import com.novel.splitter.domain.task.IngestProgress;
 import com.novel.splitter.domain.repository.ChapterRepository;
 import com.novel.splitter.domain.repository.SceneRepository;
+import com.novel.splitter.domain.model.SceneMetadata;
+import com.novel.splitter.pipeline.model.ResolvedChunkingParams;
+import com.novel.splitter.validation.core.SceneQualityScoreWriter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,10 +36,13 @@ public class SplitNovelUseCase {
     @Value("${splitter.rule.min-length:50}")
     private int minLength;
 
-    @Value("${splitter.ingestion.chunk-size:500}")
+    @Value("${splitter.rule.max-length:3000}")
+    private int maxLength;
+
+    @Value("${splitter.ingestion.chunk-size:350}")
     private int chunkSize;
 
-    @Value("${splitter.ingestion.chunk-overlap:100}")
+    @Value("${splitter.ingestion.chunk-overlap:65}")
     private int chunkOverlap;
 
     /**
@@ -70,7 +76,47 @@ public class SplitNovelUseCase {
         return Math.max(0, maxScenes - savedCount - batchSize);
     }
 
+    private void assignChapterSequence(List<Scene> scenes) {
+        int seq = 0;
+        for (Scene s : scenes) {
+            SceneMetadata meta = s.getMetadata();
+            if (meta == null) {
+                meta = new SceneMetadata();
+                s.setMetadata(meta);
+            }
+            meta.setSequenceNum(seq++);
+        }
+    }
+
+    /**
+     * 与 {@link #split} 内部使用的滑窗参数计算一致，供 SplitWorker 等在落库前做幂等删除。
+     */
+    public ResolvedChunkingParams resolveChunkingParams(Integer overrideChunkSize, Integer overrideChunkOverlap) {
+        int effectiveChunk = (overrideChunkSize != null && overrideChunkSize > 0) ? overrideChunkSize : chunkSize;
+        int effectiveOverlap = (overrideChunkOverlap != null && overrideChunkOverlap >= 0) ? overrideChunkOverlap : chunkOverlap;
+        if (effectiveChunk <= 0) {
+            effectiveChunk = chunkSize;
+        }
+        if (effectiveOverlap < 0) {
+            effectiveOverlap = chunkOverlap;
+        }
+        if (effectiveOverlap >= effectiveChunk) {
+            effectiveOverlap = Math.max(0, effectiveChunk - 1);
+        }
+        return new ResolvedChunkingParams(effectiveChunk, effectiveOverlap);
+    }
+
     public List<Long> split(String taskId, String novelId, String novelTitle, int maxScenes, String version, BiConsumer<Integer, String> progressCallback) {
+        return split(taskId, novelId, novelTitle, maxScenes, version, null, null, progressCallback);
+    }
+
+    /**
+     * @param overrideChunkSize    非空且 &gt;0 时覆盖全局 chunkSize
+     * @param overrideChunkOverlap 非空且 ≥0 时覆盖全局 chunkOverlap（会校验 &lt; 有效块大小）
+     */
+    public List<Long> split(String taskId, String novelId, String novelTitle, int maxScenes, String version,
+                            Integer overrideChunkSize, Integer overrideChunkOverlap,
+                            BiConsumer<Integer, String> progressCallback) {
         log.info("=== Start Split Phase for novelId={} title={} ===", novelId, novelTitle);
 
         int persistBatch = effectivePersistBatchSize();
@@ -86,7 +132,11 @@ public class SplitNovelUseCase {
             progressCallback.accept(lastProgress, String.format("准备逐章切分，共 %d 章", totalChapters));
         }
 
-        ChunkingStrategy chunkingStrategy = new OverlapChunkingStrategy(chunkSize, chunkOverlap);
+        ResolvedChunkingParams resolved = resolveChunkingParams(overrideChunkSize, overrideChunkOverlap);
+        int effectiveChunk = resolved.chunkSize();
+        int effectiveOverlap = resolved.chunkOverlap();
+
+        ChunkingStrategy chunkingStrategy = new OverlapChunkingStrategy(effectiveChunk, effectiveOverlap);
         String finalVersion = (version != null && !version.isBlank()) ? version : "v1-ingestion";
 
         boolean savePhaseStarted = false;
@@ -106,6 +156,8 @@ public class SplitNovelUseCase {
             for (Scene s : chapterScenes) {
                 if (s.getMetadata() != null) {
                     s.getMetadata().setVersion(finalVersion);
+                    s.getMetadata().setChunkSize(effectiveChunk);
+                    s.getMetadata().setChunkOverlap(effectiveOverlap);
                 }
                 chunkedScenes.addAll(chunkingStrategy.split(s));
             }
@@ -113,6 +165,9 @@ public class SplitNovelUseCase {
             scenesCount += chunkedScenes.size();
 
             List<Scene> validScenes = filterByLength(chunkedScenes);
+
+            SceneQualityScoreWriter.apply(validScenes, minLength, maxLength);
+            assignChapterSequence(validScenes);
 
             int cap = capRemaining(maxScenes, allSavedSceneIds.size(), batchScenes.size());
             if (cap <= 0) {
@@ -133,7 +188,8 @@ public class SplitNovelUseCase {
                 }
                 List<Scene> toSave = new ArrayList<>(batchScenes.subList(0, persistBatch));
                 batchScenes.subList(0, persistBatch).clear();
-                allSavedSceneIds.addAll(sceneRepository.saveScenes(novelId, finalVersion, toSave));
+                allSavedSceneIds.addAll(sceneRepository.saveScenes(
+                        novelId, finalVersion, effectiveChunk, effectiveOverlap, toSave));
                 if (progressCallback != null) {
                     int denom = Math.max(1, Math.max(totalValidAccepted, allSavedSceneIds.size()));
                     int p = IngestProgress.calc(IngestProgress.SAVE_START, IngestProgress.SAVE_END,
@@ -182,7 +238,8 @@ public class SplitNovelUseCase {
                 lastProgress = Math.max(lastProgress, IngestProgress.SAVE_START);
                 progressCallback.accept(lastProgress, "正在保存剩余场景到本地存储...");
             }
-            allSavedSceneIds.addAll(sceneRepository.saveScenes(novelId, finalVersion, batchScenes));
+            allSavedSceneIds.addAll(sceneRepository.saveScenes(
+                    novelId, finalVersion, effectiveChunk, effectiveOverlap, batchScenes));
             batchScenes.clear();
         }
 

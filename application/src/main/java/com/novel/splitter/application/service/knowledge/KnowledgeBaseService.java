@@ -1,6 +1,7 @@
 package com.novel.splitter.application.service.knowledge;
 
 import com.novel.splitter.application.model.dto.SceneDto;
+import com.novel.splitter.application.model.dto.SceneSplitProfileDto;
 import com.novel.splitter.application.model.dto.VectorPreviewRecordDto;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -34,12 +35,9 @@ public interface KnowledgeBaseService {
     List<SceneDto> getScenesByNovelId(String novelId);
 
     /**
-     * 删除指定版本的切分结果（及相关向量）
-     * @param novelName 小说名称
-     * @param version 版本
-     * @return cleanupTaskId
+     * 删除指定 (version, chunkSize, chunkOverlap) 分区下的切分结果（及相关向量）
      */
-    Long deleteVersion(String novelName, String version);
+    Long deleteVersion(String novelName, String version, int chunkSize, int chunkOverlap);
 
     /**
      * 删除指定小说的所有数据（文件、切分结果、向量）
@@ -63,17 +61,17 @@ public interface KnowledgeBaseService {
     List<String> listVersions(String novelName);
 
     /**
-     * 获取指定小说（按 novelId）的所有版本列表
-     * @param novelId novels 表主键
-     * @return 版本列表
+     * 获取指定小说（按 novelId）的展示标签列表（含滑窗参数），兼容旧前端。
      */
     List<String> listVersionsByNovelId(String novelId);
 
     /**
-     * 按 novelId 删除指定版本的切分结果（及相关向量）
-     * @param novelId novels 表主键
-     * @param version 版本
-     * @return cleanupTaskId
+     * 按 novelId 返回结构化切分数据集列表（version + chunk 参数）。
      */
-    Long deleteVersionByNovelId(String novelId, String version);
+    List<SceneSplitProfileDto> listSplitProfilesByNovelId(String novelId);
+
+    /**
+     * 按 novelId 删除指定 (version, chunkSize, chunkOverlap) 分区下的场景与对应向量。
+     */
+    Long deleteSplitProfileByNovelId(String novelId, String version, int chunkSize, int chunkOverlap);
 }

@@ -17,6 +17,7 @@ export interface NovelSummaryDto {
 }
 
 export interface NovelStatRecordDto {
+  novelId?: string;
   novelName: string;
   versions: string[];
   sceneCount: number;
@@ -44,11 +45,20 @@ export interface NovelSplitRequestDto {
   overlapTokens: number;
 }
 
-export interface ChapterTreeDto {
-  chapterId: string;
+/** 与后端 ChapterDto JSON 对齐 */
+export interface NovelChapterDto {
+  id: number;
+  novelId: string;
+  index: number;
   title: string;
-  chapterIndex: number;
+  startParagraphIndex: number;
+  endParagraphIndex: number;
+  wordCount: number;
+  paragraphCount: number;
 }
+
+/** @deprecated 使用 NovelChapterDto */
+export type ChapterTreeDto = NovelChapterDto;
 
 export interface ScenePreviewDto {
   sceneId: string;
@@ -71,9 +81,22 @@ export interface TaskSubmitResponse {
   message: string;
 }
 
+export type SplitEntry = 'FULL' | 'CHAPTER_RELOAD' | 'SCENE_ONLY';
+
 export interface NovelPipelineRequestDto {
   stages: Array<'SPLIT' | 'EMBED'>;
   version?: string;
+  maxScenes?: number;
+  /** 与后端 NovelPipelineRequestDto.splitEntry 对齐 */
+  splitEntry?: SplitEntry;
+  chunkSize?: number;
+  chunkOverlap?: number;
+  chapterTitleRegex?: string;
+}
+
+export interface ReparseChaptersRequest {
+  version?: string;
+  chapterTitleRegex?: string;
   maxScenes?: number;
 }
 
@@ -130,7 +153,7 @@ export const novelApi = {
   /** 后端 IngestRequest 要求 fileName 非空，占位即可（实际以 novelId 对应 DB 为准） */
   splitNovel: async (
     novelId: string,
-    request: { maxScenes?: number; version?: string }
+    request: { maxScenes?: number; version?: string; chapterTitleRegex?: string }
   ): Promise<TaskSubmitResponse> => {
     const response = await apiClient.post<ApiEnvelope<TaskSubmitResponse>, TaskSubmitResponse>(
       `/novels/${encodeURIComponent(novelId)}/split`,
@@ -138,14 +161,28 @@ export const novelApi = {
         fileName: 'placeholder.txt',
         maxScenes: request.maxScenes ?? 0,
         version: request.version ?? 'v1',
+        ...(request.chapterTitleRegex != null && request.chapterTitleRegex !== ''
+          ? { chapterTitleRegex: request.chapterTitleRegex }
+          : {}),
       }
+    );
+    return response;
+  },
+
+  reparseChapters: async (
+    novelId: string,
+    body?: ReparseChaptersRequest
+  ): Promise<TaskSubmitResponse> => {
+    const response = await apiClient.post<ApiEnvelope<TaskSubmitResponse>, TaskSubmitResponse>(
+      `/novels/${encodeURIComponent(novelId)}/re-parse-chapters`,
+      body ?? {}
     );
     return response;
   },
 
   loadNovel: async (
     novelId: string,
-    body?: { version?: string; force?: boolean }
+    body?: { version?: string; force?: boolean; chapterTitleRegex?: string }
   ): Promise<TaskSubmitResponse> => {
     const response = await apiClient.post<ApiEnvelope<TaskSubmitResponse>, TaskSubmitResponse>(
       `/novels/${encodeURIComponent(novelId)}/load`,
@@ -168,8 +205,31 @@ export const novelApi = {
     return response;
   },
 
-  getChapters: async (novelId: string): Promise<ChapterTreeDto[]> => {
-    const response = await apiClient.get<ApiEnvelope<ChapterTreeDto[]>, ChapterTreeDto[]>(`/novels/${novelId}/chapters`);
+  /**
+   * 场景切分（Split 队列），需已完成章节解析。
+   * 后端按 (novelId, version) 分区：先删该 version 旧场景再写入多条 Scene；换 chunk 规则若要并存请改 version。
+   */
+  sceneSplit: async (
+    novelId: string,
+    body: {
+      version?: string;
+      maxScenes?: number;
+      chunkSize?: number;
+      chunkOverlap?: number;
+      triggerEmbed?: boolean;
+    }
+  ): Promise<TaskSubmitResponse> => {
+    const response = await apiClient.post<ApiEnvelope<TaskSubmitResponse>, TaskSubmitResponse>(
+      `/novels/${encodeURIComponent(novelId)}/scene-split`,
+      body
+    );
+    return response;
+  },
+
+  getChapters: async (novelId: string): Promise<NovelChapterDto[]> => {
+    const response = await apiClient.get<ApiEnvelope<NovelChapterDto[]>, NovelChapterDto[]>(
+      `/novels/${novelId}/chapters`
+    );
     return response;
   },
 

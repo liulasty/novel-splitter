@@ -25,6 +25,12 @@ public class SceneMetadata {
     
     /** 版本号 */
     private String version;
+
+    /** 场景切分时生效的滑窗块大小（字符），与 DB scenes.chunk_size 一致 */
+    private Integer chunkSize;
+
+    /** 场景切分时生效的块重叠（字符），与 DB scenes.chunk_overlap 一致 */
+    private Integer chunkOverlap;
     
     /** 章节标题 */
     private String chapterTitle;
@@ -37,18 +43,12 @@ public class SceneMetadata {
     
     /** 结束段落 */
     private Integer endParagraph;
-    
-    /** Chunk 类型 (e.g., "scene", "summary") */
-    private String chunkType;
-    
-    /** 序列号 (例如在切分后的片段序号) */
-    private Integer sequenceNum;
-    
-    /** 角色/功能 (e.g., "narration", "dialogue") */
-    private String role;
 
-    /** 父级 Scene ID (用于 Parent-Child Chunking 检索) */
-    private String parentSceneId;
+    /** 序列号（章内从 0 递增） */
+    private Integer sequenceNum;
+
+    /** 角色/功能，预留由 LLM 抽取 */
+    private String role;
 
     /** 信息密度得分 */
     private Double densityScore;

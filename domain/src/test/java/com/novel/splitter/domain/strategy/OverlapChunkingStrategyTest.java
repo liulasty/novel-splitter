@@ -23,8 +23,7 @@ class OverlapChunkingStrategyTest {
                 .chapterIndex(1)
                 .startParagraph(0)
                 .endParagraph(50)
-                .chunkType("scene")
-                .role("narration")
+                .role(null)
                 .densityScore(0.42)
                 .qualityScore(0.9)
                 .extra(Map.of("k", "v"))
@@ -49,8 +48,6 @@ class OverlapChunkingStrategyTest {
         assertTrue(children.size() >= 2);
         Scene first = children.get(0);
         assertEquals("…上文结尾", first.getPrefixContext());
-        assertEquals("child_chunk", first.getMetadata().getChunkType());
-        assertEquals("parent-uuid", first.getMetadata().getParentSceneId());
         assertEquals(0, first.getMetadata().getSequenceNum());
         assertEquals("novel-1", first.getMetadata().getNovel());
         assertEquals("第一章 试炼", first.getMetadata().getChapterTitle());
@@ -59,7 +56,7 @@ class OverlapChunkingStrategyTest {
         assertEquals(50, first.getMetadata().getEndParagraph());
         assertEquals(0.42, first.getMetadata().getDensityScore());
         assertEquals(0.9, first.getMetadata().getQualityScore());
-        assertEquals("narration", first.getMetadata().getRole());
+        assertNull(first.getMetadata().getRole());
         assertEquals("v", first.getMetadata().getExtra().get("k"));
 
         Scene second = children.get(1);

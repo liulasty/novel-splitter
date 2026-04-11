@@ -5,6 +5,9 @@ import com.novel.splitter.domain.model.paging.PagedResult;
 import com.novel.splitter.domain.task.SplitTask;
 import com.novel.splitter.domain.task.SplitTaskFilter;
 import com.novel.splitter.domain.task.TaskProgressEvent;
+import com.novel.splitter.domain.model.Novel;
+import com.novel.splitter.domain.repository.NovelRepository;
+import com.novel.splitter.domain.repository.SceneRepository;
 import com.novel.splitter.domain.repository.SplitTaskRepository;
 import com.novel.splitter.domain.repository.TaskEventRepository;
 import com.novel.splitter.application.model.dto.JobStatSummaryDto;
@@ -12,8 +15,10 @@ import com.novel.splitter.application.model.dto.JobRecordDto;
 import com.novel.splitter.application.model.dto.PollResponse;
 import com.novel.splitter.application.port.out.TaskCachePort;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -30,19 +35,109 @@ public class TaskService {
     private final SplitTaskRepository taskRepository;
     private final TaskEventRepository taskEventRepository;
     private final TaskCachePort taskCachePort;
+    private final NovelRepository novelRepository;
+    private final SceneRepository sceneRepository;
 
-    public TaskService(SplitTaskRepository taskRepository, TaskEventRepository taskEventRepository, TaskCachePort taskCachePort) {
+    public TaskService(
+            SplitTaskRepository taskRepository,
+            TaskEventRepository taskEventRepository,
+            TaskCachePort taskCachePort,
+            NovelRepository novelRepository,
+            SceneRepository sceneRepository) {
         this.taskRepository = taskRepository;
         this.taskEventRepository = taskEventRepository;
         this.taskCachePort = taskCachePort;
+        this.novelRepository = novelRepository;
+        this.sceneRepository = sceneRepository;
     }
 
     @Transactional
     public SplitTask createTask(String taskId, TaskType taskType, String novelId, String fileName, int maxScenes, String version) {
         SplitTask task = new SplitTask(taskId, taskType, novelId, fileName, maxScenes, version);
+        persistNewTask(task);
+        return task;
+    }
+
+    /**
+     * 在单事务内对小说行加锁并校验无进行中任务后创建任务，避免并发下的检查-提交竞态。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public SplitTask createTaskWithNovelAdmission(String taskId, TaskType taskType, String novelId, int maxScenes, String version) {
+        Novel novel = loadNovelLockedForTaskAdmission(novelId);
+        throwIfHasActiveTasks(novel.getId(), "该小说存在进行中的任务，请结束后再试");
+        SplitTask task = new SplitTask(taskId, taskType, novel.getId(), novel.getFilePath(), maxScenes, version);
+        persistNewTask(task);
+        return task;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public SplitTask createEmbedTaskWithNovelAdmission(String taskId, String novelId, String normalizedVersion) {
+        return createEmbedTaskWithNovelAdmission(taskId, novelId, normalizedVersion, null, null);
+    }
+
+    /**
+     * 与 {@link #createTaskWithNovelAdmission} 相同的事务语义，并校验场景数后创建 EMBED 任务。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public SplitTask createEmbedTaskWithNovelAdmission(
+            String taskId, String novelId, String normalizedVersion, Integer chunkSize, Integer chunkOverlap) {
+        Novel novel = loadNovelLockedForTaskAdmission(novelId);
+        throwIfHasActiveTasks(novel.getId(), "该小说存在进行中的任务，请结束后再试");
+        long sceneCount;
+        if (chunkSize != null && chunkOverlap != null) {
+            sceneCount = sceneRepository.countByProfile(novel.getId(), normalizedVersion, chunkSize, chunkOverlap);
+        } else {
+            sceneCount = sceneRepository.countAllByNovelIdAndVersion(novel.getId(), normalizedVersion);
+        }
+        if (sceneCount <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "暂无场景数据，请先完成切分。novelId=" + novel.getId() + ", version=" + normalizedVersion);
+        }
+        SplitTask task = new SplitTask(taskId, TaskType.EMBED, novel.getId(), novel.getFilePath(), Integer.MAX_VALUE, normalizedVersion);
+        persistNewTask(task);
+        return task;
+    }
+
+    /**
+     * 对小说行加锁并校验无进行中任务（用于删除等与创建任务互斥的操作）。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void ensureNoActiveTasksForNovelLocked(String novelId, String conflictMessage) {
+        if (novelId == null || novelId.isBlank()) {
+            throw new IllegalArgumentException("novelId must not be blank");
+        }
+        String nid = novelId.trim();
+        novelRepository.findByIdForUpdate(nid)
+                .orElseThrow(() -> new IllegalArgumentException("Novel not found: " + nid));
+        throwIfHasActiveTasks(nid, conflictMessage);
+    }
+
+    private Novel loadNovelLockedForTaskAdmission(String novelId) {
+        if (novelId == null || novelId.isBlank()) {
+            throw new IllegalArgumentException("novelId must not be blank");
+        }
+        String nid = novelId.trim();
+        Novel novel = novelRepository.findByIdForUpdate(nid)
+                .orElseThrow(() -> new IllegalArgumentException("Novel not found: " + nid));
+        if (novel.isDeleted()) {
+            throw new IllegalArgumentException("Novel is deleted: " + nid);
+        }
+        return novel;
+    }
+
+    private void throwIfHasActiveTasks(String novelId, String conflictMessage) {
+        List<SplitTask> tasks = taskRepository.findRecentByNovelId(novelId, 50);
+        boolean active = tasks.stream().anyMatch(t ->
+                t != null && (t.getStatus() == SplitTask.TaskStatus.PENDING || t.getStatus() == SplitTask.TaskStatus.PROCESSING));
+        if (active) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, conflictMessage);
+        }
+    }
+
+    private void persistNewTask(SplitTask task) {
         taskRepository.save(task);
         appendTaskEvent(task);
-        
+        String taskId = task.getTaskId();
         taskCachePort.put(taskId, PollResponse.builder()
                 .taskId(taskId)
                 .status(task.getStatus().name())
@@ -51,8 +146,6 @@ public class TaskService {
                 .updatedAt(task.getUpdatedAt())
                 .serverTime(System.currentTimeMillis())
                 .build());
-                
-        return task;
     }
 
     @Transactional(readOnly = true)

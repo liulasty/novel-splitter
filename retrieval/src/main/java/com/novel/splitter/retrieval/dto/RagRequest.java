@@ -37,4 +37,8 @@ public class RagRequest {
      * // 用于指定小说数据解析和入库时的版本（如 v1, v2），保证数据的一致性 
      */
     private String version;
+
+    /** 与场景/向量分区一致；多数据集共用同一 version 时必填 */
+    private Integer chunkSize;
+    private Integer chunkOverlap;
 }

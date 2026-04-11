@@ -9,4 +9,8 @@ public class IngestRequest {
     private String fileName;
     private int maxScenes = 0;
     private String version;
+    private Integer chunkSize;
+    private Integer chunkOverlap;
+    /** 可选：章节标题行 Java 正则（整行匹配） */
+    private String chapterTitleRegex;
 }

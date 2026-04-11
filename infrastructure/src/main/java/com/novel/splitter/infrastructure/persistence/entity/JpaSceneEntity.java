@@ -49,6 +49,14 @@ public class JpaSceneEntity {
     @Column(name = "version", nullable = false)
     private String version;
 
+    /** 场景切分滑窗块大小；新数据必写，旧数据可能为 null */
+    @Column(name = "chunk_size")
+    private Integer chunkSize;
+
+    /** 场景切分块重叠；新数据必写，旧数据可能为 null */
+    @Column(name = "chunk_overlap")
+    private Integer chunkOverlap;
+
     @Column(name = "chapter_title")
     private String chapterTitle;
 

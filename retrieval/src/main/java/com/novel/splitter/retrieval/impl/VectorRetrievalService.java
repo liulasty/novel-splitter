@@ -5,6 +5,7 @@ import com.novel.splitter.retrieval.dto.RetrievalQuery;
 import com.novel.splitter.domain.model.embedding.VectorRecord;
 import com.novel.splitter.embedding.api.EmbeddingService;
 import com.novel.splitter.embedding.api.VectorStore;
+import com.novel.splitter.domain.model.SceneSplitProfile;
 import com.novel.splitter.domain.repository.SceneRepository;
 import com.novel.splitter.retrieval.api.RetrievalService;
 import lombok.RequiredArgsConstructor;
@@ -28,11 +29,9 @@ public class VectorRetrievalService implements RetrievalService {
 
     /** 与 {@link com.novel.splitter.embedding.store.ChromaVectorStore} 写入的 metadata 键一致 */
     private static final String META_NOVEL_ID = "novelId";
-    // 元数据键名：小说版本
     private static final String META_VERSION = "version";
-    // 元数据键名：父级场景ID（用于子块追溯）
-    private static final String META_PARENT_SCENE_ID = "parent_scene_id";
-    // 分隔符，用于构建唯一键
+    private static final String META_CHUNK_SIZE = "chunkSize";
+    private static final String META_CHUNK_OVERLAP = "chunkOverlap";
     private static final String KEY_SEPARATOR = "::";
 
     private final EmbeddingService embeddingService;
@@ -70,6 +69,33 @@ public class VectorRetrievalService implements RetrievalService {
             filter.put(META_VERSION, query.getVersion());
         }
 
+        Integer chunkSize = query.getChunkSize();
+        Integer chunkOverlap = query.getChunkOverlap();
+        String novelId = query.getNovelId();
+        String version = query.getVersion();
+        if (novelId != null && !novelId.isBlank() && version != null && !version.isBlank()
+                && (chunkSize == null || chunkOverlap == null)) {
+            java.util.List<SceneSplitProfile> sameVersion = sceneRepository.listSplitProfilesByNovelId(novelId).stream()
+                    .filter(p -> version.equals(p.version()))
+                    .toList();
+            java.util.List<SceneSplitProfile> withDims = sameVersion.stream()
+                    .filter(p -> p.chunkSize() != null && p.chunkOverlap() != null)
+                    .toList();
+            if (withDims.size() > 1) {
+                throw new IllegalArgumentException(
+                        "Multiple split profiles for novelId=" + novelId + " version=" + version
+                                + "; specify chunkSize and chunkOverlap.");
+            }
+            if (withDims.size() == 1) {
+                chunkSize = withDims.get(0).chunkSize();
+                chunkOverlap = withDims.get(0).chunkOverlap();
+            }
+        }
+        if (chunkSize != null && chunkOverlap != null) {
+            filter.put(META_CHUNK_SIZE, chunkSize);
+            filter.put(META_CHUNK_OVERLAP, chunkOverlap);
+        }
+
         log.info("Executing vector search with filter: {}", filter);
 
         // 执行向量搜索
@@ -96,7 +122,7 @@ public class VectorRetrievalService implements RetrievalService {
 
         // 收集所有需要查询的目标 Scene ID，以便执行批量查询降低 IO 开销
         List<String> allTargetIds = processingOrder.stream()
-                .map(this::resolveTargetId)
+                .map(VectorRecord::getChunkId)
                 .distinct()
                 .collect(Collectors.toList());
 
@@ -115,17 +141,15 @@ public class VectorRetrievalService implements RetrievalService {
         // 遍历每个分组，装填相应的 Scene 数据
         for (Map.Entry<String, List<VectorRecord>> entry : groupedRecords.entrySet()) {
             String[] parts = entry.getKey().split(KEY_SEPARATOR, 2);
-            String novelId = parts[0];
-            String version = parts.length > 1 ? parts[1] : "";
+            String groupNovelId = parts[0];
+            String groupVersion = parts.length > 1 ? parts[1] : "";
 
             try {
                 for (VectorRecord r : entry.getValue()) {
-                    String targetId = resolveTargetId(r);
+                    String targetId = r.getChunkId();
                     Scene s = allScenesMap.get(targetId);
                     
                     if (s != null) {
-                        // 去重逻辑：如果多个子块（Chunk）指向同一个父级 Scene，
-                        // 则保留相关度得分最高的分数作为该 Scene 的代表得分
                         if (hydratedScenes.containsKey(targetId)) {
                             Scene existing = hydratedScenes.get(targetId);
                             if (r.getScore() > existing.getScore()) {
@@ -136,12 +160,12 @@ public class VectorRetrievalService implements RetrievalService {
                             hydratedScenes.put(targetId, s);
                         }
                     } else {
-                        log.warn("Scene {} not found for novelId={} version={}", targetId, novelId, version);
+                        log.warn("Scene {} not found for novelId={} version={}", targetId, groupNovelId, groupVersion);
                     }
                 }
             } catch (Exception e) {
-                log.error("Failed to load scenes for novelId={} version={}", novelId, version, e);
-                failedGroups.add(novelId + "/" + version);
+                log.error("Failed to load scenes for novelId={} version={}", groupNovelId, groupVersion, e);
+                failedGroups.add(groupNovelId + "/" + groupVersion);
             }
         }
 
@@ -153,7 +177,7 @@ public class VectorRetrievalService implements RetrievalService {
         List<Scene> resultList = new ArrayList<>();
         Set<String> seenIds = new HashSet<>();
         for (VectorRecord r : processingOrder) {
-            String targetId = resolveTargetId(r);
+            String targetId = r.getChunkId();
             if (!seenIds.contains(targetId)) {
                 Scene s = hydratedScenes.get(targetId);
                 if (s != null) {
@@ -164,22 +188,5 @@ public class VectorRetrievalService implements RetrievalService {
         }
         
         return resultList;
-    }
-
-    /**
-     * 从 VectorRecord 元数据中解析 targetId。
-     * <p>
-     * 如果在切分阶段子块（Chunk）保留了其所属的父级场景 ID（parent_scene_id），
-     * 则优先返回父级场景 ID，以保证提供给 LLM 更加完整的上下文；否则直接返回当前子块 ID。
-     * </p>
-     *
-     * @param record 向量记录，包含由向量数据库返回的元数据信息
-     * @return 目标 Scene 的唯一标识符（ID）
-     */
-    private String resolveTargetId(VectorRecord record) {
-        if (record.getMetadata() != null && record.getMetadata().containsKey(META_PARENT_SCENE_ID)) {
-            return (String) record.getMetadata().get(META_PARENT_SCENE_ID);
-        }
-        return record.getChunkId();
     }
 }

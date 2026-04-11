@@ -10,6 +10,7 @@ import com.novel.splitter.application.model.dto.NovelPipelineRequestDto;
 import com.novel.splitter.application.model.dto.NovelSummaryDto;
 import com.novel.splitter.application.model.dto.NovelUploadResponseDto;
 import com.novel.splitter.application.model.dto.SceneDto;
+import com.novel.splitter.application.model.dto.SceneSplitRequestDto;
 import com.novel.splitter.application.model.dto.SplitRetryRequestDto;
 import com.novel.splitter.application.model.dto.TaskSubmitResponseDto;
 import jakarta.validation.Valid;
@@ -23,6 +24,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.novel.splitter.application.model.dto.NovelStatRecordDto;
+import com.novel.splitter.application.model.dto.ReparseChaptersRequestDto;
 import com.novel.splitter.domain.model.paging.PagedResult;
 
 import java.io.IOException;
@@ -140,29 +142,49 @@ public class NovelController {
             @RequestParam(value = "size", defaultValue = "200") int size) {
         return novelFacadeService.getScenesByChapter(novelId, chapterId, page, size);
     }
+    @Operation(summary = "章节解析（CHAPTER_PARSE）", description = "投递 Load 队列：原文正则章节边界 → chapters 与 parsed JSON 落库；不自动场景切分，完成后请调用 scene-split")
     @PostMapping("/{novelId}/split")
     public TaskSubmitResponseDto splitNovel(@PathVariable("novelId") String novelId, @Valid @RequestBody IngestRequest request) throws IOException {
         return novelFacadeService.split(novelId, request);
     }
 
-    @Operation(summary = "重试 Split（跳过 Load）", description = "当 SplitWorker 清理失败/切分失败时，可手动从 Split 阶段重新触发；要求 chapters 与 chapter JSON 均已存在")
+    @Operation(summary = "强制重解析章节", description = "清理旧章节/解析产物后重新 Load；可选 chapterTitleRegex 覆盖默认章节标题规则")
+    @PostMapping("/{novelId}/re-parse-chapters")
+    public TaskSubmitResponseDto reparseChapters(
+            @PathVariable("novelId") String novelId,
+            @RequestBody(required = false) ReparseChaptersRequestDto body) throws IOException {
+        return novelFacadeService.reparseChapters(novelId, body != null ? body : new ReparseChaptersRequestDto());
+    }
+
+    @Operation(summary = "场景切分（SCENE_SPLIT）", description = "投递 Split 队列：需已完成章节解析。每次任务会生成多条 Scene；按 version 分区落库，任务前会删除该小说同名 version 的旧场景与向量。chunk 规则不会自动改变 version，不同滑窗策略并存请使用不同 version。")
+    @PostMapping("/{novelId}/scene-split")
+    public TaskSubmitResponseDto sceneSplitNovel(
+            @PathVariable("novelId") String novelId,
+            @RequestBody(required = false) SceneSplitRequestDto request) throws IOException {
+        return novelFacadeService.sceneSplit(novelId, request != null ? request : new SceneSplitRequestDto());
+    }
+
+    @Operation(summary = "重试场景切分（跳过章节解析）", description = "当 SplitWorker 失败时可重试；要求 chapters 与 chapter JSON 均已存在")
     @PostMapping("/{novelId}/split/retry")
     public TaskSubmitResponseDto retrySplitNovel(@PathVariable("novelId") String novelId, @RequestBody SplitRetryRequestDto request) throws IOException {
         return novelFacadeService.retrySplit(novelId, request);
     }
 
-    @Operation(summary = "触发小说处理流水线", description = "通过 stages 指定处理阶段（SPLIT/EMBED），推荐用于统一触发入口")
+    @Operation(summary = "触发小说处理流水线", description = "stages 含 SPLIT 时默认仅章节解析（Load）；场景切分请用 /scene-split。stages 仅 EMBED 时向量化。splitEntry=SCENE_ONLY 时直接场景切分。")
     @PostMapping("/{novelId}/pipeline")
     public TaskSubmitResponseDto triggerPipeline(@PathVariable("novelId") String novelId, @Valid @RequestBody NovelPipelineRequestDto request) throws IOException {
         return novelFacadeService.pipeline(novelId, request);
     }
 
-    @Operation(summary = "启动小说向量化", description = "触发已切分小说的异步向量化入库流程")
+    @Operation(summary = "启动小说向量化", description = "触发已切分小说的异步向量化入库流程；同一 version 下有多套滑窗分区时需传 chunkSize/chunkOverlap")
     @PostMapping("/{novelId}/embed")
     public TaskSubmitResponseDto embedNovel(
             @PathVariable("novelId") String novelId,
-            @Parameter(description = "切分版本，默认 v1") @RequestParam(value = "version", required = false) String version) throws IOException {
-        return novelFacadeService.embed(novelId, version);
+            @Parameter(description = "切分版本，默认 v1") @RequestParam(value = "version", required = false) String version,
+            @Parameter(description = "场景滑窗块大小，与场景切分一致") @RequestParam(value = "chunkSize", required = false) Integer chunkSize,
+            @Parameter(description = "块重叠") @RequestParam(value = "chunkOverlap", required = false) Integer chunkOverlap)
+            throws IOException {
+        return novelFacadeService.embed(novelId, version, chunkSize, chunkOverlap);
     }
 
     @Deprecated

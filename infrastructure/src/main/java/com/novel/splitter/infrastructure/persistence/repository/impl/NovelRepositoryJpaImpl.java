@@ -41,6 +41,12 @@ public class NovelRepositoryJpaImpl implements NovelRepository {
     }
 
     @Override
+    public Optional<Novel> findByIdForUpdate(String id) {
+        String novelId = Objects.requireNonNull(id, "id must not be null");
+        return jpaNovelRepository.findByIdForUpdate(novelId).map(novelMapper::toDomain);
+    }
+
+    @Override
     public Optional<Novel> findByTitle(String title) {
         String t = Objects.requireNonNull(title, "title must not be null");
         return jpaNovelRepository.findFirstByTitle(t).map(novelMapper::toDomain);

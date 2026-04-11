@@ -44,9 +44,9 @@ export default function Layout() {
   return (
     <div className="min-h-screen bg-gray-50/50 flex flex-col font-sans">
       <header className="sticky top-0 z-50 w-full glass border-b-0">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <div className="flex items-center gap-2">
+        <div className="max-w-[96rem] mx-auto px-3 sm:px-5 lg:px-8">
+          <div className="flex min-h-14 min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-2 py-2 sm:min-h-16 sm:py-2.5">
+            <div className="flex shrink-0 items-center gap-2">
               <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg flex items-center justify-center">
                 <span className="text-white font-bold text-lg">N</span>
               </div>
@@ -55,7 +55,7 @@ export default function Layout() {
               </span>
             </div>
 
-            <nav className="hidden md:flex items-center gap-1">
+            <nav className="hidden md:flex flex-1 min-w-0 flex-wrap items-center justify-end gap-x-0.5 gap-y-1.5">
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = isItemActive(item.path);
@@ -64,7 +64,7 @@ export default function Layout() {
                     key={item.path}
                     to={item.path}
                     className={cn(
-                      "flex items-center px-4 py-2 rounded-full text-sm font-medium transition-all duration-200",
+                      "flex shrink-0 items-center whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium transition-all duration-200 lg:px-3.5 lg:py-2",
                       isActive
                         ? "bg-blue-50 text-blue-600 shadow-sm ring-1 ring-blue-100"
                         : "text-gray-600 hover:bg-gray-100/80 hover:text-gray-900"
@@ -122,7 +122,7 @@ export default function Layout() {
         </div>
       </header>
 
-      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in fade-in duration-500">
+      <main className="flex-1 w-full max-w-[96rem] mx-auto px-3 sm:px-5 lg:px-8 py-8 animate-in fade-in duration-500">
         <Outlet />
       </main>
       

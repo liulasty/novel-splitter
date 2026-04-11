@@ -35,6 +35,9 @@ public class RetrievalQuery {
      */
     private String version;
 
+    private Integer chunkSize;
+    private Integer chunkOverlap;
+
     /** 
      * 检索范围的起始章节号 (包含该章节) 
      * // 用于将检索范围限制在小说的特定进度之后，结合 chapterTo 使用 

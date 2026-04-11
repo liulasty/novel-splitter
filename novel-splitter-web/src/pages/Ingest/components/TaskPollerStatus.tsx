@@ -46,9 +46,13 @@ export function TaskPollerStatus({ tasks, poller, onManualRefresh }: TaskPollerS
         const isTimeout = poller.timeoutTaskIds.includes(task.taskId);
         const novelTitle = task.novelTitle ?? titleById.get(task.novelId);
         const displayName = novelTitle || task.fileName || task.novelId;
-        const tt = task.taskType || 'SPLIT';
+        const tt = task.taskType || 'SCENE_SPLIT';
         const phaseLabel =
-          tt === 'EMBED' ? '向量化' : tt === 'LOAD' ? 'Load' : tt === 'PIPELINE' ? '流水线' : '切分';
+          tt === 'EMBED' ? '向量化' :
+          tt === 'LOAD' ? 'Load' :
+          tt === 'CHAPTER_PARSE' ? '章节解析' :
+          tt === 'SCENE_SPLIT' ? '场景切分' :
+          tt === 'PIPELINE' ? '场景+向量' : '任务';
 
         return (
           <div key={task.taskId} className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-xl shadow-sm">

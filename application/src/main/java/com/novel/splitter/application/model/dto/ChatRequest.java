@@ -13,4 +13,7 @@ public class ChatRequest {
     private int topK = 3;
     private String novelId;
     private String version;
+    /** 可选；同一 version 下多数据集时必须提供 */
+    private Integer chunkSize;
+    private Integer chunkOverlap;
 }

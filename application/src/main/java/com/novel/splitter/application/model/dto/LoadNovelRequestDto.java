@@ -11,4 +11,6 @@ public class LoadNovelRequestDto {
     private String version;
     /** true：忽略“已完整结构化”短路，清理后强制重新解析 */
     private boolean force;
+    /** 可选：章节标题行 Java 正则（整行匹配） */
+    private String chapterTitleRegex;
 }

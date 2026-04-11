@@ -12,7 +12,7 @@ export interface SplitTask {
   message: string;
   createdAt: number;
   updatedAt: number;
-  taskType?: 'LOAD' | 'SPLIT' | 'PIPELINE' | 'EMBED';
+  taskType?: 'LOAD' | 'CHAPTER_PARSE' | 'SCENE_SPLIT' | 'PIPELINE' | 'EMBED';
   sceneCount?: number;
   embeddedCount?: number;
   logs?: string[];

@@ -1,6 +1,29 @@
 import { apiClient, type ApiEnvelope } from './client';
 import type { Scene } from '@/types/api';
 
+/** 与后端 SceneSplitProfileDto 一致 */
+export interface SceneSplitProfileDto {
+  version: string;
+  chunkSize: number | null;
+  chunkOverlap: number | null;
+}
+
+export function splitProfileLabel(p: SceneSplitProfileDto): string {
+  if (p.chunkSize != null && p.chunkOverlap != null) {
+    return `${p.version} (${p.chunkSize}/${p.chunkOverlap})`;
+  }
+  return p.version;
+}
+
+/** 解析 {@link splitProfileLabel} 生成的展示串 */
+export function parseSplitProfileLabel(label: string): { version: string; chunkSize?: number; chunkOverlap?: number } {
+  const m = label.trim().match(/^(.+)\s+\((\d+)\/(\d+)\)\s*$/);
+  if (m) {
+    return { version: m[1].trim(), chunkSize: Number(m[2]), chunkOverlap: Number(m[3]) };
+  }
+  return { version: label.trim() };
+}
+
 export interface VectorPreviewRecordDto {
   id: string;
   novelId: string;
@@ -31,6 +54,13 @@ export const knowledgeApi = {
     return response;
   },
 
+  listSplitProfilesByNovelId: async (novelId: string): Promise<SceneSplitProfileDto[]> => {
+    const response = await apiClient.get<ApiEnvelope<SceneSplitProfileDto[]>, SceneSplitProfileDto[]>(
+      `/knowledge/id/${encodeURIComponent(novelId)}/split-profiles`
+    );
+    return response;
+  },
+
   // Legacy: query by novelName (kept for backwards compatibility)
   getVersions: async (novelName: string): Promise<string[]> => {
     const response = await apiClient.get<ApiEnvelope<string[]>, string[]>(`/knowledge/${encodeURIComponent(novelName)}/versions`);
@@ -55,17 +85,24 @@ export const knowledgeApi = {
   },
 
   // Preferred: delete version by novelId
-  deleteVersionByNovelId: async (novelId: string, version: string): Promise<number> => {
+  deleteVersionByNovelId: async (
+    novelId: string,
+    version: string,
+    chunkSize: number,
+    chunkOverlap: number
+  ): Promise<number> => {
+    const q = `chunkSize=${encodeURIComponent(String(chunkSize))}&chunkOverlap=${encodeURIComponent(String(chunkOverlap))}`;
     const cleanupTaskId = await apiClient.delete<ApiEnvelope<number>, number>(
-      `/knowledge/id/${encodeURIComponent(novelId)}/versions/${encodeURIComponent(version)}`
+      `/knowledge/id/${encodeURIComponent(novelId)}/versions/${encodeURIComponent(version)}?${q}`
     );
     return cleanupTaskId;
   },
 
   // Legacy: delete version by novelName
-  deleteVersion: async (novelName: string, version: string): Promise<number> => {
+  deleteVersion: async (novelName: string, version: string, chunkSize: number, chunkOverlap: number): Promise<number> => {
+    const q = `chunkSize=${encodeURIComponent(String(chunkSize))}&chunkOverlap=${encodeURIComponent(String(chunkOverlap))}`;
     const cleanupTaskId = await apiClient.delete<ApiEnvelope<number>, number>(
-      `/knowledge/${encodeURIComponent(novelName)}/versions/${encodeURIComponent(version)}`
+      `/knowledge/${encodeURIComponent(novelName)}/versions/${encodeURIComponent(version)}?${q}`
     );
     return cleanupTaskId;
   },

@@ -5,7 +5,7 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 
 public interface ChromaAdminService {
 
-    StreamingResponseBody exportData(String novelName, String version);
+    StreamingResponseBody exportData(String novelName, String version, Integer chunkSize, Integer chunkOverlap);
 
     Map<String, Object> getStats();
 
@@ -21,7 +21,8 @@ public interface ChromaAdminService {
 
     Map<String, String> rebuildCollection();
 
-    com.novel.splitter.application.model.dto.ChromaVersionDiagnosticDto getVersionDiagnostics(String novel, String version);
+    com.novel.splitter.application.model.dto.ChromaVersionDiagnosticDto getVersionDiagnostics(
+            String novel, String version, Integer chunkSize, Integer chunkOverlap);
 
     Object proxyGet(String path);
 

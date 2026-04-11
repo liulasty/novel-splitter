@@ -19,4 +19,9 @@ public class DownloadAndIngestRequest {
      * 可选处理阶段，默认执行全流程 [SPLIT, EMBED]
      */
     private List<String> stages;
+    private String splitEntry;
+    private Integer chunkSize;
+    private Integer chunkOverlap;
+    /** 章节解析阶段可选：章节标题行 Java 正则 */
+    private String chapterTitleRegex;
 }

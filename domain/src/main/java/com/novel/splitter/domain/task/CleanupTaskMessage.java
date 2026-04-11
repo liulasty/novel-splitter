@@ -25,4 +25,8 @@ public class CleanupTaskMessage implements Serializable {
      * Optional legacy name (used for backward compatibility and UX).
      */
     private String novelName;
+
+    /** 与场景分区一致；非空时仅清理该滑窗配置对应的向量 */
+    private Integer chunkSize;
+    private Integer chunkOverlap;
 }

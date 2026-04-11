@@ -6,106 +6,200 @@ import com.novel.splitter.domain.model.RawParagraph;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 /**
- * 章节识别器
- * <p>
- * 基于正则表达式识别章节标题，并将连续的段落归组为 Chapter 对象。
- * 适用于 NLP 和 RAG（检索增强生成）系统，用于对长篇小说进行结构化分章，便于后续语料处理。
- * </p>
+ * 章节识别器：基于正则识别章节标题行。可使用 {@link #defaultChapterPattern()} 或自定义整行匹配正则。
  */
 public class ChapterRecognizer {
 
     /**
-     * 匹配章节标题的正则表达式模式。
-     * <p>
-     * 匹配 "第1章", "第一章", "第100回", "Chapter 1" 等常见格式。
-     * 宽松模式：允许前面有空白字符，允许后面有额外的标题内容。
-     * </p>
+     * 默认：匹配 "第1章"、"第一章"、"第100回"、"Chapter 1" 等。
      */
-    private static final Pattern CHAPTER_PATTERN = Pattern.compile("^\\s*第[0-9零一二三四五六七八九十百千两]+[章回节卷].*|^\\s*Chapter\\s*\\d+.*");
+    public static final Pattern DEFAULT_CHAPTER_PATTERN = Pattern.compile(
+            "^\\s*第\\s*[0-9零一二三四五六七八九十百千两]+\\s*[章回节卷].*|^\\s*Chapter\\s*\\d+.*");
 
-    /**
-     * 标题最大长度限制。
-     * <p>
-     * 用于防止将过长的普通句子误判为章节标题，只有长度不超过此值的段落才会参与匹配。
-     * </p>
-     */
+    private static final Pattern DECORATIVE_RULE_LINE = Pattern.compile("^[-=*_]{4,}$");
     private static final int MAX_TITLE_LENGTH = 50;
+    private static final int MIN_TOC_CHAPTER_LINES = 2;
+
+    private final Pattern chapterPattern;
+
+    public ChapterRecognizer() {
+        this.chapterPattern = DEFAULT_CHAPTER_PATTERN;
+    }
+
+    public ChapterRecognizer(Pattern chapterPattern) {
+        this.chapterPattern = chapterPattern != null ? chapterPattern : DEFAULT_CHAPTER_PATTERN;
+    }
 
     /**
-     * 根据段落列表识别并构建章节结构。
-     *
-     * @param paragraphs 原始段落列表，即从文本中拆分出的所有独立段落
-     * @return 识别并构建完成的章节（{@link Chapter}）列表
+     * @throws PatternSyntaxException 正则非法时抛出，由调用方转为 400
      */
-    public List<Chapter> recognize(List<RawParagraph> paragraphs) {
-        // 用于存储识别出的所有章节结果
-        List<Chapter> chapters = new ArrayList<>();
-        // 章节编号，从 1 开始递增
-        int chapterIndex = 1;
+    public static Pattern compileUserPattern(String regex) {
+        if (regex == null || regex.isBlank()) {
+            return DEFAULT_CHAPTER_PATTERN;
+        }
+        return Pattern.compile(regex.trim());
+    }
 
-        // 记录当前章节的起始段落索引
-        int currentStart = 0;
-        // 当前章节的标题，默认将第一章之前的文本归为“序章/前言”
+    public static Pattern defaultChapterPattern() {
+        return DEFAULT_CHAPTER_PATTERN;
+    }
+
+    public Pattern getChapterPattern() {
+        return chapterPattern;
+    }
+
+    public static int skipLeadingTableOfContents(List<String> lines) {
+        return skipLeadingTableOfContents(lines, DEFAULT_CHAPTER_PATTERN);
+    }
+
+    /**
+     * 与 {@link #isChapterTitleLine(String, Pattern)} 使用同一 pattern，保证目录跳过与正文分章一致。
+     */
+    public static int skipLeadingTableOfContents(List<String> lines, Pattern chapterPattern) {
+        if (lines == null || lines.isEmpty()) {
+            return 0;
+        }
+        Pattern p = chapterPattern != null ? chapterPattern : DEFAULT_CHAPTER_PATTERN;
+        int i = 0;
+        int n = lines.size();
+
+        while (i < n && isBlankLine(lines.get(i))) {
+            i++;
+        }
+
+        if (i < n && isDecorativeRuleLine(lines.get(i))) {
+            i++;
+            while (i < n && !isDecorativeRuleLine(lines.get(i))) {
+                i++;
+            }
+            if (i < n && isDecorativeRuleLine(lines.get(i))) {
+                i++;
+            }
+            while (i < n && isBlankLine(lines.get(i))) {
+                i++;
+            }
+        }
+
+        int tocRun = countLeadingChapterTitleRun(lines, i, p);
+        if (tocRun >= MIN_TOC_CHAPTER_LINES) {
+            i += tocRun;
+            while (i < n && isBlankLine(lines.get(i))) {
+                i++;
+            }
+        }
+
+        return Math.min(i, n);
+    }
+
+    private static int countLeadingChapterTitleRun(List<String> lines, int start, Pattern pattern) {
+        int n = lines.size();
+        int j = start;
+        int count = 0;
+        while (j < n) {
+            String t = lines.get(j);
+            if (isBlankLine(t)) {
+                j++;
+                continue;
+            }
+            if (isChapterTitleLine(t, pattern)) {
+                count++;
+                j++;
+            } else {
+                break;
+            }
+        }
+        return count;
+    }
+
+    private static boolean isBlankLine(String line) {
+        return line == null || line.trim().isEmpty();
+    }
+
+    private static boolean isDecorativeRuleLine(String line) {
+        if (line == null) {
+            return false;
+        }
+        return DECORATIVE_RULE_LINE.matcher(line.trim()).matches();
+    }
+
+    public boolean isLikelyChapterTitle(String content) {
+        return isChapterTitleLine(content, chapterPattern);
+    }
+
+    /**
+     * 是否与章节标题行一致（与分章规则对齐）。
+     */
+    public static boolean isChapterTitleLine(String content, Pattern pattern) {
+        if (content == null || content.isEmpty()) {
+            return false;
+        }
+        String trimmed = content.trim();
+        if (trimmed.length() > MAX_TITLE_LENGTH) {
+            return false;
+        }
+        Pattern p = pattern != null ? pattern : DEFAULT_CHAPTER_PATTERN;
+        return p.matcher(trimmed).matches();
+    }
+
+    public List<Chapter> recognize(List<RawParagraph> paragraphs) {
+        if (paragraphs == null || paragraphs.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        List<String> contents = new ArrayList<>(paragraphs.size());
+        for (RawParagraph p : paragraphs) {
+            contents.add(p.getContent() != null ? p.getContent() : "");
+        }
+        int skip = skipLeadingTableOfContents(contents, chapterPattern);
+        List<RawParagraph> body = skip <= 0
+                ? paragraphs
+                : new ArrayList<>(paragraphs.subList(skip, paragraphs.size()));
+        if (body.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        List<Chapter> chapters = new ArrayList<>();
+        int chapterIndex = 1;
+        int currentBodyStart = 0;
         String currentTitle = "序章/前言";
 
-        // 遍历所有段落进行章节标题匹配
-        for (int i = 0; i < paragraphs.size(); i++) {
-            RawParagraph p = paragraphs.get(i);
+        for (int i = 0; i < body.size(); i++) {
+            RawParagraph p = body.get(i);
 
-            // 检查当前段落是否符合章节标题的格式
             if (isChapterTitle(p)) {
-                // 发现新章节标题，需要结算（保存）上一章节的内容
-                // 只有当这一章包含实际段落内容（i > 0）时才进行结算
                 if (i > 0) {
                     chapters.add(Chapter.builder()
-                            .index(chapterIndex++) // 设置当前章节编号并自增
-                            .title(currentTitle) // 设置上一章的标题
-                            .startParagraphIndex(currentStart) // 设置上一章的起始段落索引
-                            .endParagraphIndex(i - 1) // 设置上一章的结束段落索引（当前标题段落的前一段）
+                            .index(chapterIndex++)
+                            .title(currentTitle)
+                            .startParagraphIndex(body.get(currentBodyStart).getIndex())
+                            .endParagraphIndex(body.get(i - 1).getIndex())
                             .build());
                 }
 
-                // 开启新的一章，更新起始索引和标题内容
-                currentStart = i;
+                currentBodyStart = i;
                 currentTitle = p.getContent();
             }
         }
 
-        // 遍历结束后，结算最后剩余的段落作为一个独立章节
-        if (currentStart < paragraphs.size()) {
+        if (currentBodyStart < body.size()) {
             chapters.add(Chapter.builder()
-                    .index(chapterIndex) // 设置最后一个章节的编号
-                    .title(currentTitle) // 设置最后一个章节的标题
-                    .startParagraphIndex(currentStart) // 起始段落索引
-                    .endParagraphIndex(paragraphs.size() - 1) // 结束段落索引为全文最后一个段落
+                    .index(chapterIndex)
+                    .title(currentTitle)
+                    .startParagraphIndex(body.get(currentBodyStart).getIndex())
+                    .endParagraphIndex(body.get(body.size() - 1).getIndex())
                     .build());
         }
 
         return chapters;
     }
 
-    /**
-     * 判断指定段落是否为章节标题。
-     * <p>
-     * 通过检查段落是否为空、长度是否超过限制以及是否匹配预定义的章节标题正则表达式来进行综合判定。
-     * </p>
-     *
-     * @param p 需要判断的原始段落对象
-     * @return 如果段落被识别为章节标题，则返回 true；否则返回 false
-     */
     private boolean isChapterTitle(RawParagraph p) {
-        // 空段落不能作为章节标题
         if (p.isEmpty()) {
             return false;
         }
-        String content = p.getContent();
-        // 长度超过最大限制的段落被排除，以防误判长句
-        if (content.length() > MAX_TITLE_LENGTH) {
-            return false;
-        }
-        // 使用预编译的正则表达式匹配段落内容
-        return CHAPTER_PATTERN.matcher(content).matches();
+        return isChapterTitleLine(p.getContent(), chapterPattern);
     }
 }

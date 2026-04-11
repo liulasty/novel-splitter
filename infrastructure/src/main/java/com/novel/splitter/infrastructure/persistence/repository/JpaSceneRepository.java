@@ -33,31 +33,44 @@ public interface JpaSceneRepository extends JpaRepository<JpaSceneEntity, Long>,
     List<JpaSceneEntity> findByNovelIdAndVersion(String novelId, String version);
 
     @EntityGraph(attributePaths = {"novel", "chapter"})
-    Page<JpaSceneEntity> findByNovelIdAndVersion(String novelId, String version, Pageable pageable);
+    List<JpaSceneEntity> findByNovelIdAndVersionAndChunkSizeAndChunkOverlap(
+            String novelId, String version, Integer chunkSize, Integer chunkOverlap);
 
-    Stream<JpaSceneEntity> streamAllByNovelIdAndVersion(String novelId, String version);
+    @EntityGraph(attributePaths = {"novel", "chapter"})
+    Page<JpaSceneEntity> findByNovelIdAndVersionAndChunkSizeAndChunkOverlap(
+            String novelId, String version, Integer chunkSize, Integer chunkOverlap, Pageable pageable);
+
+    Stream<JpaSceneEntity> streamAllByNovelIdAndVersionAndChunkSizeAndChunkOverlap(
+            String novelId, String version, Integer chunkSize, Integer chunkOverlap);
 
     @Query("SELECT s FROM JpaSceneEntity s")
     Stream<JpaSceneEntity> streamAll();
 
-    long countByNovelIdAndVersion(String novelId, String version);
+    long countByNovelIdAndVersionAndChunkSizeAndChunkOverlap(
+            String novelId, String version, Integer chunkSize, Integer chunkOverlap);
+
+    @Query("SELECT COUNT(s) FROM JpaSceneEntity s WHERE s.novel.id = ?1 AND s.version = ?2")
+    long countByNovelIdAndVersionAllChunks(String novelId, String version);
 
     @EntityGraph(attributePaths = {"novel", "chapter"})
     Page<JpaSceneEntity> findByNovelIdAndChapterId(String novelId, Long chapterId, Pageable pageable);
 
     @Modifying
-    @Query("UPDATE JpaSceneEntity s SET s.isDeleted = true WHERE s.novel.id = ?1 AND s.version = ?2")
-    void deleteByNovelIdAndVersion(String novelId, String version);
+    @Query("UPDATE JpaSceneEntity s SET s.isDeleted = true WHERE s.novel.id = ?1 AND s.version = ?2 "
+            + "AND s.chunkSize = ?3 AND s.chunkOverlap = ?4")
+    void deleteByNovelIdAndVersionAndChunkSizeAndChunkOverlap(
+            String novelId, String version, Integer chunkSize, Integer chunkOverlap);
 
     @Modifying
     @Query("UPDATE JpaSceneEntity s SET s.isDeleted = true WHERE s.novel.id = ?1")
     void deleteByNovelId(String novelId);
 
-    @Query("SELECT DISTINCT s.version FROM JpaSceneEntity s WHERE s.novel.id = ?1")
-    List<String> findDistinctVersionsByNovelId(String novelId);
+    @Query("SELECT DISTINCT s.version, s.chunkSize, s.chunkOverlap FROM JpaSceneEntity s WHERE s.novel.id = ?1")
+    List<Object[]> findDistinctProfilesByNovelId(String novelId);
 
-    @Query("SELECT s.novel.id, s.version, COUNT(s) FROM JpaSceneEntity s GROUP BY s.novel.id, s.version")
-    List<Object[]> countScenesByNovelAndVersion();
+    @Query("SELECT s.novel.id, s.version, s.chunkSize, s.chunkOverlap, COUNT(s) FROM JpaSceneEntity s "
+            + "GROUP BY s.novel.id, s.version, s.chunkSize, s.chunkOverlap")
+    List<Object[]> countScenesByNovelVersionAndChunk();
 
     interface SceneLightweightProjection {
         Long getId();

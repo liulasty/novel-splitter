@@ -12,6 +12,8 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class NovelStatRecordDto {
+    /** novels 表主键，供 Chroma 过滤与 API 使用 */
+    private String novelId;
     private String novelName;
     private List<String> versions;
     private long sceneCount;

@@ -25,8 +25,10 @@ public class ChromaAdminController {
     @GetMapping("/export")
     public ResponseEntity<StreamingResponseBody> export(
             @RequestParam(required = false) String novelName,
-            @RequestParam(required = false) String version) {
-        StreamingResponseBody responseBody = chromaAdminService.exportData(novelName, version);
+            @RequestParam(required = false) String version,
+            @RequestParam(required = false) Integer chunkSize,
+            @RequestParam(required = false) Integer chunkOverlap) {
+        StreamingResponseBody responseBody = chromaAdminService.exportData(novelName, version, chunkSize, chunkOverlap);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"chroma_export.json\"")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -65,8 +67,12 @@ public class ChromaAdminController {
 
     @Operation(summary = "获取版本诊断信息", description = "获取数据库与Chroma的同步诊断信息")
     @GetMapping("/diagnostics")
-    public ChromaVersionDiagnosticDto getVersionDiagnostics(@RequestParam("novel") String novel, @RequestParam("version") String version) {
-        return chromaAdminService.getVersionDiagnostics(novel, version);
+    public ChromaVersionDiagnosticDto getVersionDiagnostics(
+            @RequestParam("novel") String novel,
+            @RequestParam("version") String version,
+            @RequestParam(required = false) Integer chunkSize,
+            @RequestParam(required = false) Integer chunkOverlap) {
+        return chromaAdminService.getVersionDiagnostics(novel, version, chunkSize, chunkOverlap);
     }
 
     @Operation(summary = "获取Chroma心跳", description = "获取Chroma服务器的心跳时间戳")

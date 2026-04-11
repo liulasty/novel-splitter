@@ -92,8 +92,7 @@ public class ChromaVectorStore implements VectorStore {
         List<Map<String, Object>> metadatas = scenes.stream()
                         .map(s -> {
                             Map<String, Object> map = new HashMap<>();
-                            // P3 contract: metadata must be minimal & stable (no novelName/chinese title).
-                            // Only: novelId, version, sceneId, chapterIndex.
+                            // Metadata: novelId, version, sceneId, chapterIndex, sequenceNum (when present).
                             map.put("sceneId", s.getId());
                             map.put("chapterIndex", s.getChapterIndex());
                             if (s.getMetadata() != null) {
@@ -102,6 +101,15 @@ public class ChromaVectorStore implements VectorStore {
                                 }
                                 if (s.getMetadata().getVersion() != null) {
                                     map.put("version", s.getMetadata().getVersion());
+                                }
+                                if (s.getMetadata().getChunkSize() != null) {
+                                    map.put("chunkSize", s.getMetadata().getChunkSize());
+                                }
+                                if (s.getMetadata().getChunkOverlap() != null) {
+                                    map.put("chunkOverlap", s.getMetadata().getChunkOverlap());
+                                }
+                                if (s.getMetadata().getSequenceNum() != null) {
+                                    map.put("sequenceNum", s.getMetadata().getSequenceNum());
                                 }
                             }
                             if (!map.containsKey("novelId") || !map.containsKey("version")) {

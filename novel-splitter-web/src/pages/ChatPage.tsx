@@ -39,9 +39,9 @@ export default function ChatPage() {
                             </div>
                             <span className="font-semibold text-gray-800 text-sm">Novel Splitter 助手</span>
                         </div>
-                        {state.selectedNovel && state.selectedVersion && (
+                        {state.selectedNovel && state.selectedProfileLabel && (
                             <span className="text-xs bg-teal-100 text-teal-700 font-medium px-2.5 py-0.5 rounded-full">
-                                {state.selectedNovel} · {state.selectedVersion}
+                                {state.selectedNovel} · {state.selectedProfileLabel}
                             </span>
                         )}
                     </div>
@@ -57,8 +57,14 @@ export default function ChatPage() {
                     <ChatInputArea 
                         inputValue={state.inputValue}
                         isPending={state.isPending}
-                        disabled={!state.selectedNovel || state.isPending}
-                        placeholder={!state.selectedNovel ? "请先选择小说..." : "输入你的问题，按 Enter 发送..."}
+                        disabled={!state.selectedNovel || !state.profileOptions?.length || state.isPending}
+                        placeholder={
+                            !state.selectedNovel
+                                ? "请先选择小说..."
+                                : !state.profileOptions?.length
+                                  ? "该书目暂无已入库的数据集…"
+                                  : "输入你的问题，按 Enter 发送..."
+                        }
                         actions={actions}
                     />
                 </div>

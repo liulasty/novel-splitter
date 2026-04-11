@@ -1,5 +1,6 @@
 package com.novel.splitter.pipeline.etl;
 
+import com.novel.splitter.core.ChapterRecognizer;
 import com.novel.splitter.core.NovelLineNoiseFilter;
 import com.novel.splitter.domain.model.Chapter;
 import com.novel.splitter.domain.model.Novel;
@@ -9,7 +10,6 @@ import com.novel.splitter.domain.repository.NovelCacheRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -28,18 +28,22 @@ public class LocalNovelLoader {
         this.novelCacheRepository = novelCacheRepository;
     }
 
-    // Matches "第123章 标题" or "第一章 标题"
-    // Handles spaces: "第 1 章"
-    private static final Pattern CHAPTER_PATTERN = Pattern.compile("^\\s*第\\s*[0-9零一二三四五六七八九十百千万]+\\s*[章回].*");
-
     public Novel load(String novelId, Path path) throws IOException {
-        log.info("Loading novel from: {}", path);
+        return load(novelId, path, null);
+    }
+
+    /**
+     * @param chapterTitleRegex 可选；非空时作为<strong>整行匹配</strong>的 Java 正则覆盖默认章节标题规则
+     */
+    public Novel load(String novelId, Path path, String chapterTitleRegex) throws IOException {
+        log.info("Loading novel from: {} (custom chapter regex: {})", path, chapterTitleRegex != null && !chapterTitleRegex.isBlank());
+        Pattern pattern = ChapterRecognizer.compileUserPattern(chapterTitleRegex);
+        ChapterRecognizer chapterRecognizer = new ChapterRecognizer(pattern);
+
         String fileName = path.getFileName().toString();
-        // Use the full filename without extension as the title to ensure uniqueness and matching with storage
         String title = fileName.replace(".txt", "");
-        String author = "Unknown"; 
-        
-        // Optional: Parse author if needed for metadata, but keep title as the identifier
+        String author = "Unknown";
+
         if (fileName.contains("-")) {
             String[] parts = fileName.replace(".txt", "").split("-");
             if (parts.length > 1) {
@@ -47,80 +51,75 @@ public class LocalNovelLoader {
             }
         }
 
+        List<String> rawLines = Files.readAllLines(path, StandardCharsets.UTF_8);
+        int lineOffset = ChapterRecognizer.skipLeadingTableOfContents(rawLines, pattern);
+        if (lineOffset > 0) {
+            log.info("Skipped {} leading lines as table-of-contents / decorative block", lineOffset);
+        }
+
         List<Chapter> chapters = new ArrayList<>();
         List<RawParagraph> currentChapterParagraphs = new ArrayList<>();
         int currentWordCount = 0;
-        
-        try (BufferedReader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
-            String line;
-            int lineIndex = 0;
-            Chapter.ChapterBuilder currentChapterBuilder = null;
-            
-            while ((line = reader.readLine()) != null) {
-                // Clean content: trim whitespace
-                String content = line.trim();
-                if (NovelLineNoiseFilter.shouldSkipParagraphLine(content)) {
-                    lineIndex++;
-                    continue;
-                }
-                boolean isEmpty = content.isEmpty();
-                
-                // Check for chapter title
-                if (!isEmpty && CHAPTER_PATTERN.matcher(content).matches()) {
-                    // Close previous chapter
-                    if (currentChapterBuilder != null) {
-                         Chapter finishedChapter = currentChapterBuilder
-                                 .endParagraphIndex(lineIndex - 1)
-                                 .wordCount(currentWordCount)
-                                 .build();
-                         chapters.add(finishedChapter);
-                         if (novelId != null) {
-                             novelCacheRepository.saveChapter(novelId, finishedChapter.getIndex(), new ChapterData(finishedChapter, new ArrayList<>(currentChapterParagraphs)));
-                         }
-                         currentChapterParagraphs.clear();
-                         currentWordCount = 0;
-                    }
-                    
-                    // Start new chapter
-                    currentChapterBuilder = Chapter.builder()
-                            .index(chapters.size() + 1)
-                            .title(content)
-                            .startParagraphIndex(lineIndex);
-                }
-                
-                // Add paragraph
-                currentChapterParagraphs.add(RawParagraph.builder()
-                        .index(lineIndex)
-                        .content(content)
-                        .isEmpty(isEmpty)
-                        .build());
-                if (!isEmpty) {
-                    currentWordCount += content.replaceAll("\\s+", "").length();
-                }
-                
-                lineIndex++;
+
+        Chapter.ChapterBuilder currentChapterBuilder = null;
+
+        for (int lineIndex = lineOffset; lineIndex < rawLines.size(); lineIndex++) {
+            String line = rawLines.get(lineIndex);
+            String content = line.trim();
+            if (NovelLineNoiseFilter.shouldSkipParagraphLine(content)) {
+                continue;
             }
-            
-            // Close last chapter
-            if (currentChapterBuilder != null) {
-                Chapter finishedChapter = currentChapterBuilder
-                        .endParagraphIndex(lineIndex - 1)
-                        .wordCount(currentWordCount)
-                        .build();
-                chapters.add(finishedChapter);
-                if (novelId != null) {
-                    novelCacheRepository.saveChapter(novelId, finishedChapter.getIndex(), new ChapterData(finishedChapter, new ArrayList<>(currentChapterParagraphs)));
+            boolean isEmpty = content.isEmpty();
+
+            if (!isEmpty && chapterRecognizer.isLikelyChapterTitle(content)) {
+                if (currentChapterBuilder != null) {
+                    Chapter finishedChapter = currentChapterBuilder
+                            .endParagraphIndex(lineIndex - 1)
+                            .wordCount(currentWordCount)
+                            .build();
+                    chapters.add(finishedChapter);
+                    if (novelId != null) {
+                        novelCacheRepository.saveChapter(novelId, finishedChapter.getIndex(), new ChapterData(finishedChapter, new ArrayList<>(currentChapterParagraphs)));
+                    }
+                    currentChapterParagraphs.clear();
+                    currentWordCount = 0;
                 }
+
+                currentChapterBuilder = Chapter.builder()
+                        .index(chapters.size() + 1)
+                        .title(content)
+                        .startParagraphIndex(lineIndex);
+            }
+
+            currentChapterParagraphs.add(RawParagraph.builder()
+                    .index(lineIndex)
+                    .content(content)
+                    .isEmpty(isEmpty)
+                    .build());
+            if (!isEmpty) {
+                currentWordCount += content.replaceAll("\\s+", "").length();
             }
         }
-        
+
+        if (currentChapterBuilder != null) {
+            int endIdx = rawLines.isEmpty() ? lineOffset : rawLines.size() - 1;
+            Chapter finishedChapter = currentChapterBuilder
+                    .endParagraphIndex(endIdx)
+                    .wordCount(currentWordCount)
+                    .build();
+            chapters.add(finishedChapter);
+            if (novelId != null) {
+                novelCacheRepository.saveChapter(novelId, finishedChapter.getIndex(), new ChapterData(finishedChapter, new ArrayList<>(currentChapterParagraphs)));
+            }
+        }
+
         log.info("Loaded novel '{}' by '{}'. Chapters: {}", title, author, chapters.size());
-        
+
         return Novel.builder()
                 .title(title)
                 .author(author)
                 .chapters(chapters)
-                .paragraphs(new ArrayList<>()) // Return empty paragraphs to save memory
+                .paragraphs(new ArrayList<>())
                 .build();
     }
 }

@@ -100,20 +100,34 @@ public class SceneMerger {
         double score2 = s2.getScore() != null ? s2.getScore() : 0.0;
         merged.setScore(Math.max(score1, score2));
 
-        // 合并 Metadata
-        SceneMetadata meta = s1.getMetadata(); // 浅拷贝
-        if (meta == null) meta = new SceneMetadata();
-        else {
-             // Deep copy ideally, but simple builder copy here
-             meta = SceneMetadata.builder()
-                     .novel(meta.getNovel())
-                     .version(meta.getVersion())
-                     .chapterTitle(meta.getChapterTitle())
-                     .chapterIndex(meta.getChapterIndex())
-                     .startParagraph(s1.getStartParagraphIndex())
-                     .endParagraph(s2.getEndParagraphIndex())
-                     .chunkType("merged_scene")
-                     .build();
+        SceneMetadata src = s1.getMetadata();
+        SceneMetadata meta;
+        if (src == null) {
+            meta = SceneMetadata.builder()
+                    .chapterTitle(s1.getChapterTitle())
+                    .chapterIndex(s1.getChapterIndex())
+                    .startParagraph(s1.getStartParagraphIndex())
+                    .endParagraph(s2.getEndParagraphIndex())
+                    .build();
+        } else {
+            meta = SceneMetadata.builder()
+                    .novel(src.getNovel())
+                    .version(src.getVersion())
+                    .chapterTitle(src.getChapterTitle())
+                    .chapterIndex(src.getChapterIndex())
+                    .startParagraph(s1.getStartParagraphIndex())
+                    .endParagraph(s2.getEndParagraphIndex())
+                    .sequenceNum(src.getSequenceNum())
+                    .role(src.getRole())
+                    .time(src.getTime())
+                    .location(src.getLocation())
+                    .characters(src.getCharacters())
+                    .densityScore(src.getDensityScore())
+                    .qualityScore(src.getQualityScore())
+                    .build();
+            if (src.getExtra() != null && !src.getExtra().isEmpty()) {
+                meta.setExtra(new HashMap<>(src.getExtra()));
+            }
         }
         
         // 记录原始 IDs

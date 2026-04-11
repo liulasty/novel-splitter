@@ -5,6 +5,7 @@ import com.novel.splitter.domain.task.SplitTask;
 import com.novel.splitter.domain.task.SplitTaskMessage;
 import com.novel.splitter.domain.task.EnrichTaskMessage;
 import com.novel.splitter.domain.enums.TaskType;
+import com.novel.splitter.pipeline.model.ResolvedChunkingParams;
 import com.novel.splitter.pipeline.orchestrator.SplitNovelUseCase;
 import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.application.service.novel.NovelService;
@@ -48,16 +49,16 @@ public class SplitWorker {
             SplitTask task = taskService.getTask(taskId);
             if (task == null) {
                 log.warn("任务 {} 在内存中不存在，可能由于服务重启，正在尝试自动重建...", taskId);
-                TaskType tt = TaskType.SPLIT;
+                TaskType tt = TaskType.SCENE_SPLIT;
                 if (message.getTaskTypeForRecovery() != null && !message.getTaskTypeForRecovery().isBlank()) {
                     try {
                         tt = TaskType.valueOf(message.getTaskTypeForRecovery().trim());
                     } catch (IllegalArgumentException ignored) {
-                        tt = TaskType.SPLIT;
+                        tt = TaskType.SCENE_SPLIT;
                     }
                 }
-                if (tt != TaskType.PIPELINE && tt != TaskType.SPLIT) {
-                    tt = TaskType.SPLIT;
+                if (tt != TaskType.PIPELINE && tt != TaskType.SCENE_SPLIT) {
+                    tt = TaskType.SCENE_SPLIT;
                 }
                 String fileName = novelService.getNovelById(message.getNovelId()).getFilePath();
                 task = taskService.createTask(
@@ -81,24 +82,38 @@ public class SplitWorker {
                 throw new IllegalArgumentException("version must not be blank");
             }
 
+            ResolvedChunkingParams chunkParams =
+                    splitNovelUseCase.resolveChunkingParams(message.getChunkSize(), message.getChunkOverlap());
+
             // P2: strict idempotent cleanup (DB + Chroma). Either failure blocks processing.
             taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, 1, "幂等清理：删除旧场景与旧向量...");
             try {
-                sceneRepository.deleteVersionByNovelId(novelId, version);
+                sceneRepository.deleteByProfile(novelId, version, chunkParams.chunkSize(), chunkParams.chunkOverlap());
             } catch (Exception e) {
-                throw new IllegalStateException("Failed to cleanup DB scenes for novelId=" + novelId + " version=" + version, e);
+                throw new IllegalStateException("Failed to cleanup DB scenes for novelId=" + novelId + " version=" + version
+                        + " chunk=" + chunkParams.chunkSize() + "/" + chunkParams.chunkOverlap(), e);
             }
             try {
-                vectorStore.delete(Map.of("novelId", novelId, "version", version));
+                vectorStore.delete(Map.of(
+                        "novelId", novelId,
+                        "version", version,
+                        "chunkSize", chunkParams.chunkSize(),
+                        "chunkOverlap", chunkParams.chunkOverlap()));
             } catch (Exception e) {
                 throw new IllegalStateException("Failed to cleanup Chroma vectors for novelId=" + novelId + " version=" + version, e);
             }
 
             String novelTitle = novelId != null ? novelService.getNovelById(novelId).getTitle() : null;
 
-            List<Long> sceneIds = splitNovelUseCase.split(taskId, novelId, novelTitle, task.getMaxScenes(), version, (progress, info) -> {
-                taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, progress, info);
-            });
+            List<Long> sceneIds = splitNovelUseCase.split(
+                    taskId,
+                    novelId,
+                    novelTitle,
+                    task.getMaxScenes(),
+                    version,
+                    message.getChunkSize(),
+                    message.getChunkOverlap(),
+                    (progress, info) -> taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, progress, info));
 
             if (sceneIds == null || sceneIds.isEmpty()) {
                 log.warn("任务 {} 切分后没有场景，直接标记为成功", taskId);
@@ -129,7 +144,12 @@ public class SplitWorker {
                     rabbitTemplate.convertAndSend(
                             RabbitConfig.EXCHANGE_NAME,
                             "embed",
-                            new com.novel.splitter.domain.task.EmbedTaskMessage(embedTaskId, message.getNovelId(), message.getVersion())
+                            new com.novel.splitter.domain.task.EmbedTaskMessage(
+                                    embedTaskId,
+                                    message.getNovelId(),
+                                    message.getVersion(),
+                                    chunkParams.chunkSize(),
+                                    chunkParams.chunkOverlap())
                     );
                     log.info("任务 {} 已自动串联 EMBED 阶段，embedTaskId={}", taskId, embedTaskId);
                 }

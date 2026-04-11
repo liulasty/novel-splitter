@@ -1,6 +1,8 @@
 package com.novel.splitter.infrastructure.persistence.repository.impl;
 
 import com.novel.splitter.domain.model.Scene;
+import com.novel.splitter.domain.model.SceneMetadata;
+import com.novel.splitter.domain.model.SceneSplitProfile;
 import com.novel.splitter.domain.model.paging.PageQuery;
 import com.novel.splitter.domain.model.paging.PagedResult;
 import com.novel.splitter.domain.repository.SceneRepository;
@@ -11,17 +13,16 @@ import com.novel.splitter.infrastructure.persistence.mapper.SceneMapper;
 import com.novel.splitter.infrastructure.persistence.repository.JpaChapterRepository;
 import com.novel.splitter.infrastructure.persistence.repository.JpaNovelRepository;
 import com.novel.splitter.infrastructure.persistence.repository.JpaSceneRepository;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -45,7 +46,7 @@ public class SceneRepositoryJpaImpl implements SceneRepository {
     private int jdbcBatchSize;
 
     @Override
-    public List<Long> saveScenes(String novelId, String version, List<Scene> scenes) {
+    public List<Long> saveScenes(String novelId, String version, int chunkSize, int chunkOverlap, List<Scene> scenes) {
         JpaNovelEntity novelEntity = null;
         Map<Integer, JpaChapterEntity> chapterMap = new HashMap<>();
 
@@ -60,17 +61,27 @@ public class SceneRepositoryJpaImpl implements SceneRepository {
         }
 
         final JpaNovelEntity finalNovelEntity = novelEntity;
-        
+
         List<JpaSceneEntity> entities = scenes.stream().map(scene -> {
             if (scene.getMetadata() != null) {
                 scene.getMetadata().setVersion(version);
+                scene.getMetadata().setChunkSize(chunkSize);
+                scene.getMetadata().setChunkOverlap(chunkOverlap);
+            } else {
+                SceneMetadata meta = SceneMetadata.builder()
+                        .version(version)
+                        .chunkSize(chunkSize)
+                        .chunkOverlap(chunkOverlap)
+                        .build();
+                scene.setMetadata(meta);
             }
-            
+
             JpaSceneEntity entity = sceneMapper.toEntity(scene);
             entity.setVersion(version);
-            // Backward-compat: if DB still has NOT NULL novel_name, write stable novelId here.
+            entity.setChunkSize(chunkSize);
+            entity.setChunkOverlap(chunkOverlap);
             entity.setLegacyNovelName(novelId);
-            
+
             if (finalNovelEntity != null) {
                 entity.setNovel(finalNovelEntity);
             }
@@ -115,13 +126,24 @@ public class SceneRepositoryJpaImpl implements SceneRepository {
 
     @Override
     @Transactional
-    public void deleteVersionByNovelId(String novelId, String version) {
-        jpaSceneRepository.deleteByNovelIdAndVersion(novelId, version);
+    public void deleteByProfile(String novelId, String version, int chunkSize, int chunkOverlap) {
+        jpaSceneRepository.deleteByNovelIdAndVersionAndChunkSizeAndChunkOverlap(
+                novelId, version, chunkSize, chunkOverlap);
     }
 
     @Override
-    public List<String> listVersionsByNovelId(String novelId) {
-        return jpaSceneRepository.findDistinctVersionsByNovelId(novelId);
+    public List<SceneSplitProfile> listSplitProfilesByNovelId(String novelId) {
+        List<Object[]> rows = jpaSceneRepository.findDistinctProfilesByNovelId(novelId);
+        List<SceneSplitProfile> out = new ArrayList<>();
+        for (Object[] row : rows) {
+            String v = row[0] != null ? String.valueOf(row[0]) : null;
+            Integer cs = row[1] != null ? ((Number) row[1]).intValue() : null;
+            Integer co = row[2] != null ? ((Number) row[2]).intValue() : null;
+            if (v != null) {
+                out.add(new SceneSplitProfile(v, cs, co));
+            }
+        }
+        return out;
     }
 
     @Override
@@ -131,8 +153,15 @@ public class SceneRepositoryJpaImpl implements SceneRepository {
     }
 
     @Override
-    public List<Scene> findByNovelIdAndVersion(String novelId, String version) {
+    public List<Scene> findAllByNovelIdAndVersion(String novelId, String version) {
         List<JpaSceneEntity> entities = jpaSceneRepository.findByNovelIdAndVersion(novelId, version);
+        return entities.stream().map(sceneMapper::toDomain).collect(Collectors.toList());
+    }
+
+    @Override
+    public List<Scene> findByProfile(String novelId, String version, int chunkSize, int chunkOverlap) {
+        List<JpaSceneEntity> entities = jpaSceneRepository.findByNovelIdAndVersionAndChunkSizeAndChunkOverlap(
+                novelId, version, chunkSize, chunkOverlap);
         return entities.stream().map(sceneMapper::toDomain).collect(Collectors.toList());
     }
 
@@ -143,20 +172,23 @@ public class SceneRepositoryJpaImpl implements SceneRepository {
     }
 
     @Override
-    public long countByNovelIdAndVersion(String novelId, String version) {
-        return jpaSceneRepository.countByNovelIdAndVersion(novelId, version);
+    public long countByProfile(String novelId, String version, int chunkSize, int chunkOverlap) {
+        return jpaSceneRepository.countByNovelIdAndVersionAndChunkSizeAndChunkOverlap(
+                novelId, version, chunkSize, chunkOverlap);
+    }
+
+    @Override
+    public long countAllByNovelIdAndVersion(String novelId, String version) {
+        return jpaSceneRepository.countByNovelIdAndVersionAllChunks(novelId, version);
     }
 
     @Override
     public PagedResult<Scene> findLightweightScenes(PageQuery pageQuery) {
-        // Here we map the DTO returned by JpaSceneRepository to Domain Scene
-        // We'll construct dummy Scene objects to satisfy Domain contract or return partial models
         Page<Scene> page = jpaSceneRepository.findLightweightScenes(toPageable(pageQuery))
                 .map(dto -> {
                     Scene scene = new Scene();
                     scene.setId(dto.getId() != null ? String.valueOf(dto.getId()) : null);
                     scene.setChapterIndex(dto.getChapterIndex() != null ? dto.getChapterIndex() : 0);
-                    // store type in chapterTitle as a hack for now, or just set it if domain adds type
                     scene.setChapterTitle(dto.getType());
                     scene.setWordCount(dto.getTokenCount() != null ? dto.getTokenCount() : 0);
                     scene.setText(dto.getTextContent());
@@ -172,8 +204,11 @@ public class SceneRepositoryJpaImpl implements SceneRepository {
     }
 
     @Override
-    public PagedResult<Scene> findByNovelIdAndVersion(String novelId, String version, PageQuery pageQuery) {
-        Page<Scene> page = jpaSceneRepository.findByNovelIdAndVersion(novelId, version, toPageable(pageQuery)).map(sceneMapper::toDomain);
+    public PagedResult<Scene> findByProfile(String novelId, String version, int chunkSize, int chunkOverlap, PageQuery pageQuery) {
+        Page<Scene> page = jpaSceneRepository
+                .findByNovelIdAndVersionAndChunkSizeAndChunkOverlap(
+                        novelId, version, chunkSize, chunkOverlap, toPageable(pageQuery))
+                .map(sceneMapper::toDomain);
         return toPagedResult(page);
     }
 
@@ -185,8 +220,8 @@ public class SceneRepositoryJpaImpl implements SceneRepository {
     }
 
     @Override
-    public List<Object[]> countScenesByNovelAndVersion() {
-        return jpaSceneRepository.countScenesByNovelAndVersion();
+    public List<Object[]> countScenesByNovelVersionAndChunk() {
+        return jpaSceneRepository.countScenesByNovelVersionAndChunk();
     }
 
     private Pageable toPageable(PageQuery pageQuery) {

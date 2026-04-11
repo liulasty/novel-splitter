@@ -29,40 +29,38 @@ public class OverlapChunkingStrategy implements ChunkingStrategy {
     }
 
     @Override
-    public List<Scene> split(Scene parent) {
-        List<Scene> children = new ArrayList<>();
-        String text = parent.getText();
+    public List<Scene> split(Scene source) {
+        List<Scene> chunks = new ArrayList<>();
+        String text = source.getText();
 
         if (text == null || text.trim().isEmpty()) {
-            return children;
+            return chunks;
         }
 
         if (text.length() <= chunkSize) {
-            children.add(createChildScene(parent, text, 0));
-            return children;
+            chunks.add(createOverlappedChunk(source, text, 0));
+            return chunks;
         }
 
         int index = 0;
-        int childIdx = 0;
+        int partIdx = 0;
         while (index < text.length()) {
             int maxEnd = Math.min(index + chunkSize, text.length());
             int end = findBestSplitPoint(text, index, maxEnd);
-            
-            // If the chunk becomes too small due to lookback, just use maxEnd
+
             if (end <= index) {
                 end = maxEnd;
             }
-            
+
             String chunkText = text.substring(index, end);
-            children.add(createChildScene(parent, chunkText, childIdx++));
+            chunks.add(createOverlappedChunk(source, chunkText, partIdx++));
 
             if (end == text.length()) {
                 break;
             }
-            // 保证游标严格前进，避免 end 靠近 index 时 end - overlap <= index 导致死循环
             index = Math.max(index + 1, end - overlap);
         }
-        return children;
+        return chunks;
     }
 
     private int findBestSplitPoint(String text, int start, int maxEnd) {
@@ -97,36 +95,28 @@ public class OverlapChunkingStrategy implements ChunkingStrategy {
         return maxEnd;
     }
 
-    private Scene createChildScene(Scene parent, String text, int childIndex) {
-        Scene child = new Scene();
-        child.setId(UUID.randomUUID().toString());
-        child.setText(text);
-        child.setWordCount(text.length());
-        child.setChapterIndex(parent.getChapterIndex());
-        child.setChapterTitle(parent.getChapterTitle());
-        child.setStartParagraphIndex(parent.getStartParagraphIndex());
-        child.setEndParagraphIndex(parent.getEndParagraphIndex());
-        child.setCanSplit(false);
-        // First child: carry over overlap from the scene before the parent; later children already
-        // include textual overlap from the sliding window in {@link #split}.
-        if (childIndex == 0) {
-            child.setPrefixContext(parent.getPrefixContext());
+    private Scene createOverlappedChunk(Scene source, String text, int partIndex) {
+        Scene chunk = new Scene();
+        chunk.setId(UUID.randomUUID().toString());
+        chunk.setText(text);
+        chunk.setWordCount(text.length());
+        chunk.setChapterIndex(source.getChapterIndex());
+        chunk.setChapterTitle(source.getChapterTitle());
+        chunk.setStartParagraphIndex(source.getStartParagraphIndex());
+        chunk.setEndParagraphIndex(source.getEndParagraphIndex());
+        chunk.setCanSplit(false);
+        if (partIndex == 0) {
+            chunk.setPrefixContext(source.getPrefixContext());
         }
 
-        SceneMetadata childMeta = childMetadataFromParent(parent.getMetadata());
-        childMeta.setParentSceneId(parent.getId());
-        childMeta.setChunkType("child_chunk");
-        childMeta.setSequenceNum(childIndex);
-        child.setMetadata(childMeta);
+        SceneMetadata meta = copyMetadataFromSource(source.getMetadata());
+        meta.setSequenceNum(partIndex);
+        chunk.setMetadata(meta);
 
-        return child;
+        return chunk;
     }
 
-    /**
-     * Copies parent scene metadata into a new object so child_chunk rows keep chapter / paragraph
-     * span and scores aligned with top-level columns (for RAG filters and assembly).
-     */
-    private static SceneMetadata childMetadataFromParent(SceneMetadata parentMeta) {
+    private static SceneMetadata copyMetadataFromSource(SceneMetadata parentMeta) {
         SceneMetadata childMeta = new SceneMetadata();
         if (parentMeta == null) {
             return childMeta;
