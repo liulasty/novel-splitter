@@ -2,6 +2,8 @@ package com.novel.splitter.domain.model.embedding.chroma;
 
 import lombok.Data;
 
+import java.util.Map;
+
 /**
  * ChromaDB 集合信息
  * <p>
@@ -19,4 +21,9 @@ public class ChromaCollection {
      * 集合名称 
      */
     private String name;
+
+    /**
+     * 建表时传入的元数据（如 {@code hnsw:space}），创建后不可改。
+     */
+    private Map<String, Object> metadata;
 }

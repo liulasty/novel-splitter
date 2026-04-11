@@ -63,8 +63,9 @@ public class KnowledgeBaseController {
             @PathVariable("novelName") String novelName,
             @PathVariable("version") String version,
             @RequestParam int chunkSize,
-            @RequestParam int chunkOverlap) {
-        return knowledgeBaseService.deleteVersion(novelName, version, chunkSize, chunkOverlap);
+            @RequestParam int chunkOverlap,
+            @RequestParam(name = "purgeTerminalSplitTasks", defaultValue = "false") boolean purgeTerminalSplitTasks) {
+        return knowledgeBaseService.deleteVersion(novelName, version, chunkSize, chunkOverlap, purgeTerminalSplitTasks);
     }
 
     @Operation(summary = "按 novelId 删除指定切分数据集")
@@ -73,20 +74,25 @@ public class KnowledgeBaseController {
             @PathVariable("novelId") String novelId,
             @PathVariable("version") String version,
             @RequestParam int chunkSize,
-            @RequestParam int chunkOverlap) {
-        return knowledgeBaseService.deleteSplitProfileByNovelId(novelId, version, chunkSize, chunkOverlap);
+            @RequestParam int chunkOverlap,
+            @RequestParam(name = "purgeTerminalSplitTasks", defaultValue = "false") boolean purgeTerminalSplitTasks) {
+        return knowledgeBaseService.deleteSplitProfileByNovelId(novelId, version, chunkSize, chunkOverlap, purgeTerminalSplitTasks);
     }
 
     @Operation(summary = "按 novelId 删除整部小说的知识库")
     @DeleteMapping("/id/{novelId}")
-    public Long deleteKnowledgeBaseById(@PathVariable("novelId") String novelId) {
-        return knowledgeBaseService.deleteKnowledgeBaseById(novelId);
+    public Long deleteKnowledgeBaseById(
+            @PathVariable("novelId") String novelId,
+            @RequestParam(name = "purgeTerminalSplitTasks", defaultValue = "false") boolean purgeTerminalSplitTasks) {
+        return knowledgeBaseService.deleteKnowledgeBaseById(novelId, purgeTerminalSplitTasks);
     }
 
     @Operation(summary = "删除整部小说的知识库")
     @Deprecated
     @DeleteMapping("/{novelName:.+}")
-    public Long deleteKnowledgeBase(@PathVariable("novelName") String novelName) {
-        return knowledgeBaseService.deleteKnowledgeBase(novelName);
+    public Long deleteKnowledgeBase(
+            @PathVariable("novelName") String novelName,
+            @RequestParam(name = "purgeTerminalSplitTasks", defaultValue = "false") boolean purgeTerminalSplitTasks) {
+        return knowledgeBaseService.deleteKnowledgeBase(novelName, purgeTerminalSplitTasks);
     }
 }

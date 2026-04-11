@@ -1,6 +1,7 @@
 package com.novel.splitter.application.service.chroma;
 
 import com.novel.splitter.embedding.api.VectorStore;
+import com.novel.splitter.embedding.store.ChromaVectorStore;
 import com.novel.splitter.domain.repository.NovelRepository;
 import com.novel.splitter.domain.repository.SceneRepository;
 import com.novel.splitter.application.model.dto.ChromaVersionDiagnosticDto;
@@ -31,6 +32,9 @@ public class ChromaAdminServiceImpl implements ChromaAdminService {
 
     @Value("${chroma.collection:novel-splitter}")
     private String collectionName;
+
+    @Value("${chroma.hnsw-space:cosine}")
+    private String chromaHnswSpace;
 
     @Override
     public StreamingResponseBody exportData(String novelName, String version, Integer chunkSize, Integer chunkOverlap) {
@@ -115,14 +119,17 @@ public class ChromaAdminServiceImpl implements ChromaAdminService {
             log.warn("Failed to delete collection (might not exist): {}", e.getMessage());
         }
 
+        String space = chromaHnswSpace != null && !chromaHnswSpace.isBlank()
+                ? chromaHnswSpace.trim().toLowerCase()
+                : "cosine";
         Map<String, Object> body = Map.of(
                 "name", collectionName,
-                "metadata", Map.of("hnsw:space", "cosine")
+                "metadata", Map.of(ChromaVectorStore.CHROMA_HNSW_SPACE_KEY, space)
         );
         
         try {
             chromaApiClient.post(pathPrefix, body);
-            log.info("Created ChromaDB collection: {} with cosine space", collectionName);
+            log.info("Created ChromaDB collection: {} with hnsw:space={}", collectionName, space);
         } catch (Exception e) {
             log.error("Failed to create collection: {}", e.getMessage());
             throw new RuntimeException("Failed to recreate collection", e);

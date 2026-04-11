@@ -16,6 +16,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -134,5 +135,39 @@ public class SplitTaskRepositoryJpaImpl implements SplitTaskRepository {
     @Override
     public void deleteById(String taskId) {
         jpaSplitTaskRepository.deleteById(Objects.requireNonNull(taskId, "taskId must not be null"));
+    }
+
+    @Override
+    public List<String> findTaskIdsByNovelIdAndStatuses(String novelId, List<SplitTask.TaskStatus> statuses) {
+        if (novelId == null || novelId.isBlank() || statuses == null || statuses.isEmpty()) {
+            return List.of();
+        }
+        return jpaSplitTaskRepository
+                .findByNovelIdAndStatusIn(novelId.trim(), statuses)
+                .stream()
+                .map(JpaSplitTaskEntity::getTaskId)
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    @Override
+    public List<String> findTaskIdsByNovelIdAndVersionAndStatuses(String novelId, String version, List<SplitTask.TaskStatus> statuses) {
+        if (novelId == null || novelId.isBlank() || version == null || version.isBlank() || statuses == null || statuses.isEmpty()) {
+            return List.of();
+        }
+        return jpaSplitTaskRepository
+                .findByNovelIdAndVersionAndStatusIn(novelId.trim(), version.trim(), statuses)
+                .stream()
+                .map(JpaSplitTaskEntity::getTaskId)
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    @Override
+    public void deleteAllByIds(Collection<String> taskIds) {
+        if (taskIds == null || taskIds.isEmpty()) {
+            return;
+        }
+        jpaSplitTaskRepository.deleteAllByIdInBatch(taskIds);
     }
 }

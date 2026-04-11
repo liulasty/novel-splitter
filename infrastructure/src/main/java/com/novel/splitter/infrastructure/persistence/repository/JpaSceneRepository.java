@@ -23,6 +23,7 @@ public interface JpaSceneRepository extends JpaRepository<JpaSceneEntity, Long>,
     Page<SceneLightweightProjection> findLightweightScenes(Pageable pageable);
 
     // Custom query method for SubTask 2.2: "按 ID 列表查询的方法"
+    @EntityGraph(attributePaths = {"novel", "chapter"})
     List<JpaSceneEntity> findByIdIn(List<Long> ids);
 
     List<JpaSceneEntity> findBySceneIdIn(List<String> sceneIds);
@@ -108,6 +109,15 @@ public interface JpaSceneRepository extends JpaRepository<JpaSceneEntity, Long>,
             + "WHERE s.id = :id AND s.embedRunId = :rid AND s.isDeleted = false")
     int updateEmbedOutcome(
             @Param("id") Long persistenceId,
+            @Param("rid") String embedRunId,
+            @Param("st") EmbedStatus status,
+            @Param("err") String embedError);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE JpaSceneEntity s SET s.embedStatus = :st, s.embedError = :err "
+            + "WHERE s.id IN :ids AND s.embedRunId = :rid AND s.isDeleted = false")
+    int batchUpdateEmbedOutcome(
+            @Param("ids") List<Long> persistenceIds,
             @Param("rid") String embedRunId,
             @Param("st") EmbedStatus status,
             @Param("err") String embedError);

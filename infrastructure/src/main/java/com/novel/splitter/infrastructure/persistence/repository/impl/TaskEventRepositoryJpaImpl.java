@@ -8,6 +8,7 @@ import com.novel.splitter.infrastructure.persistence.repository.JpaTaskEventRepo
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -38,5 +39,13 @@ public class TaskEventRepositoryJpaImpl implements TaskEventRepository {
         return jpaTaskEventRepository.findByTaskIdAndCreatedAtGreaterThanOrderByCreatedAtAsc(taskId, sinceTimestamp).stream()
                 .map(mapper::toDomain)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public int deleteByTaskIds(Collection<String> taskIds) {
+        if (taskIds == null || taskIds.isEmpty()) {
+            return 0;
+        }
+        return (int) jpaTaskEventRepository.deleteByTaskIdIn(taskIds);
     }
 }

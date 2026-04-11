@@ -21,7 +21,8 @@ import java.util.UUID;
 @TestPropertySource(properties = {
     "embedding.store.type=chroma",
     "chroma.url=http://localhost:8081",
-    "chroma.collection=test-collection"
+    "chroma.collection=test-collection",
+    "chroma.init.eager=false"
 })
 public class ChromaIntegrationTest {
 
@@ -46,6 +47,7 @@ public class ChromaIntegrationTest {
         // Create a dummy scene
         String id = UUID.randomUUID().toString();
         Scene scene = Scene.builder()
+                .persistenceId(1L)
                 .id(id)
                 .chapterTitle("Test Chapter")
                 .chapterIndex(1)
@@ -54,7 +56,13 @@ public class ChromaIntegrationTest {
                 .text("This is a test sentence for ChromaDB.")
                 .wordCount(10)
                 .canSplit(false)
-                .metadata(SceneMetadata.builder().build())
+                .metadata(SceneMetadata.builder()
+                        .novel("novel-itest-1")
+                        .version("v-itest")
+                        .chunkSize(350)
+                        .chunkOverlap(65)
+                        .sequenceNum(0)
+                        .build())
                 .build();
 
         // Create a dummy embedding (dimension 10 for simplicity, though real is 512/768)

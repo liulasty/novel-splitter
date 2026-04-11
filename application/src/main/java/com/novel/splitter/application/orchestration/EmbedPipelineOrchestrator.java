@@ -1,9 +1,7 @@
 package com.novel.splitter.application.orchestration;
 
 import com.novel.splitter.application.port.out.TaskQueuePort;
-import com.novel.splitter.application.service.novel.NovelService;
 import com.novel.splitter.application.service.task.TaskService;
-import com.novel.splitter.domain.enums.NovelStatus;
 import com.novel.splitter.domain.model.SceneSplitProfile;
 import com.novel.splitter.domain.repository.SceneRepository;
 import com.novel.splitter.domain.task.EmbedSceneTaskMessage;
@@ -32,7 +30,7 @@ public class EmbedPipelineOrchestrator {
     private final SceneRepository sceneRepository;
     private final VectorStore vectorStore;
     private final TaskQueuePort taskQueuePort;
-    private final NovelService novelService;
+    private final EmbedRunDbCoordinator embedRunDbCoordinator;
 
     @Value("${splitter.embed.scene-publish-batch-size:200}")
     private int scenePublishBatchSize;
@@ -43,7 +41,8 @@ public class EmbedPipelineOrchestrator {
     public void startNewEmbedRun(String taskId, String novelId, String version, Integer chunkSize, Integer chunkOverlap) {
         SplitTask task = taskService.getTask(taskId);
         if (task == null) {
-            throw new IllegalStateException("Embed task not found: " + taskId);
+            log.warn("Skip embed orchestration: task row gone (stale MQ after purge/delete?). taskId={}", taskId);
+            return;
         }
         if (task.getStatus() == SplitTask.TaskStatus.SUCCESS || task.getStatus() == SplitTask.TaskStatus.FAILED) {
             log.warn("Skip embed orchestration for terminal task {} status {}", taskId, task.getStatus());
@@ -74,18 +73,10 @@ public class EmbedPipelineOrchestrator {
                     + " chunk=" + cs + "/" + co, e);
         }
 
-        sceneRepository.resetEmbedStateForRun(novelId, version, cs, co, embedRunId);
-        long total = sceneRepository.countByProfile(novelId, version, cs, co);
-        if (total <= 0) {
-            throw new IllegalStateException("No scenes for novelId=" + novelId + " version=" + version
-                    + " chunk=" + cs + "/" + co);
-        }
-
-        taskService.beginEmbedRun(taskId, embedRunId, (int) total, "向量化：子任务投递中...");
-        novelService.updateNovelStatus(novelId, NovelStatus.EMBEDDING);
+        int totalScenes = embedRunDbCoordinator.beginRunAfterVectorsCleaned(taskId, novelId, version, cs, co, embedRunId);
 
         fanOutSceneMessages(taskId, novelId, version, cs, co, embedRunId);
-        log.info("Embed run started taskId={} embedRunId={} totalScenes={}", taskId, embedRunId, total);
+        log.info("Embed run started taskId={} embedRunId={} totalScenes={}", taskId, embedRunId, totalScenes);
     }
 
     /**
@@ -106,7 +97,8 @@ public class EmbedPipelineOrchestrator {
     public void resumeEmbedRun(String taskId) {
         SplitTask task = taskService.getTask(taskId);
         if (task == null) {
-            throw new IllegalStateException("Embed task not found: " + taskId);
+            log.warn("Skip embed resume: task row gone (stale MQ?). taskId={}", taskId);
+            return;
         }
         String runId = task.getCurrentEmbedRunId();
         if (runId == null || runId.isBlank()) {

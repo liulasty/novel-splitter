@@ -36,22 +36,28 @@ public interface KnowledgeBaseService {
 
     /**
      * 删除指定 (version, chunkSize, chunkOverlap) 分区下的切分结果（及相关向量）
+     *
+     * @param purgeTerminalSplitTasks 为 true 时，在已通过「无进行中任务」校验的前提下，额外删除本书
+     *                                {@code SUCCESS}/{@code FAILED} 的 {@code split_tasks}（及 task_events）；
+     *                                仅按 {@code version} 字符串匹配任务行，chunk 参数不在任务表上。
      */
-    Long deleteVersion(String novelName, String version, int chunkSize, int chunkOverlap);
+    Long deleteVersion(String novelName, String version, int chunkSize, int chunkOverlap, boolean purgeTerminalSplitTasks);
 
     /**
      * 删除指定小说的所有数据（文件、切分结果、向量）
      * @param novelName 小说名称
+     * @param purgeTerminalSplitTasks 为 true 时删除本书终态 split_tasks / task_events，见 {@link #deleteVersion}
      * @return cleanupTaskId
      */
-    Long deleteKnowledgeBase(String novelName);
+    Long deleteKnowledgeBase(String novelName, boolean purgeTerminalSplitTasks);
 
     /**
      * 按 novelId 删除指定小说的所有数据（文件、切分结果、向量）
      * @param novelId novels 表主键
+     * @param purgeTerminalSplitTasks 为 true 时删除本书终态 split_tasks / task_events，见 {@link #deleteVersion}
      * @return cleanupTaskId
      */
-    Long deleteKnowledgeBaseById(String novelId);
+    Long deleteKnowledgeBaseById(String novelId, boolean purgeTerminalSplitTasks);
 
     /**
      * 获取指定小说的所有版本列表
@@ -72,6 +78,8 @@ public interface KnowledgeBaseService {
 
     /**
      * 按 novelId 删除指定 (version, chunkSize, chunkOverlap) 分区下的场景与对应向量。
+     *
+     * @param purgeTerminalSplitTasks 见 {@link #deleteVersion}
      */
-    Long deleteSplitProfileByNovelId(String novelId, String version, int chunkSize, int chunkOverlap);
+    Long deleteSplitProfileByNovelId(String novelId, String version, int chunkSize, int chunkOverlap, boolean purgeTerminalSplitTasks);
 }

@@ -37,6 +37,13 @@ public class RabbitConfig {
     @Value("${splitter.embed.scene-listener.batch-size:50}")
     private int embedSceneBatchSize;
 
+    /**
+     * embed.scene 批量监听器在「整批投递」失败时的最大尝试次数（含首次）。默认 1：不在 MQ 层对同一批做多次重试，
+     * 避免 Chroma/模型等硬错误反复执行；单场景失败由 {@code EmbedWorker} 写入 {@code scenes.embed_error} 并由进度调度汇总。
+     */
+    @Value("${splitter.embed.scene-listener.listener-max-attempts:1}")
+    private int embedSceneListenerMaxAttempts;
+
     public static final String EXCHANGE_NAME = "novel.task.exchange";
 
     public static final String LOAD_TASK_QUEUE = "novel.task.load";
@@ -225,6 +232,16 @@ public class RabbitConfig {
     }
 
     @Bean
+    public RetryOperationsInterceptor embedSceneRabbitRetryInterceptor() {
+        int attempts = Math.max(1, embedSceneListenerMaxAttempts);
+        return RetryInterceptorBuilder.stateless()
+                .maxAttempts(attempts)
+                .backOffOptions(retryInitialIntervalMs, retryMultiplier, retryMaxIntervalMs)
+                .recoverer(new RejectAndDontRequeueRecoverer())
+                .build();
+    }
+
+    @Bean
     public SimpleRabbitListenerContainerFactory rabbitListenerContainerFactory(
             ConnectionFactory connectionFactory,
             MessageConverter jsonMessageConverter,
@@ -245,13 +262,13 @@ public class RabbitConfig {
     public SimpleRabbitListenerContainerFactory embedSceneBatchListenerContainerFactory(
             ConnectionFactory connectionFactory,
             MessageConverter jsonMessageConverter,
-            RetryOperationsInterceptor rabbitRetryInterceptor
+            RetryOperationsInterceptor embedSceneRabbitRetryInterceptor
     ) {
         SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
         factory.setConnectionFactory(connectionFactory);
         factory.setMessageConverter(jsonMessageConverter);
         factory.setDefaultRequeueRejected(false);
-        factory.setAdviceChain(rabbitRetryInterceptor);
+        factory.setAdviceChain(embedSceneRabbitRetryInterceptor);
         factory.setConsumerBatchEnabled(true);
         factory.setBatchListener(true);
         factory.setBatchSize(Math.max(1, embedSceneBatchSize));

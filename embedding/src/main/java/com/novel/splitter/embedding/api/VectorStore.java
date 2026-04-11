@@ -76,6 +76,7 @@ public interface VectorStore {
      * </p>
      *
      * @param filter 用于定位需要删除的记录的过滤条件 (Key -> Value)，例如：{"novelId": "456"}
+     * @throws IllegalStateException 底层向量库删除失败时（如 Chroma 不可用或非幂等清理不可接受时）抛出
      */
     void delete(java.util.Map<String, Object> filter);
 

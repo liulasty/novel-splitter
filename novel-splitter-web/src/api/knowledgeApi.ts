@@ -89,31 +89,56 @@ export const knowledgeApi = {
     novelId: string,
     version: string,
     chunkSize: number,
-    chunkOverlap: number
+    chunkOverlap: number,
+    purgeTerminalSplitTasks?: boolean
   ): Promise<number> => {
-    const q = `chunkSize=${encodeURIComponent(String(chunkSize))}&chunkOverlap=${encodeURIComponent(String(chunkOverlap))}`;
+    const params = new URLSearchParams({
+      chunkSize: String(chunkSize),
+      chunkOverlap: String(chunkOverlap),
+    });
+    if (purgeTerminalSplitTasks) {
+      params.set('purgeTerminalSplitTasks', 'true');
+    }
     const cleanupTaskId = await apiClient.delete<ApiEnvelope<number>, number>(
-      `/knowledge/id/${encodeURIComponent(novelId)}/versions/${encodeURIComponent(version)}?${q}`
+      `/knowledge/id/${encodeURIComponent(novelId)}/versions/${encodeURIComponent(version)}?${params.toString()}`
     );
     return cleanupTaskId;
   },
 
   // Legacy: delete version by novelName
-  deleteVersion: async (novelName: string, version: string, chunkSize: number, chunkOverlap: number): Promise<number> => {
-    const q = `chunkSize=${encodeURIComponent(String(chunkSize))}&chunkOverlap=${encodeURIComponent(String(chunkOverlap))}`;
+  deleteVersion: async (
+    novelName: string,
+    version: string,
+    chunkSize: number,
+    chunkOverlap: number,
+    purgeTerminalSplitTasks?: boolean
+  ): Promise<number> => {
+    const params = new URLSearchParams({
+      chunkSize: String(chunkSize),
+      chunkOverlap: String(chunkOverlap),
+    });
+    if (purgeTerminalSplitTasks) {
+      params.set('purgeTerminalSplitTasks', 'true');
+    }
     const cleanupTaskId = await apiClient.delete<ApiEnvelope<number>, number>(
-      `/knowledge/${encodeURIComponent(novelName)}/versions/${encodeURIComponent(version)}?${q}`
+      `/knowledge/${encodeURIComponent(novelName)}/versions/${encodeURIComponent(version)}?${params.toString()}`
     );
     return cleanupTaskId;
   },
 
-  deleteKnowledgeBase: async (novelName: string): Promise<number> => {
-    const cleanupTaskId = await apiClient.delete<ApiEnvelope<number>, number>(`/knowledge/${encodeURIComponent(novelName)}`);
+  deleteKnowledgeBase: async (novelName: string, purgeTerminalSplitTasks?: boolean): Promise<number> => {
+    const q = purgeTerminalSplitTasks ? '?purgeTerminalSplitTasks=true' : '';
+    const cleanupTaskId = await apiClient.delete<ApiEnvelope<number>, number>(
+      `/knowledge/${encodeURIComponent(novelName)}${q}`
+    );
     return cleanupTaskId;
   },
 
-  deleteKnowledgeBaseById: async (novelId: string): Promise<number> => {
-    const cleanupTaskId = await apiClient.delete<ApiEnvelope<number>, number>(`/knowledge/id/${encodeURIComponent(novelId)}`);
+  deleteKnowledgeBaseById: async (novelId: string, purgeTerminalSplitTasks?: boolean): Promise<number> => {
+    const q = purgeTerminalSplitTasks ? '?purgeTerminalSplitTasks=true' : '';
+    const cleanupTaskId = await apiClient.delete<ApiEnvelope<number>, number>(
+      `/knowledge/id/${encodeURIComponent(novelId)}${q}`
+    );
     return cleanupTaskId;
   },
 };

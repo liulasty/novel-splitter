@@ -57,11 +57,13 @@ export function NovelVersionsCard({
 }) {
     const queryClient = useQueryClient();
     const [deleteConfirming, setDeleteConfirming] = useState(false);
+    const [purgeTerminalSplitTasks, setPurgeTerminalSplitTasks] = useState(false);
     const phase = novelKnowledgePhase(status);
     const fetchVersions = phase !== 'awaitingSplit';
 
     useEffect(() => {
         setDeleteConfirming(false);
+        setPurgeTerminalSplitTasks(false);
     }, [novelId]);
 
     const { data: splitProfiles, isLoading, isError } = useQuery({
@@ -72,13 +74,17 @@ export function NovelVersionsCard({
 
     const deleteNovelMutation = useMutation({
         mutationFn: async () => {
-            const cleanupTaskId = await knowledgeApi.deleteKnowledgeBaseById(novelId);
+            const cleanupTaskId = await knowledgeApi.deleteKnowledgeBaseById(novelId, purgeTerminalSplitTasks);
             await novelApi.softDeleteNovel(novelId);
             return cleanupTaskId;
         },
         onSuccess: (cleanupTaskId) => {
-            toast.success(`知识库 "${novelName}" 已删除，清理任务：${cleanupTaskId}`);
+            const extra = purgeTerminalSplitTasks ? '；已清理本书终态任务记录' : '';
+            toast.success(`知识库 "${novelName}" 已删除，清理任务：${cleanupTaskId}${extra}`);
             queryClient.invalidateQueries({ queryKey: ['novelSummaries'] });
+            if (purgeTerminalSplitTasks) {
+                queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            }
         },
         onError: (error: any) => {
             if (handleConflict409(error, '当前小说存在运行中任务，请等待任务完成后再删除知识库/版本')) {
@@ -96,11 +102,21 @@ export function NovelVersionsCard({
             if (p.chunkSize == null || p.chunkOverlap == null) {
                 return Promise.reject(new Error("legacy_missing_chunk"));
             }
-            return knowledgeApi.deleteVersionByNovelId(novelId, p.version, p.chunkSize, p.chunkOverlap);
+            return knowledgeApi.deleteVersionByNovelId(
+                novelId,
+                p.version,
+                p.chunkSize,
+                p.chunkOverlap,
+                purgeTerminalSplitTasks
+            );
         },
         onSuccess: (_, p) => {
-            toast.success(`数据集 "${splitProfileLabel(p)}" 已删除`);
+            const extra = purgeTerminalSplitTasks ? '（已按版本清理终态任务记录）' : '';
+            toast.success(`数据集 "${splitProfileLabel(p)}" 已删除${extra}`);
             queryClient.invalidateQueries({ queryKey: ['splitProfiles', novelId] });
+            if (purgeTerminalSplitTasks) {
+                queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            }
         },
         onError: (error: any) => {
             if (error?.message === 'legacy_missing_chunk') {
@@ -205,6 +221,17 @@ export function NovelVersionsCard({
                         <p className="text-xs text-red-500 mb-3">
                             将删除所有源文件、切分版本和向量数据，操作不可恢复。
                         </p>
+                        <label className="flex items-start gap-2 mb-3 text-xs text-red-800 cursor-pointer select-none">
+                            <input
+                                type="checkbox"
+                                className="mt-0.5 rounded border-red-300 text-red-600 focus:ring-red-400 shrink-0"
+                                checked={purgeTerminalSplitTasks}
+                                onChange={(e) => setPurgeTerminalSplitTasks(e.target.checked)}
+                            />
+                            <span>
+                                同时删除本书流水线任务表中<span className="font-semibold">已成功/已失败</span>的历史记录（进行中的任务仍会阻止删除）
+                            </span>
+                        </label>
                         <div className="flex gap-2">
                             <button
                                 onClick={() => deleteNovelMutation.mutate()}
@@ -253,6 +280,8 @@ export function NovelVersionsCard({
                                 isPending={deleteVersionMutation.isPending}
                                 disabled={hasRunningTasks || p.chunkSize == null || p.chunkOverlap == null}
                                 stat={undefined}
+                                purgeTerminalSplitTasks={purgeTerminalSplitTasks}
+                                onPurgeTerminalSplitTasksChange={setPurgeTerminalSplitTasks}
                             />
                         ))}
                     </div>

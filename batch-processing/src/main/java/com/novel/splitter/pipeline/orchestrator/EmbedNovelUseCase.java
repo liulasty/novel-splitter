@@ -9,7 +9,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * 批量写入向量库。场景行 embed 状态由应用层消费者在向量写入之后更新；
@@ -24,28 +26,42 @@ public class EmbedNovelUseCase {
     private final VectorStore vectorStore;
     private final SceneRepository sceneRepository;
 
-    public void embedBatch(List<Long> sceneIds) {
-        if (sceneIds == null || sceneIds.isEmpty()) return;
-        List<Scene> scenes = sceneRepository.findByIds(sceneIds);
-        if (scenes == null || scenes.isEmpty()) return;
+    /**
+     * 对给定 DB 主键做 ONNX + Chroma 批量写入；整批原子（任一步失败则抛异常，不返回部分成功）。
+     *
+     * @return 实际完成向量写入的场景 persistence id 列表（顺序与 validScenes 一致）
+     */
+    public List<Long> embedBatch(List<Long> scenePersistenceIds) {
+        if (scenePersistenceIds == null || scenePersistenceIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<Scene> scenes = sceneRepository.findByIds(scenePersistenceIds);
+        if (scenes == null || scenes.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<String> texts = new ArrayList<>();
+        List<Scene> validScenes = new ArrayList<>();
+        for (Scene scene : scenes) {
+            if (scene.getText() != null && !scene.getText().trim().isEmpty()) {
+                texts.add(scene.getText());
+                validScenes.add(scene);
+            } else {
+                log.warn("Skipping scene ID {} due to empty text", scene.getId());
+            }
+        }
+        if (validScenes.isEmpty()) {
+            return Collections.emptyList();
+        }
 
         try {
-            List<String> texts = new ArrayList<>();
-            List<Scene> validScenes = new ArrayList<>();
-            for (Scene scene : scenes) {
-                if (scene.getText() != null && !scene.getText().trim().isEmpty()) {
-                    texts.add(scene.getText());
-                    validScenes.add(scene);
-                } else {
-                    log.warn("Skipping scene ID {} due to empty text", scene.getId());
-                }
-            }
-            if (validScenes.isEmpty()) return;
-
             List<float[]> embeddings = embeddingService.embedBatch(texts);
             vectorStore.saveBatch(validScenes, embeddings);
+            return validScenes.stream()
+                    .map(Scene::getPersistenceId)
+                    .collect(Collectors.toList());
         } catch (Exception e) {
-            log.error("Error processing embed batch (Scene IDs: {}-...)", sceneIds.get(0), e);
+            log.error("Error processing embed batch (first persistence id: {})", scenePersistenceIds.get(0), e);
             throw new RuntimeException("Batch embed processing failed", e);
         }
     }

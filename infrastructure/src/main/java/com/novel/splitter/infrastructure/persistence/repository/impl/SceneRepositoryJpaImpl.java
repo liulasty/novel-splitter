@@ -247,6 +247,16 @@ public class SceneRepositoryJpaImpl implements SceneRepository {
     }
 
     @Override
+    @Transactional
+    public void batchUpdateEmbedOutcome(List<Long> persistenceIds, String embedRunId, EmbedStatus status, String embedError) {
+        if (persistenceIds == null || persistenceIds.isEmpty()) {
+            return;
+        }
+        String err = embedError != null && embedError.length() > 4000 ? embedError.substring(0, 4000) : embedError;
+        jpaSceneRepository.batchUpdateEmbedOutcome(persistenceIds, embedRunId, status, err);
+    }
+
+    @Override
     public long countEmbedByRunAndStatus(
             String novelId, String version, int chunkSize, int chunkOverlap, String embedRunId, EmbedStatus status) {
         return jpaSceneRepository.countByProfileRunAndStatus(

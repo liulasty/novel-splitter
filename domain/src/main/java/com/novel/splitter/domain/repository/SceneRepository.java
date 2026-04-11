@@ -71,6 +71,12 @@ public interface SceneRepository {
 
     void updateEmbedOutcome(Long persistenceId, String embedRunId, EmbedStatus status, String embedError);
 
+    /**
+     * 批量更新嵌入结果；{@code persistenceIds} 为空则 no-op。
+     * SUCCESS 时 {@code embedError} 应为 null；FAILED 时与单条 {@link #updateEmbedOutcome} 一致须带非空错误说明。
+     */
+    void batchUpdateEmbedOutcome(List<Long> persistenceIds, String embedRunId, EmbedStatus status, String embedError);
+
     long countEmbedByRunAndStatus(String novelId, String version, int chunkSize, int chunkOverlap,
                                   String embedRunId, EmbedStatus status);
 

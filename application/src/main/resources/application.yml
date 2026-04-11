@@ -5,9 +5,12 @@ api:
 server:
   port: ${BACKEND_PORT:8080}
 
+# 日志目录；具体分文件由 classpath:logback-spring.xml 配置：
+#   novel-splitter-app.log  |  novel-splitter-embed.log  |  novel-splitter-sql.log
+# 滚动归档在 ${LOG_PATH:logs}/archive/
 logging:
   file:
-    name: ${LOG_PATH:logs}/novel-splitter.log
+    path: ${LOG_PATH:logs}
   level:
     root: INFO
     com.novel.splitter: DEBUG
@@ -96,6 +99,17 @@ embedding:
 chroma:
   url: ${CHROMA_URL:http://localhost:8000}
   collection: novel-splitter
+  # 与 embedding 模型一致；仅在建 collection 时生效，已存在的 collection 不可原地修改
+  hnsw-space: ${CHROMA_HNSW_SPACE:cosine}
+  init:
+    # 为 true 时：已存在 collection 的 hnsw:space 与 chroma.hnsw-space 不一致则启动失败（需删 collection 或改配置）
+    fail-on-distance-mismatch: ${CHROMA_FAIL_ON_DISTANCE_MISMATCH:true}
+    # 为 true 时：进程启动即 get_or_create + 校验距离 + 打向量总数（无 Chroma 的测试可设为 false）
+    eager: ${CHROMA_INIT_EAGER:true}
+  # /delete 对瞬时网络/Chroma 5xx 的重试（与 DB 无法原子，重试可降低「删量成功、后续 DB 失败」概率）
+  delete:
+    max-attempts: ${CHROMA_DELETE_MAX_ATTEMPTS:4}
+    backoff-ms: ${CHROMA_DELETE_BACKOFF_MS:200}
 
 assembler:
   max-chunks: 5
@@ -116,11 +130,15 @@ splitter:
       max-interval-ms: 10000
 
   embed:
+    # ONNX / Chroma 子批大小（在 scene-listener.batch-size 内再切分）；OOM 时调小，CPU 富余可试 24～32
+    sub-batch-size: 16
     # 编排层 fan-out 时每批发送条数（单次 List 传给 TaskQueuePort）
     scene-publish-batch-size: 200
     # 细粒度队列批量监听 batch size（与 RabbitConfig.embedSceneBatchListenerContainerFactory 一致）
     scene-listener:
       batch-size: 50
+      # embed.scene 队列「整批」失败时 MQ 监听器重试次数（含首次）。1=不重试，避免不可恢复错误反复跑 ONNX/Chroma。
+      listener-max-attempts: 1
     progress-interval-ms: 5000
     progress-scheduler-enabled: true
   

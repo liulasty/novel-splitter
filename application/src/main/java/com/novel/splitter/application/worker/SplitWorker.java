@@ -87,14 +87,8 @@ public class SplitWorker {
             ResolvedChunkingParams chunkParams =
                     splitNovelUseCase.resolveChunkingParams(message.getChunkSize(), message.getChunkOverlap());
 
-            // P2: strict idempotent cleanup (DB + Chroma). Either failure blocks processing.
-            taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, 1, "幂等清理：删除旧场景与旧向量...");
-            try {
-                sceneRepository.deleteByProfile(novelId, version, chunkParams.chunkSize(), chunkParams.chunkOverlap());
-            } catch (Exception e) {
-                throw new IllegalStateException("Failed to cleanup DB scenes for novelId=" + novelId + " version=" + version
-                        + " chunk=" + chunkParams.chunkSize() + "/" + chunkParams.chunkOverlap(), e);
-            }
+            // 先删向量再删 DB：向量删除失败时库内场景仍在，MQ 重试可幂等继续；若先删 DB 则向量删除失败会留下孤儿向量。
+            taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, 1, "幂等清理：删除旧向量与旧场景...");
             try {
                 vectorStore.delete(Map.of(
                         "novelId", novelId,
@@ -103,6 +97,12 @@ public class SplitWorker {
                         "chunkOverlap", chunkParams.chunkOverlap()));
             } catch (Exception e) {
                 throw new IllegalStateException("Failed to cleanup Chroma vectors for novelId=" + novelId + " version=" + version
+                        + " chunk=" + chunkParams.chunkSize() + "/" + chunkParams.chunkOverlap(), e);
+            }
+            try {
+                sceneRepository.deleteByProfile(novelId, version, chunkParams.chunkSize(), chunkParams.chunkOverlap());
+            } catch (Exception e) {
+                throw new IllegalStateException("Failed to cleanup DB scenes for novelId=" + novelId + " version=" + version
                         + " chunk=" + chunkParams.chunkSize() + "/" + chunkParams.chunkOverlap(), e);
             }
 

@@ -24,7 +24,7 @@ public class SceneMetadata {
     public static final double SCORE_NOT_COMPUTED = -1.0;
 
     // === RAG 核心字段 ===
-    /** 小说名称 */
+    /** 小说 ID（与 Chroma metadata {@code novelId} 一致）；历史字段名 {@code novel} */
     private String novel;
     
     /** 版本号 */

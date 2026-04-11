@@ -8,20 +8,36 @@ export function VersionTag({
     isPending,
     disabled,
     stat,
+    purgeTerminalSplitTasks,
+    onPurgeTerminalSplitTasksChange,
 }: {
     version: string;
     onDelete: () => void;
     isPending: boolean;
     disabled?: boolean;
     stat?: NovelStatRecordDto;
+    purgeTerminalSplitTasks?: boolean;
+    onPurgeTerminalSplitTasksChange?: (value: boolean) => void;
 }) {
     const [confirming, setConfirming] = useState(false);
     const isDisabled = Boolean(disabled);
 
     if (confirming) {
         return (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600 border border-red-200 animate-in fade-in duration-150">
+            <span className="inline-flex flex-col gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-600 border border-red-200 animate-in fade-in duration-150">
                 <span className="mr-0.5">删除此版本？</span>
+                {onPurgeTerminalSplitTasksChange != null && (
+                    <label className="flex items-center gap-1.5 font-normal text-[10px] text-red-700 cursor-pointer select-none">
+                        <input
+                            type="checkbox"
+                            className="rounded border-red-300 text-red-600 focus:ring-red-400"
+                            checked={Boolean(purgeTerminalSplitTasks)}
+                            onChange={(e) => onPurgeTerminalSplitTasksChange(e.target.checked)}
+                        />
+                        同时清理本书已结束的任务记录（成功/失败）
+                    </label>
+                )}
+                <span className="inline-flex items-center gap-1">
                 <button
                     onClick={() => { onDelete(); setConfirming(false); }}
                     disabled={isPending || isDisabled}
@@ -36,6 +52,7 @@ export function VersionTag({
                 >
                     <X className="w-3 h-3" />
                 </button>
+                </span>
             </span>
         );
     }

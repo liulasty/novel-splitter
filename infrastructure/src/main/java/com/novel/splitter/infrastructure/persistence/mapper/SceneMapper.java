@@ -29,6 +29,10 @@ public class SceneMapper {
         if (entity.getVersion() != null) {
             meta.setVersion(entity.getVersion());
         }
+        if (entity.getNovel() != null
+                && (meta.getNovel() == null || meta.getNovel().isBlank())) {
+            meta.setNovel(entity.getNovel().getId());
+        }
         return Scene.builder()
                 .persistenceId(entity.getId())
                 .id(entity.getSceneId())

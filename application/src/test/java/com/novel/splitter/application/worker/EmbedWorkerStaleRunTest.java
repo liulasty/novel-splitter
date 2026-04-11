@@ -19,6 +19,7 @@ import java.util.List;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -39,7 +40,7 @@ class EmbedWorkerStaleRunTest {
     private EmbedWorker embedWorker;
 
     @Test
-    void embedScene_skipsEmbedding_whenEmbedRunIdDoesNotMatchTask() throws Exception {
+    void embedScene_skipsEmbedding_whenEmbedRunIdDoesNotMatchTask() {
         SplitTask task = new SplitTask();
         task.setTaskId("t1");
         task.setStatus(SplitTask.TaskStatus.PROCESSING);
@@ -49,33 +50,31 @@ class EmbedWorkerStaleRunTest {
         EmbedSceneTaskMessage msg = new EmbedSceneTaskMessage(
                 "t1", "n1", "v1", 350, 65, "run-stale", 99L);
 
-        var m = EmbedWorker.class.getDeclaredMethod("processEmbedScene", EmbedSceneTaskMessage.class);
-        m.setAccessible(true);
-        m.invoke(embedWorker, msg);
+        embedWorker.onEmbedSceneBatch(List.of(msg));
 
         verify(embedNovelUseCase, never()).embedBatch(anyList());
+        verify(sceneRepository, never()).batchUpdateEmbedOutcome(anyList(), any(), any(), any());
         verify(sceneRepository, never()).updateEmbedOutcome(any(), any(), any(), any());
     }
 
     @Test
-    void embedScene_marksSuccess_afterEmbedBatch() throws Exception {
+    void embedScene_marksSuccess_afterEmbedBatch() {
         SplitTask task = new SplitTask();
         task.setTaskId("t1");
         task.setStatus(SplitTask.TaskStatus.PROCESSING);
         task.setCurrentEmbedRunId("run-a");
         when(taskService.getTask("t1")).thenReturn(task);
 
-        Scene sc = Scene.builder().persistenceId(5L).id("sid").embedStatus(EmbedStatus.PENDING).embedRunId("run-a").build();
+        Scene sc = Scene.builder().persistenceId(5L).id("sid").text("hello").embedStatus(EmbedStatus.PENDING).embedRunId("run-a").build();
         when(sceneRepository.findByIds(List.of(5L))).thenReturn(List.of(sc));
+        when(embedNovelUseCase.embedBatch(List.of(5L))).thenReturn(List.of(5L));
 
         EmbedSceneTaskMessage msg = new EmbedSceneTaskMessage(
                 "t1", "n1", "v1", 350, 65, "run-a", 5L);
 
-        var m = EmbedWorker.class.getDeclaredMethod("processEmbedScene", EmbedSceneTaskMessage.class);
-        m.setAccessible(true);
-        m.invoke(embedWorker, msg);
+        embedWorker.onEmbedSceneBatch(List.of(msg));
 
         verify(embedNovelUseCase).embedBatch(eq(List.of(5L)));
-        verify(sceneRepository).updateEmbedOutcome(5L, "run-a", EmbedStatus.SUCCESS, null);
+        verify(sceneRepository).batchUpdateEmbedOutcome(eq(List.of(5L)), eq("run-a"), eq(EmbedStatus.SUCCESS), isNull());
     }
 }

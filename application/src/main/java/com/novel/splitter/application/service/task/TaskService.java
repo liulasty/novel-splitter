@@ -28,9 +28,14 @@ import java.util.Objects;
 import java.util.stream.Stream;
 import java.util.stream.Collectors;
 
+import static com.novel.splitter.domain.task.SplitTask.TaskStatus.FAILED;
+import static com.novel.splitter.domain.task.SplitTask.TaskStatus.SUCCESS;
+
 @Service
 @Slf4j
 public class TaskService {
+
+    private static final List<SplitTask.TaskStatus> TERMINAL_STATUSES = List.of(SUCCESS, FAILED);
     
     private final SplitTaskRepository taskRepository;
     private final TaskEventRepository taskEventRepository;
@@ -293,6 +298,46 @@ public class TaskService {
     public void deleteTask(String taskId) {
         taskRepository.deleteById(taskId);
         taskCachePort.evict(taskId);
+    }
+
+    /**
+     * Deletes {@link SplitTask.TaskStatus#SUCCESS} and {@link SplitTask.TaskStatus#FAILED} rows for the novel,
+     * plus matching {@code task_events}. Never touches {@code PENDING} / {@code PROCESSING}.
+     * Call only after confirming no active tasks if the surrounding operation requires that invariant.
+     */
+    @Transactional
+    public int purgeTerminalSplitTasksForNovel(String novelId) {
+        if (novelId == null || novelId.isBlank()) {
+            return 0;
+        }
+        List<String> ids = taskRepository.findTaskIdsByNovelIdAndStatuses(novelId.trim(), TERMINAL_STATUSES);
+        return purgeSplitTasksByIds(ids);
+    }
+
+    /**
+     * Like {@link #purgeTerminalSplitTasksForNovel(String)} but only tasks whose stored {@code version} matches.
+     * Chunk size/overlap are not on {@link SplitTask}; any terminal task with the same version string is removed.
+     */
+    @Transactional
+    public int purgeTerminalSplitTasksForNovelAndVersion(String novelId, String version) {
+        if (novelId == null || novelId.isBlank() || version == null || version.isBlank()) {
+            return 0;
+        }
+        List<String> ids = taskRepository.findTaskIdsByNovelIdAndVersionAndStatuses(
+                novelId.trim(), version.trim(), TERMINAL_STATUSES);
+        return purgeSplitTasksByIds(ids);
+    }
+
+    private int purgeSplitTasksByIds(List<String> taskIds) {
+        if (taskIds == null || taskIds.isEmpty()) {
+            return 0;
+        }
+        taskEventRepository.deleteByTaskIds(taskIds);
+        taskRepository.deleteAllByIds(taskIds);
+        for (String id : taskIds) {
+            taskCachePort.evict(id);
+        }
+        return taskIds.size();
     }
 
     @Transactional(readOnly = true)
