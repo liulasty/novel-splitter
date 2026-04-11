@@ -29,13 +29,15 @@ class OverlapChunkingStrategyTest {
                 .extra(Map.of("k", "v"))
                 .build();
 
+        // 前 200 字与后段区分，便于断言重叠区仅出现在 prefix_context
+        String parentBody = "a".repeat(200) + "b".repeat(400);
         Scene parent = Scene.builder()
                 .id("parent-uuid")
                 .chapterTitle("第一章 试炼")
                 .chapterIndex(1)
                 .startParagraphIndex(0)
                 .endParagraphIndex(50)
-                .text("a".repeat(600))
+                .text(parentBody)
                 .wordCount(600)
                 .prefixContext("…上文结尾")
                 .canSplit(true)
@@ -60,7 +62,9 @@ class OverlapChunkingStrategyTest {
         assertEquals("v", first.getMetadata().getExtra().get("k"));
 
         Scene second = children.get(1);
-        assertNull(second.getPrefixContext());
+        // 滑窗重叠区写入 prefix_context，正文从下一块新内容起算（此处为 b 段）
+        assertEquals("a".repeat(40), second.getPrefixContext());
+        assertTrue(second.getText().startsWith("b"));
         assertEquals(1, second.getMetadata().getSequenceNum());
         assertEquals(1, second.getMetadata().getChapterIndex());
     }

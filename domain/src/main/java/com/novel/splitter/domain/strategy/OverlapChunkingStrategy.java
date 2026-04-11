@@ -10,7 +10,8 @@ import java.util.UUID;
 
 /**
  * 重叠切分策略 (Sliding Window)
- * 按照固定字数（chunkSize）切分，相邻子块保留重叠（overlap）字数，以提升向量召回精度。
+ * 按照固定字数（chunkSize）切分；相邻子块之间「重叠」部分写入下一块的 {@link Scene#getPrefixContext()}，
+ * 不重复进入 {@link Scene#getText()}，便于向量检索时正文语义独立。
  */
 public class OverlapChunkingStrategy implements ChunkingStrategy {
 
@@ -38,29 +39,48 @@ public class OverlapChunkingStrategy implements ChunkingStrategy {
         }
 
         if (text.length() <= chunkSize) {
-            chunks.add(createOverlappedChunk(source, text, 0));
+            chunks.add(createOverlappedChunk(source, text, 0, normalizePrefix(source.getPrefixContext())));
             return chunks;
         }
 
-        int index = 0;
+        int windowStart = 0;
+        int previousEnd = 0;
         int partIdx = 0;
-        while (index < text.length()) {
-            int maxEnd = Math.min(index + chunkSize, text.length());
-            int end = findBestSplitPoint(text, index, maxEnd);
+        while (windowStart < text.length()) {
+            int maxEnd = Math.min(windowStart + chunkSize, text.length());
+            int end = findBestSplitPoint(text, windowStart, maxEnd);
 
-            if (end <= index) {
+            if (end <= windowStart) {
                 end = maxEnd;
             }
 
-            String chunkText = text.substring(index, end);
-            chunks.add(createOverlappedChunk(source, chunkText, partIdx++));
+            String chunkText;
+            String prefixContext;
+            if (partIdx == 0) {
+                chunkText = text.substring(windowStart, end);
+                prefixContext = normalizePrefix(source.getPrefixContext());
+            } else {
+                int prefixStart = Math.max(0, previousEnd - overlap);
+                prefixContext = normalizePrefix(text.substring(prefixStart, previousEnd));
+                chunkText = text.substring(previousEnd, end);
+            }
+
+            chunks.add(createOverlappedChunk(source, chunkText, partIdx++, prefixContext));
 
             if (end == text.length()) {
                 break;
             }
-            index = Math.max(index + 1, end - overlap);
+            previousEnd = end;
+            windowStart = Math.max(windowStart + 1, end - overlap);
         }
         return chunks;
+    }
+
+    private static String normalizePrefix(String prefix) {
+        if (prefix == null || prefix.isEmpty()) {
+            return null;
+        }
+        return prefix;
     }
 
     private int findBestSplitPoint(String text, int start, int maxEnd) {
@@ -95,7 +115,7 @@ public class OverlapChunkingStrategy implements ChunkingStrategy {
         return maxEnd;
     }
 
-    private Scene createOverlappedChunk(Scene source, String text, int partIndex) {
+    private Scene createOverlappedChunk(Scene source, String text, int partIndex, String prefixContext) {
         Scene chunk = new Scene();
         chunk.setId(UUID.randomUUID().toString());
         chunk.setText(text);
@@ -105,9 +125,7 @@ public class OverlapChunkingStrategy implements ChunkingStrategy {
         chunk.setStartParagraphIndex(source.getStartParagraphIndex());
         chunk.setEndParagraphIndex(source.getEndParagraphIndex());
         chunk.setCanSplit(false);
-        if (partIndex == 0) {
-            chunk.setPrefixContext(source.getPrefixContext());
-        }
+        chunk.setPrefixContext(prefixContext);
 
         SceneMetadata meta = copyMetadataFromSource(source.getMetadata());
         meta.setSequenceNum(partIndex);
