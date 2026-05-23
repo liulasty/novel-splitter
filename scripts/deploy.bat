@@ -12,9 +12,9 @@ echo Deploying environment: %ENV% with version: %VERSION%
 set IMAGE_VERSION=%VERSION%
 
 if "%ENV%"=="prod" (
-  docker-compose --env-file config\.env.prod -f docker-compose.yml -f docker-compose.prod.yml up -d
+  docker compose --env-file config/.env.prod -f docker-compose.yml -f docker-compose.prod.yml up -d
 ) else (
-  docker-compose --env-file config\.env.dev -f docker-compose.yml -f docker-compose.dev.yml up -d
+  docker compose --env-file config/.env.dev -f docker-compose.yml -f docker-compose.dev.yml up -d
 )
 
 if %errorlevel% neq 0 exit /b %errorlevel%

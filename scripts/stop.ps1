@@ -6,10 +6,14 @@ $ErrorActionPreference = "Stop"
 
 Write-Host "Stopping environment: $Env"
 
+$composeFiles = @("-f", "docker-compose.yml")
 if ($Env -eq "prod") {
-    docker-compose --env-file config/.env.prod -f docker-compose.yml -f docker-compose.prod.yml down
+    $composeFiles += @("-f", "docker-compose.prod.yml", "--env-file", "config/.env.prod")
 } else {
-    docker-compose --env-file config/.env.dev -f docker-compose.yml -f docker-compose.dev.yml down
+    $composeFiles += @("-f", "docker-compose.dev.yml", "--env-file", "config/.env.dev")
 }
+$composeFiles += "down"
+
+docker compose $composeFiles
 
 Write-Host "Environment stopped."

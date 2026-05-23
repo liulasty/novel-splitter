@@ -12,7 +12,7 @@
 开发环境除了启动基础服务外，还会挂载本地数据卷以便调试。
 
 ```bash
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml --env-file config/.env.dev up -d
+docker compose -f docker-compose.yml -f docker-compose.dev.yml --env-file config/.env.dev up -d
 ```
 *参数解释：*
 * `-f`：指定使用的 Compose 配置文件。后面跟多个文件会进行配置合并。
@@ -23,14 +23,14 @@ docker-compose -f docker-compose.yml -f docker-compose.dev.yml --env-file config
 如果你要部署到线上，推荐使用生产环境配置，它增加了内存限制和自动重启策略。
 
 ```bash
-docker-compose -f docker-compose.yml -f docker-compose.prod.yml --env-file config/.env.prod up -d
+docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file config/.env.prod up -d
 ```
 
 ### 1.3 强制重新创建并启动所有服务
 如果你修改了 `docker-compose.yml` 或者 `config/.env.dev` 环境变量文件，需要让容器应用最新的配置，使用这个命令（以开发环境为例）：
 
 ```bash
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml --env-file config/.env.dev up -d --force-recreate
+docker compose -f docker-compose.yml -f docker-compose.dev.yml --env-file config/.env.dev up -d --force-recreate
 ```
 
 ### 1.4 一键即时调试（前端+后端代码修改）
@@ -58,7 +58,7 @@ docker-compose -f docker-compose.yml -f docker-compose.dev.yml --env-file config
 如果你只想单独启动某一个服务（例如只启动数据库 `postgres`）：
 
 ```bash
-docker-compose --env-file config/.env.dev up -d postgres
+docker compose --env-file config/.env.dev up -d postgres
 ```
 *(注：可用的服务名包括 `postgres`, `rabbitmq`, `chromadb`, `backend`, `frontend`)*
 
@@ -70,14 +70,14 @@ docker-compose --env-file config/.env.dev up -d postgres
 如果系统卡顿或出现异常，想把所有服务重启一遍：
 
 ```bash
-docker-compose restart
+docker compose restart
 ```
 
 ### 2.2 重启单个特定服务
 比如当你发现后端代码可能假死，只需要重启后端 `backend`：
 
 ```bash
-docker-compose restart backend
+docker compose restart backend
 ```
 
 ---
@@ -85,17 +85,17 @@ docker-compose restart backend
 ## 🛑 3. 停止服务
 
 ### 3.1 停止所有服务（但不删除容器）
-暂停运行，释放 CPU 和内存，但下次可以用 `docker-compose start` 快速唤醒：
+暂停运行，释放 CPU 和内存，但下次可以用 `docker compose start` 快速唤醒：
 
 ```bash
-docker-compose stop
+docker compose stop
 ```
 
 ### 3.2 停止并移除容器（日常关闭推荐）
 不仅停止服务，还会把运行的容器删掉（不用担心，数据库的数据保存在卷里，不会丢失）：
 
 ```bash
-docker-compose down
+docker compose down
 ```
 
 ---
@@ -106,7 +106,7 @@ docker-compose down
 
 ### 4.1 查看所有服务的实时日志
 ```bash
-docker-compose logs -f
+docker compose logs -f
 ```
 *参数解释：*
 * `-f`：(follow) 持续跟踪日志输出，就像在控制台看实时弹幕一样。按 `Ctrl + C` 退出查看。
@@ -115,14 +115,14 @@ docker-compose logs -f
 如果前端报错，通常你需要看后端的日志：
 
 ```bash
-docker-compose logs -f backend
+docker compose logs -f backend
 ```
 
 ### 4.3 查看特定服务最近的 N 条日志
 如果日志太多刷屏，只想看最后 50 条：
 
 ```bash
-docker-compose logs --tail=50 backend
+docker compose logs --tail=50 backend
 ```
 
 ---
@@ -133,21 +133,21 @@ docker-compose logs --tail=50 backend
 
 ### 5.1 重新构建所有服务
 ```bash
-docker-compose build
+docker compose build
 ```
 
 ### 5.2 重新构建单个服务（如后端）
 如果你只改了后端的 Java 代码：
 
 ```bash
-docker-compose build backend
+docker compose build backend
 ```
 
 ### 5.3 构建并立即启动（一气呵成）
 修改代码后，最常用的“更新并重启”组合拳（以开发环境为例）：
 
 ```bash
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml --env-file config/.env.dev up -d --build backend
+docker compose -f docker-compose.yml -f docker-compose.dev.yml --env-file config/.env.dev up -d --build backend
 ```
 *(这个命令会自动先帮你 build 后端镜像，然后再把后端容器跑起来)*
 
@@ -159,19 +159,19 @@ docker-compose -f docker-compose.yml -f docker-compose.dev.yml --env-file config
 
 ### 6.1 停止并删除所有容器和默认网络
 ```bash
-docker-compose down
+docker compose down
 ```
 
 ### 6.2 💥 停止并删除容器、网络，以及**所有数据卷**
 **【危险警告】** 这会清空你的 PostgreSQL 数据库数据、RabbitMQ 数据和 ChromaDB 向量数据！相当于系统重装！只有在确认不需要历史数据时才使用：
 
 ```bash
-docker-compose down -v
+docker compose down -v
 ```
 
 ### 6.2.1 一键重置基础设施数据（Windows）
 
-开发/本机使用 **绑定挂载**（`DOCKER_DATA_PATH` 下的 `postgres`、`rabbitmq`、`chromadb`）时，`docker-compose down -v` **不会**清空这些主机目录。可改用脚本：
+开发/本机使用 **绑定挂载**（`DOCKER_DATA_PATH` 下的 `postgres`、`rabbitmq`、`chromadb`）时，`docker compose down -v` **不会**清空这些主机目录。可改用脚本：
 
 **PowerShell（在项目根执行）**
 ```powershell
@@ -204,7 +204,7 @@ docker builder prune -f
 
 ### 7.1 查看当前正在运行的容器状态
 ```bash
-docker-compose ps
+docker compose ps
 ```
 这个命令会列出所有服务的状态（State），如果你看到状态是 `Up` 说明运行正常；如果是 `Exit` 说明容器已经退出（通常是启动报错了，需要用 `logs` 命令看原因）。
 
@@ -217,7 +217,7 @@ docker-compose ps
 3. **修改服务端口**：若本地 80 或 8080 端口被占用，修改 `FRONTEND_PORT` 或 `BACKEND_PORT`。
 4. 修改后，仅需运行重新创建服务的命令即可生效：
    ```bash
-   docker-compose -f docker-compose.yml -f docker-compose.dev.yml --env-file config/.env.dev up -d
+   docker compose -f docker-compose.yml -f docker-compose.dev.yml --env-file config/.env.dev up -d
    ```
 
 ### 8.2 常见错误：`java.net.UnknownHostException: postgres`

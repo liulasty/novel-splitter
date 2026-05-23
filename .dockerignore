@@ -1,6 +1,8 @@
-target/
-**/target/
+**/target/**
+!application/target/application-*.jar
 *.jar
+!application/target/application-*.jar
+!interfaces/target/interfaces-*.jar
 *.class
 .idea/
 .vscode/

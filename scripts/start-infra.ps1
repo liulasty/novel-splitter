@@ -21,6 +21,17 @@ Write-Host "此脚本仅启动依赖的基础设施组件 (PostgreSQL, RabbitMQ,
 Write-Host "适用于您在本地 IDE (如 IDEA) 中直接运行后端，并在终端运行前端的纯本地开发场景。"
 Write-Host ""
 
+# 预检查：Docker 是否在运行
+Write-Host "[PRE-CHECK] 检查 Docker 状态..." -ForegroundColor Yellow
+$dockerInfo = docker info 2>&1
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "[ERROR] Docker 未运行！请先启动 Docker Desktop。" -ForegroundColor Red
+    Read-Host "按 Enter 键退出..."
+    exit 1
+}
+Write-Host "[OK] Docker 正在运行。" -ForegroundColor Green
+Write-Host ""
+
 Write-Host "[1/2] 正在拉起基础服务..." -ForegroundColor Yellow
 $composeArgs = @("-f", "docker-compose.yml", "-f", "docker-compose.dev.yml", "--env-file", "config/.env.dev", "up", "-d", "postgres", "rabbitmq", "chromadb")
 

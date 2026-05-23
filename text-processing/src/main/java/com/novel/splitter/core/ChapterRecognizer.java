@@ -14,11 +14,13 @@ import java.util.regex.PatternSyntaxException;
 public class ChapterRecognizer {
 
     /**
-     * 默认：匹配 "第1章"、"第一章"、"第100回"、"Chapter 1" 等。
+     * 默认：匹配 "第1章"、"第一章"、"序章"、"序章之１"、"第100回"、"Chapter 1" 等。
      */
-    /** 含 ASCII 数字与全角数字（０-９），避免「第１章」等无法匹配 */
+    /** 行首可选前缀（书名、方括号、括号）+ 序章或第X章 */
     public static final Pattern DEFAULT_CHAPTER_PATTERN = Pattern.compile(
-            "^\\s*第\\s*[0-9\\uFF10-\\uFF19零一二三四五六七八九十百千两]+\\s*[章回节卷].*|^\\s*Chapter\\s*\\d+.*");
+            "^\\s*(\\[?[^。！？，、\\n]{0,20}\\]?)?[\\s　\\(（\\[]*序章.*"
+            + "|^\\s*(\\[?[^。！？，、\\n]{0,20}\\]?)?[\\s　\\(（\\[]*第[0-9\\uFF10-\\uFF19零一二三四五六七八九十百千两]+[章回节卷].*"
+            + "|^\\s*Chapter\\s*\\d+.*");
 
     private static final Pattern DECORATIVE_RULE_LINE = Pattern.compile("^[-=*_]{4,}$");
     private static final int MAX_TITLE_LENGTH = 50;
@@ -180,12 +182,13 @@ public class ChapterRecognizer {
         int chapterIndex = 1;
         int currentBodyStart = 0;
         String currentTitle = "序章/前言";
+        boolean hasContent = false;
 
         for (int i = 0; i < body.size(); i++) {
             RawParagraph p = body.get(i);
 
             if (isChapterTitle(p)) {
-                if (i > 0) {
+                if (hasContent) {
                     chapters.add(Chapter.builder()
                             .index(chapterIndex++)
                             .title(currentTitle)
@@ -193,9 +196,13 @@ public class ChapterRecognizer {
                             .endParagraphIndex(body.get(i - 1).getIndex())
                             .build());
                 }
+                // else: consecutive title (e.g. "书名第X章" + "第X章"), skip without creating empty chapter
 
                 currentBodyStart = i;
                 currentTitle = p.getContent();
+                hasContent = false;
+            } else if (!p.isEmpty() && !p.getContent().trim().isEmpty()) {
+                hasContent = true;
             }
         }
 

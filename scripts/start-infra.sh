@@ -20,6 +20,14 @@ echo "此脚本仅启动依赖的基础设施组件 (PostgreSQL, RabbitMQ, Chrom
 echo "适用于您在本地 IDE (如 IDEA) 中直接运行后端，并在终端运行前端的纯本地开发场景。"
 echo ""
 
+echo "[PRE-CHECK] Checking Docker status..."
+if ! docker info > /dev/null 2>&1; then
+    echo "[ERROR] Docker is not running! Please start Docker first."
+    exit 1
+fi
+echo "[OK] Docker is running."
+echo ""
+
 echo "[1/2] 正在拉起基础服务..."
 docker-compose -f docker-compose.yml -f docker-compose.dev.yml --env-file config/.env.dev up -d postgres rabbitmq chromadb
 

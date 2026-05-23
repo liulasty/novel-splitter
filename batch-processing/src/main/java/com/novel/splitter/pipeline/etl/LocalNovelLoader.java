@@ -61,6 +61,7 @@ public class LocalNovelLoader {
         int currentWordCount = 0;
 
         Chapter.ChapterBuilder currentChapterBuilder = null;
+        boolean hasContentSinceLastTitle = false;
 
         for (int lineIndex = lineOffset; lineIndex < rawLines.size(); lineIndex++) {
             String line = rawLines.get(lineIndex);
@@ -71,7 +72,7 @@ public class LocalNovelLoader {
             boolean isEmpty = content.isEmpty();
 
             if (!isEmpty && chapterRecognizer.isLikelyChapterTitle(content)) {
-                if (currentChapterBuilder != null) {
+                if (currentChapterBuilder != null && hasContentSinceLastTitle) {
                     Chapter finishedChapter = currentChapterBuilder
                             .endParagraphIndex(lineIndex - 1)
                             .wordCount(currentWordCount)
@@ -88,6 +89,9 @@ public class LocalNovelLoader {
                         .index(chapters.size() + 1)
                         .title(content)
                         .startParagraphIndex(lineIndex);
+                hasContentSinceLastTitle = false;
+            } else if (!isEmpty) {
+                hasContentSinceLastTitle = true;
             }
 
             currentChapterParagraphs.add(RawParagraph.builder()
