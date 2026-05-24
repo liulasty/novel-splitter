@@ -16,4 +16,10 @@ public class ChatRequest {
     /** 可选；同一 version 下多数据集时必须提供 */
     private Integer chunkSize;
     private Integer chunkOverlap;
+    /** 上下文场景数上限（覆盖服务端默认），≤0 表示使用服务端默认 */
+    private Integer maxScenes;
+    /** 上下文 Token 预算（覆盖服务端默认），≤0 表示使用服务端默认 */
+    private Integer maxContextTokens;
+    /** 回答目标 Token 数，≤0 表示不限制；会影响提示词中的输出长度约束 */
+    private Integer maxAnswerTokens;
 }

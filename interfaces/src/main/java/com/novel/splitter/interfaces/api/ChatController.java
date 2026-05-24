@@ -43,6 +43,9 @@ public class ChatController {
         ragRequest.setVersion(request.getVersion());
         ragRequest.setChunkSize(request.getChunkSize());
         ragRequest.setChunkOverlap(request.getChunkOverlap());
+        ragRequest.setMaxScenes(request.getMaxScenes());
+        ragRequest.setMaxContextTokens(request.getMaxContextTokens());
+        ragRequest.setMaxAnswerTokens(request.getMaxAnswerTokens());
         return dtoMapper.toAnswerDto(ragService.ask(ragRequest));
     }
 }

@@ -5,11 +5,17 @@ interface ChatSidebarProps {
         selectedNovel: string; // novelId
         selectedProfileIndex: number;
         topK: number;
+        maxScenes: number;
+        maxContextTokens: number;
+        maxAnswerTokens: number;
     };
     actions: {
         setSelectedNovel: (val: string) => void;
         setSelectedProfileIndex: (val: number) => void;
         setTopK: (val: number) => void;
+        setMaxScenes: (val: number) => void;
+        setMaxContextTokens: (val: number) => void;
+        setMaxAnswerTokens: (val: number) => void;
     };
 }
 
@@ -63,9 +69,52 @@ export function ChatSidebar({ state, actions }: ChatSidebarProps) {
                             </span>
                         </div>
                         <input
-                            type="range" min={1} max={10} value={state.topK}
+                            type="range" min={1} max={30} value={state.topK}
                             onChange={(e) => actions.setTopK(Number(e.target.value))}
                             className="w-full accent-violet-500"
+                        />
+                    </div>
+
+                    {/* MaxScenes */}
+                    <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">上下文场景上限</label>
+                            <span className="w-6 h-6 rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 text-white text-xs flex items-center justify-center font-semibold">
+                                {state.maxScenes}
+                            </span>
+                        </div>
+                        <input
+                            type="range" min={1} max={20} value={state.maxScenes}
+                            onChange={(e) => actions.setMaxScenes(Number(e.target.value))}
+                            className="w-full accent-emerald-500"
+                        />
+                    </div>
+
+                    {/* MaxContextTokens */}
+                    <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Token 预算</label>
+                            <span className="text-xs font-mono text-gray-500">{state.maxContextTokens}</span>
+                        </div>
+                        <input
+                            type="range" min={1000} max={8000} step={500} value={state.maxContextTokens}
+                            onChange={(e) => actions.setMaxContextTokens(Number(e.target.value))}
+                            className="w-full accent-amber-500"
+                        />
+                    </div>
+
+                    {/* MaxAnswerTokens */}
+                    <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">回答长度</label>
+                            <span className="text-xs font-mono text-gray-500">
+                                {state.maxAnswerTokens > 0 ? state.maxAnswerTokens + '字' : '不限'}
+                            </span>
+                        </div>
+                        <input
+                            type="range" min={0} max={2000} step={100} value={state.maxAnswerTokens}
+                            onChange={(e) => actions.setMaxAnswerTokens(Number(e.target.value))}
+                            className="w-full accent-rose-500"
                         />
                     </div>
                 </div>

@@ -186,15 +186,13 @@ splitter:
     output-constraint: "JSON 对象，包含字段：answer, citations (list of {chunkId, reason}), confidence。"
     system-instruction: |
       你是一个专门分析小说内容的智能助手。
-      任务：仅根据提供的上下文块回答用户的问题。
+      任务：仅根据提供的上下文块回答用户的问题。请充分利用上下文中的细节，给出详尽、完整的回答。
       如果上下文中没有答案，请明确说明你不知道。
 
       *** 重要：输出格式必须是严格的 JSON ***
-      不要输出任何 Markdown 标记或代码块。
-      不要输出任何多余的解释文字。
-      直接返回一个 JSON 对象，Schema 如下：
+      直接返回一个 JSON 对象。要求回答充分展开，包含人物关系、事件经过、背景细节、前后因果等，字数不少于500字。Schema 如下：
       {
-        "answer": "(string) 这里填写对问题的详细回答",
+        "answer": "(string) 详尽回答，不少于500字，包含人物关系、事件经过、背景细节等",
         "citations": [
           {
             "chunkId": "(string) 引用来源的 chunkId",

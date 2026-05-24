@@ -14,6 +14,12 @@ export interface ChatRequest {
   /** 与后端 Scene 分区一致；同一 version 多数据集时建议始终发送 */
   chunkSize?: number | null;
   chunkOverlap?: number | null;
+  /** 上下文场景数上限 */
+  maxScenes?: number;
+  /** 上下文 Token 预算 */
+  maxContextTokens?: number;
+  /** 回答目标字数 */
+  maxAnswerTokens?: number;
 }
 
 export interface Citation {

@@ -18,6 +18,9 @@ export function useChatLogic() {
     /** 选中 {@link splitProfiles} 的下标 */
     const [selectedProfileIndex, setSelectedProfileIndex] = useState<number>(0);
     const [topK, setTopK] = useState<number>(3);
+    const [maxScenes, setMaxScenes] = useState<number>(5);
+    const [maxContextTokens, setMaxContextTokens] = useState<number>(3000);
+    const [maxAnswerTokens, setMaxAnswerTokens] = useState<number>(0);
     const [inputValue, setInputValue] = useState("");
     const [messages, setMessages] = useState<Message[]>([{
         id: 'welcome',
@@ -83,6 +86,9 @@ export function useChatLogic() {
             topK,
             chunkSize: profile.chunkSize ?? undefined,
             chunkOverlap: profile.chunkOverlap ?? undefined,
+            maxScenes,
+            maxContextTokens,
+            maxAnswerTokens: maxAnswerTokens > 0 ? maxAnswerTokens : undefined,
         });
     };
 
@@ -105,12 +111,15 @@ export function useChatLogic() {
             selectedProfileLabel,
             topK,
             inputValue,
+            maxScenes,
+            maxContextTokens,
+            maxAnswerTokens,
             messages,
             novels,
             profileOptions,
             isPending: chatMutation.isPending,
         },
         refs: { messagesEndRef },
-        actions: { setSelectedNovel, setSelectedProfileIndex, setTopK, setInputValue, handleSend, handleKeyDown },
+        actions: { setSelectedNovel, setSelectedProfileIndex, setTopK, setMaxScenes, setMaxContextTokens, setMaxAnswerTokens, setInputValue, handleSend, handleKeyDown },
     };
 }

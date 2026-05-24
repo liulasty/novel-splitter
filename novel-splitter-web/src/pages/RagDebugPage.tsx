@@ -27,6 +27,9 @@ function RagDebugPage() {
   const [selectedNovel, setSelectedNovel] = useState<string>(''); // novelId
   const [question, setQuestion] = useState<string>('');
   const [topK, setTopK] = useState<number>(5);
+  const [maxScenes, setMaxScenes] = useState<number>(5);
+  const [maxContextTokens, setMaxContextTokens] = useState<number>(3000);
+  const [maxAnswerTokens, setMaxAnswerTokens] = useState<number>(0);
   
   const [result, setResult] = useState<RagDebugResponse | null>(null);
   
@@ -91,6 +94,9 @@ function RagDebugPage() {
         topK,
         chunkSize: profile.chunkSize ?? undefined,
         chunkOverlap: profile.chunkOverlap ?? undefined,
+        maxScenes,
+        maxContextTokens,
+        maxAnswerTokens: maxAnswerTokens > 0 ? maxAnswerTokens : undefined,
       };
       
       const [data] = await Promise.all([
@@ -533,6 +539,60 @@ function RagDebugPage() {
                   }}
                   min={1}
                   max={50}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label htmlFor="rag-debug-maxscenes" className="block text-xs font-medium text-slate-500">
+                  场景上限
+                </label>
+                <input
+                  id="rag-debug-maxscenes"
+                  type="number"
+                  className={cn(inputClass, 'w-[4.5rem] text-center tabular-nums')}
+                  value={maxScenes}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value, 10);
+                    if (Number.isNaN(v)) setMaxScenes(5);
+                    else setMaxScenes(Math.min(50, Math.max(1, v)));
+                  }}
+                  min={1}
+                  max={50}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label htmlFor="rag-debug-tokens" className="block text-xs font-medium text-slate-500">
+                  Token
+                </label>
+                <input
+                  id="rag-debug-tokens"
+                  type="number"
+                  className={cn(inputClass, 'w-[5rem] text-center tabular-nums')}
+                  value={maxContextTokens}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value, 10);
+                    if (Number.isNaN(v)) setMaxContextTokens(3000);
+                    else setMaxContextTokens(Math.min(16000, Math.max(500, v)));
+                  }}
+                  min={500}
+                  max={16000}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label htmlFor="rag-debug-answertokens" className="block text-xs font-medium text-slate-500">
+                  回答
+                </label>
+                <input
+                  id="rag-debug-answertokens"
+                  type="number"
+                  className={cn(inputClass, 'w-[5rem] text-center tabular-nums')}
+                  value={maxAnswerTokens}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value, 10);
+                    if (Number.isNaN(v)) setMaxAnswerTokens(0);
+                    else setMaxAnswerTokens(Math.min(4000, Math.max(0, v)));
+                  }}
+                  min={0}
+                  max={4000}
                 />
               </div>
               <button

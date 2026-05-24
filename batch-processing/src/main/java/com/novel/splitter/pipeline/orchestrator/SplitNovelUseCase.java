@@ -54,10 +54,12 @@ public class SplitNovelUseCase {
     private List<Scene> filterByLength(List<Scene> scenes) {
         List<Scene> valid = new ArrayList<>();
         for (Scene s : scenes) {
-            int len = s.getText() == null ? 0 : s.getText().length();
-            if (len < minLength) {
-                log.warn("Scene {} (chapter {}) too short: {} chars, skipping",
-                        s.getId(), s.getChapterTitle(), len);
+            String text = s.getText();
+            // count non-whitespace chars (metadata-heavy scenes have inflated length from newlines)
+            int contentLen = text == null ? 0 : text.replaceAll("\\s+", "").length();
+            if (contentLen < minLength) {
+                log.warn("Scene {} (chapter {}) too short: {} content chars ({} raw), skipping",
+                        s.getId(), s.getChapterTitle(), contentLen, text != null ? text.length() : 0);
                 continue;
             }
             valid.add(s);

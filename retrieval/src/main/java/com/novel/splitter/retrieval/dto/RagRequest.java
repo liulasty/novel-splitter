@@ -26,19 +26,26 @@ public class RagRequest {
      */
     @Min(value = 1, message = "topK 必须大于 0")
     private int topK = 3;
-    
+
     /**
      * 目标小说 ID（与 Chroma / DB 中 metadata.novelId 一致）。
      */
     private String novelId;
-    
-    /** 
-     * 数据版本 
-     * // 用于指定小说数据解析和入库时的版本（如 v1, v2），保证数据的一致性 
+
+    /**
+     * 数据版本
+     * // 用于指定小说数据解析和入库时的版本（如 v1, v2），保证数据的一致性
      */
     private String version;
 
     /** 与场景/向量分区一致；多数据集共用同一 version 时必填 */
     private Integer chunkSize;
     private Integer chunkOverlap;
+
+    /** 上下文场景数上限（覆盖服务端默认），≤0 表示使用服务端默认 */
+    private Integer maxScenes;
+    /** 上下文 Token 预算（覆盖服务端默认），≤0 表示使用服务端默认 */
+    private Integer maxContextTokens;
+    /** 回答目标 Token 数，≤0 表示不限制；会影响提示词中的输出长度约束 */
+    private Integer maxAnswerTokens;
 }
