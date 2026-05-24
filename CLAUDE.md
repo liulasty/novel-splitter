@@ -8,13 +8,20 @@ Reference: `DOCKER_COMPOSE_GUIDE.md` for the complete Docker operations manual.
 
 ### Start the full stack (recommended)
 
+**One-click script:**
+```bash
+.\scripts\start-all.ps1          # quick start (no build)
+.\scripts\start-all.ps1 -Build   # build backend first, then start
+```
+
+**Or directly with Docker Compose:**
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.dev.yml --env-file config/.env.dev up -d
 ```
 
 All 5 services (PostgreSQL, RabbitMQ, ChromaDB, backend, frontend) start in one command. Prerequisite: Docker Desktop running.
 
-**IMPORTANT**: Run `mvn clean package -DskipTests` first if you've changed backend code — the Dockerfile copies a pre-built jar, it does NOT run Maven inside the container.
+**IMPORTANT**: If backend code changed, run `mvn clean package -DskipTests` first (or use `start-all.ps1 -Build`) — the Dockerfile copies a pre-built jar, it does NOT run Maven inside the container.
 
 ### Local IDE dev (hot-reload)
 
@@ -32,6 +39,8 @@ All 5 services (PostgreSQL, RabbitMQ, ChromaDB, backend, frontend) start in one 
 
 | Script | Does |
 |---|---|
+| `start-all.ps1` / `.bat` / `.sh` | Start all 5 services (add `-Build` / `--build` to rebuild backend first) |
+| `svc.ps1` / `.bat` / `.sh` | Manage any service: `svc.ps1 restart backend`, `svc.ps1 logs frontend`, `svc.ps1 ps` |
 | `start-infra.ps1` / `.bat` / `.sh` | Start only PostgreSQL + RabbitMQ + ChromaDB |
 | `debug.ps1` / `.bat` / `.sh` | Rebuild & restart backend+frontend containers, tail logs |
 | `deploy.ps1 dev` / `prod` | Full deploy to specified environment |

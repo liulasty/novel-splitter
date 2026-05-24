@@ -181,6 +181,9 @@ public class ChromaVectorStore implements VectorStore {
             }
         }
         map.put("chapterIndex", s.getChapterIndex());
+        if (s.getChapterTitle() != null) {
+            map.put("chapterTitle", s.getChapterTitle());
+        }
         if (s.getPersistenceId() != null) {
             map.put("sceneId", s.getPersistenceId());
         }

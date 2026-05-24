@@ -1,5 +1,6 @@
 services:
   rabbitmq:
+    env_file: config/.env.dev
     ports:
       - "${RABBITMQ_PORT}:5672"
       - "15672:15672"
@@ -7,18 +8,21 @@ services:
       - ${DOCKER_DATA_PATH}/rabbitmq:/var/lib/rabbitmq
 
   chromadb:
+    env_file: config/.env.dev
     ports:
       - "${CHROMA_PORT}:8000"
     volumes:
       - ${DOCKER_DATA_PATH}/chromadb:/data
 
   postgres:
+    env_file: config/.env.dev
     ports:
       - "${DB_PORT}:5432"
     volumes:
       - ${DOCKER_DATA_PATH}/postgres:/var/lib/postgresql/data
 
   backend:
+    env_file: config/.env.dev
     ports:
       - "${BACKEND_PORT}:${BACKEND_PORT}"
     volumes:
@@ -27,5 +31,6 @@ services:
       - ${APP_DATA_PATH}/logs:/app/logs
 
   frontend:
+    env_file: config/.env.dev
     ports:
       - "${FRONTEND_PORT}:80"

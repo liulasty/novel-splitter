@@ -237,27 +237,27 @@ public class ChromaAdminServiceImpl implements ChromaAdminService {
 
     @Override
     public Object proxyGet(String path) {
-        return extractBody(chromaApiClient.get(path));
+        return parseJsonResponse(extractBody(chromaApiClient.get(path)));
     }
 
     @Override
     public Object proxyPost(String path, Object body) {
-        return extractBody(chromaApiClient.post(path, body));
+        return parseJsonResponse(extractBody(chromaApiClient.post(path, body)));
     }
 
     @Override
     public Object proxyPut(String path, Object body) {
-        return extractBody(chromaApiClient.put(path, body));
+        return parseJsonResponse(extractBody(chromaApiClient.put(path, body)));
     }
 
     @Override
     public Object proxyPatch(String path, Object body) {
-        return extractBody(chromaApiClient.patch(path, body));
+        return parseJsonResponse(extractBody(chromaApiClient.patch(path, body)));
     }
 
     @Override
     public Object proxyDelete(String path) {
-        return extractBody(chromaApiClient.delete(path));
+        return parseJsonResponse(extractBody(chromaApiClient.delete(path)));
     }
 
     /** Parse a JSON string proxy response into a proper Java object (Map/List/etc.) */
@@ -275,7 +275,12 @@ public class ChromaAdminServiceImpl implements ChromaAdminService {
 
     private Object extractBody(ResponseEntity<?> responseEntity) {
         if (responseEntity.getStatusCode().isError()) {
-            throw new RuntimeException("Proxy request failed with status " + responseEntity.getStatusCode());
+            String errorBody = responseEntity.getBody() instanceof String s ? s : "Unknown error";
+            return Map.of(
+                    "error", "Proxy request failed",
+                    "status", responseEntity.getStatusCode().value(),
+                    "details", errorBody
+            );
         }
         return responseEntity.getBody();
     }

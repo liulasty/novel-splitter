@@ -112,16 +112,16 @@ function RagDebugPage() {
               
               const prof = splitProfiles[selectedProfileIndex];
               if (selectedNovel && prof?.version) {
-                const where: Record<string, string | number> = {
-                  novelId: selectedNovel,
-                  version: prof.version,
-                };
+                const andClauses: Record<string, { $eq: string | number }>[] = [
+                  { novelId: { $eq: selectedNovel } },
+                  { version: { $eq: prof.version } },
+                ];
                 if (prof.chunkSize != null && prof.chunkOverlap != null) {
-                  where.chunkSize = prof.chunkSize;
-                  where.chunkOverlap = prof.chunkOverlap;
+                  andClauses.push({ chunkSize: { $eq: prof.chunkSize } });
+                  andClauses.push({ chunkOverlap: { $eq: prof.chunkOverlap } });
                 }
                 const records = await chromaAdminApi.getRecords(collection.id, {
-                  where,
+                  where: { $and: andClauses },
                   limit: 1,
                   include: ["metadatas", "documents"]
                 });
