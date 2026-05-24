@@ -26,8 +26,8 @@ public class ChromaAdminController {
     public ResponseEntity<StreamingResponseBody> export(
             @RequestParam(required = false) String novelName,
             @RequestParam(required = false) String version,
-            @RequestParam(required = false) Integer chunkSize,
-            @RequestParam(required = false) Integer chunkOverlap) {
+            @RequestParam(name = "chunkSize", required = false) Integer chunkSize,
+            @RequestParam(name = "chunkOverlap", required = false) Integer chunkOverlap) {
         StreamingResponseBody responseBody = chromaAdminService.exportData(novelName, version, chunkSize, chunkOverlap);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"chroma_export.json\"")
@@ -70,8 +70,8 @@ public class ChromaAdminController {
     public ChromaVersionDiagnosticDto getVersionDiagnostics(
             @RequestParam("novel") String novel,
             @RequestParam("version") String version,
-            @RequestParam(required = false) Integer chunkSize,
-            @RequestParam(required = false) Integer chunkOverlap) {
+            @RequestParam(name = "chunkSize", required = false) Integer chunkSize,
+            @RequestParam(name = "chunkOverlap", required = false) Integer chunkOverlap) {
         return chromaAdminService.getVersionDiagnostics(novel, version, chunkSize, chunkOverlap);
     }
 

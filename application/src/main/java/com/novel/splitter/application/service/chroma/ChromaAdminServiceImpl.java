@@ -94,7 +94,13 @@ public class ChromaAdminServiceImpl implements ChromaAdminService {
 
     @Override
     public Map<String, Object> healthcheck() {
-        return chromaApiClient.getMap("/api/v2/healthcheck");
+        try {
+            String result = chromaApiClient.getString("/api/v2/healthcheck");
+            return Map.of("status", "ok", "result", result != null ? result : "ok");
+        } catch (Exception e) {
+            log.error("Healthcheck failed", e);
+            return Map.of("status", "error", "error", e.getMessage());
+        }
     }
 
     @Override
@@ -151,8 +157,8 @@ public class ChromaAdminServiceImpl implements ChromaAdminService {
         List<String> metadataKeys = new ArrayList<>();
 
         try {
-            // Find collection id
-            Object collectionsObj = proxyGet("/api/v2/tenants/default_tenant/databases/default_database/collections");
+            // Find collection id (proxy returns raw JSON string, parse into proper objects)
+            Object collectionsObj = parseJsonResponse(proxyGet("/api/v2/tenants/default_tenant/databases/default_database/collections"));
             String collectionId = null;
             if (collectionsObj instanceof List<?> list) {
                 for (Object item : list) {
@@ -180,7 +186,7 @@ public class ChromaAdminServiceImpl implements ChromaAdminService {
                         "where", where,
                         "include", List.of()
                 );
-                Object countRes = proxyPost("/api/v2/tenants/default_tenant/databases/default_database/collections/" + collectionId + "/get", countBody);
+                Object countRes = parseJsonResponse(proxyPost("/api/v2/tenants/default_tenant/databases/default_database/collections/" + collectionId + "/get", countBody));
                 if (countRes instanceof Map<?, ?> map && map.get("ids") instanceof List<?> ids) {
                     chromaCount = ids.size();
                 }
@@ -191,7 +197,7 @@ public class ChromaAdminServiceImpl implements ChromaAdminService {
                         "limit", 1,
                         "include", List.of("metadatas")
                 );
-                Object metaRes = proxyPost("/api/v2/tenants/default_tenant/databases/default_database/collections/" + collectionId + "/get", metaBody);
+                Object metaRes = parseJsonResponse(proxyPost("/api/v2/tenants/default_tenant/databases/default_database/collections/" + collectionId + "/get", metaBody));
                 if (metaRes instanceof Map<?, ?> map && map.get("metadatas") instanceof List<?> metadatas) {
                     if (!metadatas.isEmpty()) {
                         Object firstMeta = metadatas.get(0);
@@ -252,6 +258,19 @@ public class ChromaAdminServiceImpl implements ChromaAdminService {
     @Override
     public Object proxyDelete(String path) {
         return extractBody(chromaApiClient.delete(path));
+    }
+
+    /** Parse a JSON string proxy response into a proper Java object (Map/List/etc.) */
+    private Object parseJsonResponse(Object proxyResult) {
+        if (proxyResult instanceof String json) {
+            try {
+                return objectMapper.readValue(json, Object.class);
+            } catch (Exception e) {
+                log.warn("Failed to parse proxy response as JSON, returning raw string", e);
+                return proxyResult;
+            }
+        }
+        return proxyResult;
     }
 
     private Object extractBody(ResponseEntity<?> responseEntity) {

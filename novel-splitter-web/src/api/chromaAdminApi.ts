@@ -1,9 +1,10 @@
 import { apiClient, type ApiEnvelope } from './client';
 
 export interface ChromaHealth {
-  "nanosecond heartbeat"?: number;
   status?: string;
+  result?: string;
   error?: string;
+  "nanosecond heartbeat"?: number;
 }
 
 export interface ChromaVersion {

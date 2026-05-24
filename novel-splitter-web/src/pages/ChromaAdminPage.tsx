@@ -68,7 +68,7 @@ function SystemTab() {
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2"><Activity className="w-4 h-4" />健康状态</CardTitle></CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{hLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : (health?.['nanosecond heartbeat'] ? <span className="text-green-600">在线</span> : <span className="text-red-600">离线</span>)}</div>
+          <div className="text-2xl font-bold">{hLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : (health?.status === 'ok' ? <span className="text-green-600">在线</span> : <span className="text-red-600">离线</span>)}</div>
         </CardContent>
       </Card>
       <Card>
