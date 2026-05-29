@@ -1,8 +1,13 @@
+import { SelectMenu, type SelectMenuOption } from '@/components/ui/select-menu';
+import type { NovelSummaryDto } from '@/api/novelApi';
+import type { SceneSplitProfileDto } from '@/api/knowledgeApi';
+
 interface ChatSidebarProps {
     state: {
-        novels: Array<{ novelId: string; title: string }> | undefined;
+        novels: Array<Pick<NovelSummaryDto, 'novelId' | 'title' | 'status'>> | undefined;
+        splitProfiles: SceneSplitProfileDto[];
         profileOptions: { index: number; label: string }[];
-        selectedNovel: string; // novelId
+        selectedNovel: string;
         selectedProfileIndex: number;
         topK: number;
         maxScenes: number;
@@ -20,6 +25,23 @@ interface ChatSidebarProps {
 }
 
 export function ChatSidebar({ state, actions }: ChatSidebarProps) {
+    const novelOptions: SelectMenuOption[] = (state.novels ?? []).map(n => ({
+        value: n.novelId,
+        label: n.title,
+        description: n.status ? `状态: ${n.status}` : undefined,
+    }));
+
+    const profileOptions: SelectMenuOption[] = state.splitProfiles.map((p, i) => ({
+        value: String(i),
+        label: p.version,
+        description: p.chunkSize != null && p.chunkOverlap != null
+            ? `chunk: ${p.chunkSize} / overlap: ${p.chunkOverlap}`
+            : undefined,
+        badge: p.chunkSize != null && p.chunkOverlap != null
+            ? `${p.chunkSize}/${p.chunkOverlap}`
+            : undefined,
+    }));
+
     return (
         <div className="flex flex-col gap-3">
             <div className="rounded-2xl border border-gray-100 overflow-hidden shadow-sm bg-white">
@@ -32,32 +54,26 @@ export function ChatSidebar({ state, actions }: ChatSidebarProps) {
                     {/* Novel select */}
                     <div className="space-y-1.5">
                         <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">选择小说</label>
-                        <select
-                            className="w-full h-9 rounded-lg border border-gray-200 bg-gray-50 px-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-violet-400"
+                        <SelectMenu
                             value={state.selectedNovel}
-                            onChange={(e) => actions.setSelectedNovel(e.target.value)}
-                        >
-                            <option value="" disabled>-- 请选择 --</option>
-                            {Array.isArray(state.novels) && state.novels.map(n => (
-                                <option key={n.novelId} value={n.novelId}>{n.title}</option>
-                            ))}
-                        </select>
+                            onValueChange={actions.setSelectedNovel}
+                            options={novelOptions}
+                            placeholder="-- 请选择 --"
+                            emptyMessage={novelOptions.length ? '暂无可选' : '加载中或暂无书目'}
+                        />
                     </div>
 
-                    {/* Split profile (version + chunk / overlap) */}
+                    {/* Split profile */}
                     <div className="space-y-1.5">
                         <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">数据集（版本 / 滑窗）</label>
-                        <select
-                            className="w-full h-9 rounded-lg border border-gray-200 bg-gray-50 px-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-400 disabled:opacity-50"
-                            value={state.profileOptions.length ? String(state.selectedProfileIndex) : ""}
-                            onChange={(e) => actions.setSelectedProfileIndex(Number(e.target.value))}
-                            disabled={!state.selectedNovel || !state.profileOptions?.length}
-                        >
-                            <option value="" disabled>-- 请选择 --</option>
-                            {state.profileOptions.map((o) => (
-                                <option key={o.index} value={String(o.index)}>{o.label}</option>
-                            ))}
-                        </select>
+                        <SelectMenu
+                            value={profileOptions.length ? String(state.selectedProfileIndex) : ''}
+                            onValueChange={(v) => actions.setSelectedProfileIndex(Number(v))}
+                            options={profileOptions}
+                            placeholder="-- 请选择 --"
+                            disabled={!state.selectedNovel || !profileOptions.length}
+                            emptyMessage="该书暂无切片配置"
+                        />
                     </div>
 
                     {/* TopK */}

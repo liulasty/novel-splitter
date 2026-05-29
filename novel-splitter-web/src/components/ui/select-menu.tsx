@@ -2,7 +2,14 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Check, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export type SelectMenuOption = { value: string; label: string };
+export type SelectMenuOption = {
+  value: string;
+  label: string;
+  /** 副标题/描述，显示在 label 下方 */
+  description?: string;
+  /** 右侧徽章，如场景数、章节数 */
+  badge?: string;
+};
 
 type SelectMenuProps = {
   value: string;
@@ -104,15 +111,30 @@ export function SelectMenu({
                   aria-selected={isActive}
                   onClick={() => handlePick(opt.value)}
                   className={cn(
-                    'flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors',
+                    'flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition-colors',
                     isActive
                       ? 'bg-indigo-50 text-indigo-900'
                       : 'text-slate-700 hover:bg-slate-50'
                   )}
                 >
-                  <span className="min-w-0 flex-1 truncate" title={opt.label}>
-                    {opt.label}
+                  <span className="min-w-0 flex-1 truncate">
+                    <span className={cn('block text-sm leading-tight truncate', isActive && 'font-semibold')} title={opt.label}>
+                      {opt.label}
+                    </span>
+                    {opt.description && (
+                      <span className="block text-xs text-slate-400 leading-tight mt-0.5 truncate" title={opt.description}>
+                        {opt.description}
+                      </span>
+                    )}
                   </span>
+                  {opt.badge && (
+                    <span className={cn(
+                      'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold leading-tight',
+                      isActive ? 'bg-indigo-200 text-indigo-700' : 'bg-slate-100 text-slate-500'
+                    )}>
+                      {opt.badge}
+                    </span>
+                  )}
                   {isActive && <Check className="h-4 w-4 shrink-0 text-indigo-600" aria-hidden />}
                 </button>
               );

@@ -1,6 +1,7 @@
 package com.novel.splitter.interfaces.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.novel.splitter.application.model.dto.ConfigSaveRequest;
 import com.novel.splitter.application.model.dto.SystemSettingsDto;
 import com.novel.splitter.application.service.settings.SystemSettingsService;
 import com.novel.splitter.interfaces.common.GlobalExceptionHandler;
@@ -16,15 +17,15 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @ExtendWith(MockitoExtension.class)
 class SystemSettingsControllerTest {
@@ -36,44 +37,45 @@ class SystemSettingsControllerTest {
     private SystemSettingsService systemSettingsService;
 
     @InjectMocks
-    private SystemSettingsController systemSettingsController;
+    private SystemSettingsController controller;
 
     @BeforeEach
     void setUp() {
-        GlobalResponseAdvice globalResponseAdvice = new GlobalResponseAdvice();
-        ReflectionTestUtils.setField(globalResponseAdvice, "objectMapper", objectMapper);
-        mockMvc = MockMvcBuilders.standaloneSetup(systemSettingsController)
-                .setControllerAdvice(new GlobalExceptionHandler(), globalResponseAdvice)
+        GlobalResponseAdvice advice = new GlobalResponseAdvice();
+        ReflectionTestUtils.setField(advice, "objectMapper", objectMapper);
+        mockMvc = MockMvcBuilders.standaloneSetup(controller)
+                .setControllerAdvice(new GlobalExceptionHandler(), advice)
                 .build();
     }
 
     @Test
     void testGetSettings() throws Exception {
-        SystemSettingsDto dto = new SystemSettingsDto();
-        dto.setEmbedding(Map.of("type", "chroma"));
+        SystemSettingsDto.ConfigItem item = SystemSettingsDto.ConfigItem.builder()
+                .id(1L).configKey("test").configValue("v").category("other").isDefault(true).build();
+        SystemSettingsDto dto = SystemSettingsDto.builder()
+                .categories(Map.of("other", List.of(item)))
+                .build();
         when(systemSettingsService.getSettings()).thenReturn(dto);
 
         mockMvc.perform(get("/api/settings"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.data.embedding.type").value("chroma"));
-
-        verify(systemSettingsService).getSettings();
+                .andExpect(jsonPath("$.data.categories.other[0].configKey").value("test"));
     }
 
     @Test
-    void testUpdateSettings() throws Exception {
-        SystemSettingsDto dto = new SystemSettingsDto();
-        dto.setEmbedding(Map.of("type", "chroma"));
+    void testSave() throws Exception {
+        ConfigSaveRequest req = new ConfigSaveRequest();
+        req.setConfigKey("test.key");
+        req.setConfigValue("123");
+        req.setCategory("splitter");
 
-        mockMvc.perform(put("/api/settings")
+        mockMvc.perform(post("/api/settings")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(dto)))
+                        .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.message").value("操作成功"))
-                .andExpect(jsonPath("$.data.message").value("Settings updated successfully"));
+                .andExpect(jsonPath("$.code").value(200));
 
-        verify(systemSettingsService).saveSettings(any(SystemSettingsDto.class));
+        verify(systemSettingsService).save(any(ConfigSaveRequest.class));
     }
 }

@@ -1,11 +1,23 @@
 import { apiClient, type ApiEnvelope } from './client';
 
+export interface ConfigItem {
+  id: number | null;
+  configKey: string;
+  configValue: string;
+  category: string;
+  description?: string;
+  isDefault: boolean;
+}
+
 export interface SystemSettingsDto {
-  embedding?: Record<string, any>;
-  llm?: Record<string, any>;
-  chroma?: Record<string, any>;
-  splitStrategy?: Record<string, any>;
-  [key: string]: any;
+  categories: Record<string, ConfigItem[]>;
+}
+
+export interface ConfigSaveRequest {
+  configKey: string;
+  configValue: string;
+  category?: string;
+  description?: string;
 }
 
 export const settingsApi = {
@@ -14,8 +26,16 @@ export const settingsApi = {
     return response;
   },
 
-  updateSettings: async (settings: SystemSettingsDto): Promise<{ message: string }> => {
-    const response = await apiClient.put<ApiEnvelope<{ message: string }>, { message: string }>('/settings', settings);
+  saveConfig: async (req: ConfigSaveRequest): Promise<ConfigItem> => {
+    const response = await apiClient.post<ApiEnvelope<ConfigItem>, ConfigItem>('/settings', req);
     return response;
-  }
+  },
+
+  deleteConfig: async (id: number): Promise<void> => {
+    await apiClient.delete(`/settings/${id}`);
+  },
+
+  deleteConfigByKey: async (key: string): Promise<void> => {
+    await apiClient.delete('/settings/key', { params: { key } });
+  },
 };

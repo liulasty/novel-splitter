@@ -1,71 +1,56 @@
 package com.novel.splitter.application.service.settings;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.novel.splitter.application.model.dto.SystemSettingsDto;
-import org.junit.jupiter.api.AfterEach;
+import com.novel.splitter.infrastructure.persistence.entity.JpaSystemConfigEntity;
+import com.novel.splitter.infrastructure.persistence.repository.JpaSystemConfigRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.env.ConfigurableEnvironment;
 
-import java.io.File;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.Map;
+import java.util.Collections;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.when;
 
+@ExtendWith(MockitoExtension.class)
 public class SystemSettingsServiceImplTest {
 
-    private SystemSettingsServiceImpl systemSettingsService;
-    private final ObjectMapper objectMapper = new ObjectMapper();
-    private static final String TEST_SETTINGS_FILE = "config/settings.json";
+    @Mock
+    private JpaSystemConfigRepository repo;
+    @Mock
+    private ConfigurableEnvironment env;
+
+    private SystemSettingsServiceImpl service;
 
     @BeforeEach
-    void setUp() throws Exception {
-        systemSettingsService = new SystemSettingsServiceImpl(objectMapper);
-        // Clean up before test
-        File file = new File(TEST_SETTINGS_FILE);
-        if (file.exists()) {
-            file.delete();
-        }
-    }
-
-    @AfterEach
-    void tearDown() throws Exception {
-        // Clean up after test
-        File file = new File(TEST_SETTINGS_FILE);
-        if (file.exists()) {
-            file.delete();
-        }
+    void setUp() {
+        service = new SystemSettingsServiceImpl(repo, env);
     }
 
     @Test
-    void testInitCreatesDefaultFile() {
-        systemSettingsService.init();
-        File file = new File(TEST_SETTINGS_FILE);
-        assertTrue(file.exists());
+    void testGetSettingsReturnsDefaultsWhenDbEmpty() {
+        when(repo.findAll()).thenReturn(Collections.emptyList());
+        SystemSettingsDto dto = service.getSettings();
+        assertNotNull(dto);
+        assertNotNull(dto.getCategories());
     }
 
     @Test
-    void testGetSettingsReturnsEmptyWhenFileNotExists() {
-        SystemSettingsDto settings = systemSettingsService.getSettings();
-        assertNotNull(settings);
-        assertNull(settings.getEmbedding());
-    }
+    void testDbOverrideMergesWithDefaults() {
+        JpaSystemConfigEntity e = new JpaSystemConfigEntity();
+        e.setId(1L);
+        e.setConfigKey("test.key");
+        e.setConfigValue("overridden");
+        e.setCategory("other");
 
-    @Test
-    void testSaveAndGetSettings() {
-        SystemSettingsDto dto = new SystemSettingsDto();
-        dto.setEmbedding(Map.of("type", "chroma"));
-        dto.setLlm(Map.of("provider", "ollama"));
-        
-        systemSettingsService.saveSettings(dto);
-        
-        File file = new File(TEST_SETTINGS_FILE);
-        assertTrue(file.exists());
-        
-        SystemSettingsDto loaded = systemSettingsService.getSettings();
-        assertNotNull(loaded);
-        assertEquals("chroma", loaded.getEmbedding().get("type"));
-        assertEquals("ollama", loaded.getLlm().get("provider"));
+        when(repo.findAll()).thenReturn(Collections.singletonList(e));
+        SystemSettingsDto dto = service.getSettings();
+        assertNotNull(dto);
+        assertTrue(dto.getCategories().values().stream()
+                .flatMap(java.util.Collection::stream)
+                .anyMatch(item -> "test.key".equals(item.getConfigKey()) && !item.isDefault()));
     }
 }

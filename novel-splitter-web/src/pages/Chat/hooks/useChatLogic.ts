@@ -34,7 +34,7 @@ export function useChatLogic() {
         queryKey: ['novelSummaries', 'embed_ready'],
         queryFn: () => novelApi.getNovelSummaries('embed_ready'),
     });
-    const novels: Array<Pick<NovelSummaryDto, 'novelId' | 'title'>> = novelSummaries?.map(n => ({ novelId: n.novelId, title: n.title })) ?? [];
+    const novels: Array<Pick<NovelSummaryDto, 'novelId' | 'title' | 'status'>> = novelSummaries?.map(n => ({ novelId: n.novelId, title: n.title, status: n.status })) ?? [];
     const { data: splitProfiles } = useQuery({
         queryKey: ['splitProfiles', selectedNovel],
         queryFn: () => knowledgeApi.listSplitProfilesByNovelId(selectedNovel),
@@ -116,6 +116,7 @@ export function useChatLogic() {
             maxAnswerTokens,
             messages,
             novels,
+            splitProfiles: splitProfiles ?? [],
             profileOptions,
             isPending: chatMutation.isPending,
         },

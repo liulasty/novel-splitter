@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { novelApi } from '@/api/novelApi';
-import { knowledgeApi, splitProfileLabel, type SceneSplitProfileDto } from '@/api/knowledgeApi';
+import { knowledgeApi, type SceneSplitProfileDto } from '@/api/knowledgeApi';
 import { ragApi } from '@/api/ragApi';
 import { chromaAdminApi } from '@/api/chromaAdminApi';
 import type { ChromaCollection } from '@/api/chromaAdminApi';
@@ -20,7 +20,7 @@ const TABS = [
 ];
 
 function RagDebugPage() {
-  const [novels, setNovels] = useState<Array<Pick<NovelSummaryDto, 'novelId' | 'title'>>>([]);
+  const [novels, setNovels] = useState<Array<Pick<NovelSummaryDto, 'novelId' | 'title' | 'status'>>>([]);
   const [splitProfiles, setSplitProfiles] = useState<SceneSplitProfileDto[]>([]);
   const [selectedProfileIndex, setSelectedProfileIndex] = useState(0);
 
@@ -51,7 +51,7 @@ function RagDebugPage() {
 
   useEffect(() => {
     novelApi.getNovelSummaries('embed_ready')
-      .then((list) => setNovels(list.map(n => ({ novelId: n.novelId, title: n.title }))))
+      .then((list) => setNovels(list.map(n => ({ novelId: n.novelId, title: n.title, status: n.status }))))
       .catch(console.error);
   }, []);
 
@@ -155,7 +155,14 @@ function RagDebugPage() {
     const parts = [];
     if (systemInstruction) parts.push(`=== System Instruction ===\n${systemInstruction}`);
     if (contextBlocks && contextBlocks.length > 0) {
-        const contextText = contextBlocks.map((b, i) => `[Block ${i+1} - ${b.chunkId}]\n${b.content}`).join('\n\n---\n\n');
+        const contextText = contextBlocks.map((b, i) => {
+          const chapterTitle: string = (b.sceneMetadata as Record<string, unknown>)?.['chapterTitle'] as string
+            || (b.metadata?.['chapterTitle'] as string) || '';
+          const header = chapterTitle
+            ? `[Block ${i + 1} — ${chapterTitle}] (chunkId: ${b.chunkId})`
+            : `[Block ${i + 1} — ${b.chunkId}]`;
+          return `${header}\n${b.content}`;
+        }).join('\n\n---\n\n');
         parts.push(`=== Context ===\n${contextText}`);
     }
     parts.push(`=== User Question ===\n${userQuestion}`);
@@ -202,7 +209,11 @@ function RagDebugPage() {
   }, [result?.contextBlocks, contextFilter, contextSortAsc]);
 
   const novelOptions: SelectMenuOption[] = useMemo(
-    () => novels.map((n) => ({ value: n.novelId, label: n.title })),
+    () => novels.map((n) => ({
+      value: n.novelId,
+      label: n.title,
+      description: n.status ? `状态: ${n.status}` : undefined,
+    })),
     [novels]
   );
 
@@ -210,7 +221,13 @@ function RagDebugPage() {
     () =>
       splitProfiles.map((p, i) => ({
         value: String(i),
-        label: splitProfileLabel(p),
+        label: p.version,
+        description: p.chunkSize != null && p.chunkOverlap != null
+          ? `chunk: ${p.chunkSize} / overlap: ${p.chunkOverlap}`
+          : undefined,
+        badge: p.chunkSize != null && p.chunkOverlap != null
+          ? `${p.chunkSize}/${p.chunkOverlap}`
+          : undefined,
       })),
     [splitProfiles]
   );

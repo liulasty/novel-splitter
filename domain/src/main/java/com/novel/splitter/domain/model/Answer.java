@@ -53,6 +53,7 @@ public class Answer {
      * 引用详情内部类
      */
     @Data
+    @Builder
     @NoArgsConstructor
     @AllArgsConstructor
     public static class Citation {
@@ -83,5 +84,10 @@ public class Answer {
          * 匹配分数 (回填字段)
          */
         private Double score;
+
+        /**
+         * 元数据 (回填字段，含 chapterTitle/chapterIndex 等溯源信息)
+         */
+        private java.util.Map<String, Object> metadata;
     }
 }

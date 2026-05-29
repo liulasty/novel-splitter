@@ -208,6 +208,7 @@ public class RagOrchestrationService implements RagFacade {
                     }
                     citation.setContent(block.getContent());
                     citation.setScore(block.getScore());
+                    citation.setMetadata(block.getMetadata());
                     return true;
                 })
                 .collect(Collectors.toList());

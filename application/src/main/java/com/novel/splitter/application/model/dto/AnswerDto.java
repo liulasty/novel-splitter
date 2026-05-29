@@ -24,5 +24,6 @@ public class AnswerDto {
         private String reason;
         private String content;
         private Double score;
+        private java.util.Map<String, Object> metadata;
     }
 }
