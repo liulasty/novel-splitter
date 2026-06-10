@@ -41,28 +41,22 @@ public class TokenBudgetAllocator {
         int currentTokens = 0;
 
         for (Scene scene : sortedByScore) {
-            // 数量限制
+            // 数量限制（硬约束）：达到 maxScenes 即停止
             if (selected.size() >= maxScenes) {
                 break;
             }
 
             int sceneTokens = tokenCounter.count(scene.getText());
-            
-            // 预算检查
-            if (currentTokens + sceneTokens <= maxTokens) {
-                selected.add(scene);
-                currentTokens += sceneTokens;
-            } else {
-                // 如果是第一个且超长，可能需要截断 (此处暂不处理截断，直接跳过或仅保留这一个)
-                // 策略：如果一个都没选且这个超长，还是选上（并在后续截断），或者严格丢弃。
-                // 这里采用严格丢弃，防止爆 Token
-                if (selected.isEmpty() && maxTokens > 0) {
-                     // 极其特殊情况：单个 Scene 比整个窗口还大。
-                     // 可以在此做截断，但 Scene 应该是完整的。
-                     // 暂且跳过。
-                     log.warn("Scene {} ({} tokens) exceeds max context tokens ({}), skipped.", scene.getId(), sceneTokens, maxTokens);
-                }
+
+            // Token 预算（软约束）：超过时记录警告但仍然保留
+            if (currentTokens + sceneTokens > maxTokens) {
+                log.warn("Adding scene {} ({} tokens) exceeds max context tokens ({}), "
+                        + "but included because maxScenes={} not yet reached ({}/{}).",
+                        scene.getId(), sceneTokens, maxTokens, maxScenes, selected.size(), maxScenes);
             }
+
+            selected.add(scene);
+            currentTokens += sceneTokens;
         }
         
         return selected;

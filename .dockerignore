@@ -16,3 +16,6 @@ data/
 config/.env.*
 !config/.env.example
 bge-small-zh-v1.5-ONNX/
+**/reranker/model.onnx
+**/reranker/tokenizer.json
+**/reranker/.cache/

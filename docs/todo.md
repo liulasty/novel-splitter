@@ -3,11 +3,11 @@
 ## Phase 5: 交付
 
 - [ ] 性能测试：1000+ 章小说（内存/耗时 profiling）
-- [ ] 编写 UserManual.md
+- [x] 编写 UserManual.md（2026-05-30）
 
 ## MQ 韧性
 
-- [ ] 全部核心队列实现 DLQ（load/split/embed/cleanup 均已创建对应队列，部分已有 DlqService/DlqController 基础，待补全 x-dead-letter-exchange 配置）
+- [x] 全部核心队列实现 DLQ——RabbitConfig.java 已为 load/split/embed/cleanup/enrich 配置 x-dead-letter-exchange（2026-05-30）
 - [ ] 完善 DlqWorker 监控和手动消息重新投递
 
 ## RAG 流式
@@ -17,14 +17,15 @@
 
 ## 前端质量
 
-- [ ] 拆分巨型组件：ChatPage.tsx (16KB), SystemPage.tsx (14KB)
+- [x] 拆分巨型组件：ChatPage.tsx 已拆分为 4 个子组件（ChatInputArea/MessageList/CitationItem/ChatSidebar），降至 73 行（2026-05-30）
+- [ ] 拆分 SystemPage.tsx (389 行)
 - [ ] `/system`、`/chroma-admin` 添加路由守卫
-- [ ] `ragApi.ts` 改用共享 axios 实例（当前独立创建，缺少 token 注入）
+- [x] `ragApi.ts` 改用共享 axios 实例——已从 `client.ts` 导入 `apiClient`（2026-05-30）
 
 ## API & 集成
 
 - [ ] 确认 `/api/novels/{novelId}/pipeline` 端点存在；未实现则拦截移动端访问
-- [ ] 添加业务错误码枚举（当前仅依赖 HTTP status + string message）
+- [x] 添加业务错误码枚举——BusinessErrorCode 含 7 大类 20+ 码值，配套 BusinessException + GlobalExceptionHandler 处理（2026-05-30）
 
 ## 数据完整性
 
@@ -41,6 +42,18 @@
 ## 移动端
 
 - [ ] 实现 docs/plan/main/ 下的移动端 PRD 设计（10 份文档，已设计未实现）
+
+## 重排模型 (bge-reranker-base)
+
+- [x] P0: JVM 内存参数统一优化（-Xms1g -Xmx2g -XX:+UseG1GC + 容器 3.5G 限制）
+- [x] P0: ONNX Session 线程数限制（InterOp=1, IntraOp=2），降低内存峰值
+- [x] P0: 支持外部路径加载模型，Docker volume 挂载
+- [x] P1: 串行推理改为 Batch 批量推理（所有 query-doc 对一次 forward pass）
+- [x] P1: 启动日志打印重排开关状态
+- [x] P2: .gitignore / .dockerignore 排除模型文件
+- [x] P2: JAR 排除 model.onnx（278MB），通过外部 volume 提供
+- [x] P2: 新增 `scripts/download-reranker-model.ps1` 下载脚本
+- [ ] 编写 OnnxRerankerService 单元测试
 
 ## 已完成的运维改进（2026-05-23）
 

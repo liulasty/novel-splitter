@@ -30,6 +30,11 @@
             <version>1.18.0</version>
         </dependency>
         <dependency>
+            <groupId>ai.djl.huggingface</groupId>
+            <artifactId>tokenizers</artifactId>
+            <version>${djl.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
         </dependency>
@@ -55,5 +60,18 @@
             <snapshots><enabled>false</enabled></snapshots>
         </repository>
     </repositories>
+
+    <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <excludes>
+                    <!-- 重排模型文件走外部 Volume 挂载，不打包进 JAR -->
+                    <exclude>reranker/model.onnx</exclude>
+                    <exclude>reranker/tokenizer.json</exclude>
+                </excludes>
+            </resource>
+        </resources>
+    </build>
 
 </project>

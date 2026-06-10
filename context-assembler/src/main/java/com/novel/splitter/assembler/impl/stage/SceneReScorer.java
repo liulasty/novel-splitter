@@ -3,29 +3,80 @@ package com.novel.splitter.assembler.impl.stage;
 import com.novel.splitter.assembler.config.AssemblerConfig;
 import com.novel.splitter.domain.model.Scene;
 import com.novel.splitter.domain.model.SceneMetadata;
+import com.novel.splitter.embedding.service.OnnxRerankerService;
+import jakarta.annotation.PostConstruct;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * Stage 1: 重评分 (ReScore)
  * <p>
- * 综合向量分数、关键词命中、实体命中等多维度进行重排序。
+ * 使用 ONNX 重排模型 (bge-reranker-base) 进行深度语义相关性打分，
+ * 当重排模型不可用或配置关闭时，回退到启发式评分（关键词+实体命中）。
  * </p>
  */
+@Slf4j
 @Component
 public class SceneReScorer {
+
+    private final OnnxRerankerService rerankerService;
+    private final AssemblerConfig config;
+
+    public SceneReScorer(OnnxRerankerService rerankerService, AssemblerConfig config) {
+        this.rerankerService = rerankerService;
+        this.config = config;
+    }
+
+    @PostConstruct
+    public void init() {
+        log.info("Reranker switch status: enable={}, serviceAvailable={}",
+                config.isEnableReranker(), rerankerService.isAvailable());
+    }
 
     public void rescore(List<Scene> scenes, String question, AssemblerConfig config) {
         if (!config.isEnableRescore()) {
             return;
         }
 
-        // 改进分词: 提取英文单词和中文词(2字以上)
+        if (config.isEnableReranker() && rerankerService.isAvailable()) {
+            rerankWithOnnx(scenes, question);
+        } else {
+            rerankWithHeuristic(scenes, question);
+        }
+    }
+
+    /**
+     * ONNX 重排模型打分
+     */
+    private void rerankWithOnnx(List<Scene> scenes, String question) {
+        List<String> texts = scenes.stream()
+                .map(Scene::getText)
+                .collect(Collectors.toList());
+
+        List<Float> scores;
+        try {
+            scores = rerankerService.rerank(question, texts);
+        } catch (Exception e) {
+            log.warn("ONNX reranker failed, falling back to heuristic scoring", e);
+            rerankWithHeuristic(scenes, question);
+            return;
+        }
+
+        for (int i = 0; i < scenes.size() && i < scores.size(); i++) {
+            scenes.get(i).setScore(scores.get(i).doubleValue());
+        }
+    }
+
+    /**
+     * 启发式规则打分（原逻辑，作为降级兜底）
+     */
+    private void rerankWithHeuristic(List<Scene> scenes, String question) {
         List<String> keywords = extractKeywords(question);
 
         for (Scene scene : scenes) {
@@ -34,10 +85,7 @@ public class SceneReScorer {
             double entityScore = calculateEntityScore(scene.getMetadata(), keywords);
             double lengthPenalty = calculateLengthPenalty(scene.getText());
 
-            // 简单评分公式：vector * 0.6 + keyword * 0.2 + entity * 0.2 - penalty
             double finalScore = (vectorScore * 0.6) + (keywordScore * 0.2) + (entityScore * 0.2) - lengthPenalty;
-            
-            // 确保分数非负 (可选)
             if (finalScore < 0) finalScore = 0;
 
             scene.setScore(finalScore);

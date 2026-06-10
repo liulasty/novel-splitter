@@ -38,13 +38,14 @@ services:
       - "${BACKEND_PORT}:${BACKEND_PORT}"
     volumes:
       - ${APP_DATA_PATH}/embedding/src/main/resources/embedding:/app/embedding/src/main/resources/embedding
+      - ${APP_DATA_PATH}/embedding/src/main/resources/reranker:/app/models/reranker
       - ${APP_DATA_PATH}/data/novel-storage:/app/data/novel-storage
       - ${APP_DATA_PATH}/logs:/app/logs
     restart: unless-stopped
     deploy:
       resources:
         limits:
-          memory: 2G
+          memory: 3.5G
 
   frontend:
     restart: unless-stopped

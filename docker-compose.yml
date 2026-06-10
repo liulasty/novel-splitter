@@ -76,8 +76,17 @@ services:
       GEMINI_MODEL: ${GEMINI_MODEL}
       API_AUTH_TOKEN: ${API_AUTH_TOKEN}
       STORAGE_ROOT_PATH: /app/data/novel-storage
-      JAVA_OPTS: ${JAVA_OPTS:--Xmx1g -Xms512m}
+      # 重排模型：启用 ONNX bge-reranker-base；默认关闭，需显式开启
+      ASSEMBLER_ENABLE_RERANKER: ${ASSEMBLER_ENABLE_RERANKER:-false}
+      # 重排模型外部路径（可选），为空时从 classpath 加载
+      ASSEMBLER_RERANKER_MODEL_PATH: ${ASSEMBLER_RERANKER_MODEL_PATH:-/app/models/reranker}
+      JAVA_OPTS: ${JAVA_OPTS:--Xms1g -Xmx2g -XX:+UseG1GC}
       LOG_PATH: /app/logs
+    deploy:
+      resources:
+        limits:
+          cpus: '${BACKEND_CPU_LIMIT:-1.0}'
+          memory: ${BACKEND_MEM_LIMIT:-3.5G}
     networks:
       - appnet
 

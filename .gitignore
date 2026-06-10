@@ -36,3 +36,8 @@ logs/
 # Local model artifacts
 bge-small-zh-v1.5-ONNX/
 
+# ONNX model files (large binaries, managed externally)
+**/reranker/model.onnx
+**/reranker/tokenizer.json
+**/reranker/.cache/
+

@@ -6,6 +6,7 @@ import com.novel.splitter.assembler.support.TokenCounter;
 import com.novel.splitter.domain.model.ContextBlock;
 import com.novel.splitter.domain.model.Scene;
 import com.novel.splitter.domain.model.SceneMetadata;
+import com.novel.splitter.embedding.service.OnnxRerankerService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -33,7 +34,8 @@ class StandardContextAssemblerTest {
         config.setEnableRescore(false);
         config.setMaxScenes(5);
 
-        SceneReScorer reScorer = new SceneReScorer();
+        OnnxRerankerService rerankerService = Mockito.mock(OnnxRerankerService.class);
+        SceneReScorer reScorer = new SceneReScorer(rerankerService, config);
         SceneDeduplicator deduplicator = new SceneDeduplicator();
         SceneMerger merger = new SceneMerger(tokenCounter);
         TokenBudgetAllocator allocator = new TokenBudgetAllocator(tokenCounter);
@@ -88,10 +90,8 @@ class StandardContextAssemblerTest {
 
     @Test
     void testAssemble_TokenBudget() {
-        // S1: 60 tokens, S2: 50 tokens. Max 100.
-        // Sorted by score: S1 (0.9), S2 (0.8).
-        // Select S1 (60). Total 60.
-        // Try S2 (50). Total 110 > 100. Skip S2.
+        // S1: 60 tokens, S2: 50 tokens. Max 100, maxScenes=5.
+        // maxScenes 是硬约束：未达到场景数上限时即使超 token 预算也保留。
         
         when(tokenCounter.count("S1")).thenReturn(60);
         when(tokenCounter.count("S2")).thenReturn(50);
@@ -103,10 +103,10 @@ class StandardContextAssemblerTest {
 
         List<ContextBlock> result = assembler.assemble("q", input, config);
 
-        assertEquals(1, result.size());
-        assertEquals("1", result.get(0).getChunkId());
+        // maxScenes 为硬约束：未达上限时即使超 token 预算也保留
+        assertEquals(2, result.size());
     }
-    
+
     @Test
     void testAssemble_Rescore_Chinese() {
         config.setEnableRescore(true);
