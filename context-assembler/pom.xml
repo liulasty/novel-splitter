@@ -16,6 +16,10 @@
             <groupId>com.novel.splitter</groupId>
             <artifactId>domain</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.novel.splitter</groupId>
+            <artifactId>embedding</artifactId>
+        </dependency>
         
         <dependency>
             <groupId>org.projectlombok</groupId>

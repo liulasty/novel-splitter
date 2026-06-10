@@ -1,5 +1,6 @@
 package com.novel.splitter.interfaces.common;
 
+import com.novel.splitter.domain.exception.BusinessErrorCode;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -62,5 +63,19 @@ public class ApiResponse<T> {
      */
     public static <T> ApiResponse<T> error(int code, String message) {
         return new ApiResponse<>(code, message, null);
+    }
+
+    /**
+     * 使用业务错误码快速创建失败响应
+     */
+    public static <T> ApiResponse<T> error(BusinessErrorCode ec) {
+        return new ApiResponse<>(ec.getCode(), ec.getDefaultMessage(), null);
+    }
+
+    /**
+     * 使用业务错误码 + 自定义消息创建失败响应
+     */
+    public static <T> ApiResponse<T> error(BusinessErrorCode ec, String message) {
+        return new ApiResponse<>(ec.getCode(), message, null);
     }
 }

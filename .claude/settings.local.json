@@ -41,7 +41,40 @@
       "Read(//c/Program Files \\(x86\\)/Google/Chrome/Application/**)",
       "Read(//d/my-pw-project/novel-output/xncwxw-52586/merged/**)",
       "Bash(powershell.exe -Command \"Get-Process java -ErrorAction SilentlyContinue | Stop-Process -Force\")",
-      "Bash(pkill -f \"vite\")"
+      "Bash(pkill -f \"vite\")",
+      "mcp__drawio__start_session",
+      "mcp__drawio__create_new_diagram",
+      "mcp__drawio__export_diagram",
+      "Bash(wsl *)",
+      "Bash(cmd.exe *)",
+      "Bash(C:\\\\Windows\\\\System32\\\\wsl.exe *)",
+      "Bash(powershell.exe *)",
+      "Bash(pip --version)",
+      "Bash(pip show *)",
+      "WebFetch(domain:hf-mirror.com)",
+      "Bash(pip install *)",
+      "Bash(ping -n 1 hf-mirror.com)",
+      "Bash(ping -n 1 huggingface.co)",
+      "Bash(ping -n 1 8.8.8.8)",
+      "Bash(du -sh embedding/src/main/resources/reranker/ embedding/src/main/resources/embedding/)",
+      "Bash(wc -c embedding/src/main/resources/reranker/model.onnx embedding/src/main/resources/reranker/tokenizer.json embedding/src/main/resources/embedding/model.onnx embedding/src/main/resources/embedding/model.onnx_data)",
+      "Bash(Sort-Object)",
+      "Bash(awk '{print $5, $NF}')",
+      "Bash(grep \"\\\\.jar$\")",
+      "Bash(jar tf *)",
+      "Bash(MSYS2_ARG_CONV_EXCL=\"*\" docker compose *)",
+      "Bash(MSYS2_ARG_CONV_EXCL=\"*\" pwsh *)",
+      "PowerShell(D:\\\\soft\\\\novel-splitter\\\\scripts\\\\_test_reranker.ps1)",
+      "PowerShell(D:\\\\soft\\\\novel-splitter\\\\scripts\\\\_test_chroma_novels.ps1)",
+      "Bash(Start-Process -NoNewWindow -FilePath \"npm\" -ArgumentList \"run dev\" -WorkingDirectory \"D:/soft/novel-splitter/novel-splitter-web\" -RedirectStandardOutput \"D:/soft/novel-splitter/logs/frontend-dev.log\" -RedirectStandardError \"D:/soft/novel-splitter/logs/frontend-dev.err\")",
+      "Bash(Get-Process -Name \"java\" -ErrorAction SilentlyContinue)",
+      "Bash(Select-Object Id, ProcessName, StartTime)",
+      "Bash(Format-Table -AutoSize)",
+      "PowerShell(Get-Process *)"
     ]
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "drawio"
+  ]
 }

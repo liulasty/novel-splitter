@@ -50,6 +50,12 @@ public class AssemblerConfig {
     private boolean enableKeywordBoost = true;
 
     /**
+     * 是否启用 ONNX 重排模型 (bge-reranker-base) 替代启发式重评分
+     * 开启后将使用交叉编码器进行深度语义相关性打分
+     */
+    private boolean enableReranker = false;
+
+    /**
      * 最大 Scene 数量限制 (同 maxChunks，保留以兼容)
      */
     private int maxScenes = 5;

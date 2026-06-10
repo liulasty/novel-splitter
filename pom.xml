@@ -50,6 +50,7 @@
         <junit.version>5.10.1</junit.version>
         <jsoup.version>1.17.2</jsoup.version>
         <picocli.version>4.7.7</picocli.version>
+        <djl.version>0.27.0</djl.version>
         <mapstruct.version>1.5.5.Final</mapstruct.version>
     </properties>
 
@@ -207,6 +208,18 @@
                 <groupId>org.checkerframework</groupId>
                 <artifactId>checker-qual</artifactId>
                 <version>${checker-qual.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>commons-codec</groupId>
+                <artifactId>commons-codec</artifactId>
+                <version>1.16.1</version>
+            </dependency>
+
+            <!-- DJL HuggingFace Tokenizers -->
+            <dependency>
+                <groupId>ai.djl.huggingface</groupId>
+                <artifactId>tokenizers</artifactId>
+                <version>${djl.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

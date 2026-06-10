@@ -1,11 +1,13 @@
 package com.novel.splitter.interfaces.common;
 
+import com.novel.splitter.domain.exception.BusinessErrorCode;
+import com.novel.splitter.domain.exception.BusinessException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.slf4j.MDC;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -81,6 +83,14 @@ public class GlobalExceptionHandler {
         log.warn("非法参数异常, traceId={}, req={}, message={}", traceId(), requestSummary(request), errorMsg);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error(HttpStatus.BAD_REQUEST.value(), errorMsg));
+    }
+
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException e, HttpServletRequest request) {
+        BusinessErrorCode ec = e.getErrorCode();
+        log.warn("业务异常, traceId={}, req={}, code={}, message={}", traceId(), requestSummary(request), ec.getCode(), e.getMessage());
+        return ResponseEntity.status(e.getHttpStatus())
+                .body(ApiResponse.error(ec.getCode(), e.getMessage()));
     }
 
     @ExceptionHandler(Exception.class)
