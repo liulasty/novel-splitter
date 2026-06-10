@@ -94,11 +94,11 @@ body {
 /* ══════════════════════════════════════════
    JSON Syntax Highlight
    ══════════════════════════════════════════ */
-.json-highlight .json-key   { color: #38bdf8; }
-.json-highlight .json-str   { color: #4ade80; }
-.json-highlight .json-num   { color: #a78bfa; }
-.json-highlight .json-bool  { color: #fbbf24; }
-.json-highlight .json-null  { color: #fb7185; }
+.json-highlight .json-key   { color: #2563EB; }
+.json-highlight .json-str   { color: #059669; }
+.json-highlight .json-num   { color: #D97706; }
+.json-highlight .json-bool  { color: #BE185D; }
+.json-highlight .json-null  { color: #6B7280; }
 
 /* ══════════════════════════════════════════
    Legacy (keep for other pages)

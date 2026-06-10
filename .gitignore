@@ -41,3 +41,4 @@ bge-small-zh-v1.5-ONNX/
 **/reranker/tokenizer.json
 **/reranker/.cache/
 
+.superpowers/
