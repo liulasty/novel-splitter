@@ -7,6 +7,7 @@ import com.novel.splitter.downloader.core.DownloaderFactory;
 import com.novel.splitter.domain.model.downloader.DownloadChapter;
 import com.novel.splitter.domain.model.downloader.SiteRule;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
@@ -21,6 +22,7 @@ import java.util.List;
  */
 @Slf4j
 @Service
+@Profile("!prod")
 public class DownloadService {
 
     private final AppConfig appConfig;

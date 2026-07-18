@@ -22,7 +22,7 @@
 |----------|------|----------|
 | `NovelFacadeService` | 服务类 | 小说业务门面，编排小说上传、解析、删除等完整用例。 |
 | `SplitWorker` | MQ消费者 | 监听小说拆分队列，异步调度 `batch-processing` 执行分块与验证流程。 |
-| `TaskSseService` | 服务类 | 利用 Server-Sent Events (SSE) 向前端推送实时异步任务进度。 |
+| `TaskService` | 服务类 | 任务状态管理，前端通过轮询 `GET /api/tasks/poll` 获取进度。 |
 | `DtoMapper` | 接口(MapStruct) | 提供统一的 `Domain <-> DTO` 映射机制，隔离内部模型与外部 API 数据结构。 |
 | `SystemSettingsService` | 服务类 | 读取、管理并向前端暴露系统的当前配置信息（如 LLM 提供商、切分规则）。 |
 

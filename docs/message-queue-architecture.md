@@ -151,7 +151,7 @@ sequenceDiagram
 }
 ```
 
-### 4.5 PollingResponse (当前前端查询契约)
+### 4.4 PollingResponse (当前前端查询契约)
 **用途**: 前端轮询任务状态最小字段集响应。
 ```json
 {
@@ -164,7 +164,7 @@ sequenceDiagram
 }
 ```
 
-### 4.4 CleanupTaskMessage
+### 4.5 CleanupTaskMessage
 **用途**: 触发异步垃圾数据清理。
 ```json
 {
@@ -188,44 +188,18 @@ sequenceDiagram
 
 ---
 
-## 5. 死信队列 (DLQ) 架构规划
+## 5. 死信队列 (DLQ) 架构（已实现 2026-05-30）
 
-**当前状态**：当前系统未配置死信队列 (DLQ)。若消息多次重试失败后会被直接丢弃，存在数据丢失隐患。
+所有核心工作队列（load/split/embed/cleanup/enrich）均已配置 `x-dead-letter-exchange`，
+失败消息在重试耗尽后自动路由至 DLQ。
 
-**规划方案 (待实施)**：
-为确保系统的健壮性，需要在 `RabbitConfig.java` 中为所有核心工作队列引入 DLQ 架构，以便在消息多次重试失败后能被捕获和人工干预。
+### 架构
 
-1.  **声明 DLQ 交换机和队列**：
-    ```java
-    @Bean
-    public DirectExchange dlqExchange() {
-        return new DirectExchange("novel.task.dlq.exchange");
-    }
+- **DLQ Exchange**: `novel.task.dlq.exchange` (DirectExchange)
+- **DLQ Queue**: `novel.task.dlq` (持久化)
+- **Binding Key**: `dlq.routing.key`
 
-    @Bean
-    public Queue dlqQueue() {
-        return new Queue("novel.task.dlq", true);
-    }
-    
-    @Bean
-    public Binding dlqBinding() {
-        return BindingBuilder.bind(dlqQueue()).to(dlqExchange()).with("dlq.routing.key");
-    }
-    ```
+### 待完善
 
-2.  **重构业务队列声明**：为现有的 `load`、`split`、`embed`、`cleanup` 队列添加 DLQ 属性。
-    ```java
-    @Bean
-    public Queue loadTaskQueue() {
-        return QueueBuilder.durable(LOAD_TASK_QUEUE)
-                .withArgument("x-dead-letter-exchange", "novel.task.dlq.exchange")
-                .withArgument("x-dead-letter-routing-key", "dlq.routing.key")
-                .build();
-    }
-    // 其他队列同理配置...
-    ```
-
-3.  **DLQ 监控与干预**：
-    *   增加一个专门的 `DlqWorker` 监听 `novel.task.dlq` 队列。
-    *   将失败消息记录到数据库的异常告警表中，并触发告警（如邮件/企业微信）。
-    *   提供管理后台接口，允许管理员查看失败原因并手动重新投递消息（Republish）。
+- `DlqWorker` 监控和手动消息重新投递管理后台尚未实现
+- DLQ 告警通知（邮件/企业微信）未接入

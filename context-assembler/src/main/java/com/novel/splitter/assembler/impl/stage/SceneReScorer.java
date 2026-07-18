@@ -119,8 +119,6 @@ public class SceneReScorer {
             }
         }
 
-        // DEBUG LOG
-        // System.out.println("DEBUG: Question='" + text + "', Extracted keywords=" + keywords);
         return keywords;
     }
 
@@ -132,9 +130,6 @@ public class SceneReScorer {
                 hits++;
             }
         }
-        // DEBUG LOG
-        // System.out.println("DEBUG: Content='" + (content.length() > 20 ? content.substring(0,20)+"..." : content) + "', Hits=" + hits);
-        
         // 简单归一化: 每个命中 +0.1，上限 1.0
         return Math.min(hits * 0.1, 1.0);
     }
