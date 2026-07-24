@@ -77,7 +77,10 @@ public class GeminiLlmClient implements LlmClient {
                     if (block.getSceneMetadata() != null) {
                         userContentBuilder.append("来源: ").append(block.getSceneMetadata().getChapterTitle()).append("\n");
                     }
-                    userContentBuilder.append("内容: ").append(block.getContent()).append("\n");
+                    String chapterTag = block.getSceneMetadata() != null && block.getSceneMetadata().getChapterTitle() != null
+                        ? "(" + block.getSceneMetadata().getChapterTitle() + ") "
+                        : "";
+                    userContentBuilder.append("内容: ").append(chapterTag).append(block.getContent()).append("\n");
                     userContentBuilder.append("---\n");
                 }
                 userContentBuilder.append("\n");

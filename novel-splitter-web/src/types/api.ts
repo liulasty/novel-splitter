@@ -24,6 +24,7 @@ export interface ChatRequest {
 
 export interface Citation {
   content: string;
+  chapterPosition?: string;
   score?: number;
   metadata?: Record<string, any>;
 }

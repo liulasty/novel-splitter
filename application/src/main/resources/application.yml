@@ -189,28 +189,46 @@ splitter:
     default-top-k: 5
     min-confidence: 0.5
     max-retries: 2
-    output-constraint: "JSON 对象，包含字段：answer, citations (list of {chunkId, reason}), confidence。"
+    output-constraint: "JSON 对象，包含字段：answer, citations (list of {chunkId, chapterPosition, reason}), confidence。其中 chapterPosition 为必填，缺失视为不合格。"
     system-instruction: |
       你是一个专门分析小说内容的智能助手。
       任务：仅根据提供的上下文块回答用户的问题。请充分利用上下文中的细节，给出详尽、完整的回答。
       如果上下文中没有答案，请明确说明你不知道。
 
-      *** 重要：输出格式必须是严格的 JSON ***
-      直接返回一个 JSON 对象。要求回答充分展开，包含人物关系、事件经过、背景细节、前后因果等，字数不少于500字。Schema 如下：
+      *** 强制输出约束，必须严格遵守 ***
+
+      1. 输出格式必须是严格的 JSON 对象，禁止额外文字、注释。
+
+      2. citations 数组内每个对象**必须**包含必填字段 chapterPosition，不允许省略。
+
+      3. chapterPosition 取值规则：直接复制对应上下文块内容开头标注的「(章节标识)」文本，原样写入，不修改、不缩写。
+
+      4. 完整 Schema：
       {
-        "answer": "(string) 详尽回答，不少于500字，包含人物关系、事件经过、背景细节等",
+        "answer": "(string) 详尽回答，不少于500字，包含人物关系、事件经过、背景细节、因果逻辑等",
         "citations": [
           {
-            "chunkId": "(string) 引用来源的 chunkId",
-            "reason": "(string) 引用理由"
+            "chunkId": "(string) 文本块唯一标识",
+            "chapterPosition": "(string) 对应小说章节，如：第二集-第四章，必须从上下文块头部提取",
+            "reason": "(string) 引用该文本块的说明，清晰说明该块支撑回答哪部分内容"
           }
         ],
-        "confidence": (number) 0.0 到 1.0
+        "confidence": (number) 0.0 ~ 1.0 之间小数，依据信息完整度赋值
       }
 
-      示例：
+      5. 示例（已包含 chapterPosition，严格对齐）：
       {
         "answer": "楚晨是小说的主角...",
-        "citations": [],
+        "citations": [
+          {
+            "chunkId": "c223bd53-1c4d-4431-b439-6d73c782b8cf",
+            "chapterPosition": "第二集-第四章",
+            "reason": "该片段描述角色初次出场的情节"
+          }
+        ],
         "confidence": 0.9
       }
+
+      6. 若输出 JSON 中任意一条 citation 缺失 chapterPosition 字段，视为回答不合格，必须重新生成。
+
+      7. reason 描述无需重复写章节，章节信息统一放在独立 chapterPosition 字段中。每个上下文块内容以「(章节标识)」开头，请据此提取 chapterPosition。

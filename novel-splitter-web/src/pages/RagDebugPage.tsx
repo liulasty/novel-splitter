@@ -398,6 +398,11 @@ function ContextTab({ result }: { result: RagDebugResponse }) {
                         <div className="flex items-center gap-3 min-w-0">
                             <span className="text-xs font-bold text-[#D97706] shrink-0" style={mono}>#{i + 1}</span>
                             <span className="truncate text-xs text-[#6B7280]" style={mono}>{b.chunkId}</span>
+                            {(b.sceneMetadata as any)?.chapterTitle && (
+                                <span className="shrink-0 rounded border border-[#D97706]/30 bg-[#D97706]/10 px-1.5 py-0.5 text-[11px] font-medium text-[#D97706]" style={mono}>
+                                    {(b.sceneMetadata as any).chapterTitle}
+                                </span>
+                            )}
                             <span className="shrink-0 rounded border border-[#D1D5DB] bg-[#F0EDE8] px-1.5 py-0.5 text-[11px] text-[#6B7280]" style={mono}>
                                 {b.tokenCount} tok
                             </span>

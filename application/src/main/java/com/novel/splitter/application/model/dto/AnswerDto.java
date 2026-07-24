@@ -21,6 +21,7 @@ public class AnswerDto {
     @AllArgsConstructor
     public static class CitationDto {
         private String chunkId;
+        private String chapterPosition;
         private String reason;
         private String content;
         private Double score;

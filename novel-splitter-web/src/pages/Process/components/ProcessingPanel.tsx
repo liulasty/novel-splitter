@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { novelApi } from '@/api/novelApi';
 import {
-  Loader2, FileText, Eye, CheckCircle, AlertCircle, ListChecks,
-  XCircle, Library, RefreshCw, ClipboardCheck
+  Loader2, FileText, Eye, CheckCircle, ListChecks,
+  XCircle, RefreshCw, ClipboardCheck
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SplitPreviewModal } from '@/pages/Ingest/components/SplitPreviewModal';

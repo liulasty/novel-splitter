@@ -60,16 +60,25 @@ public class Answer {
         /**
          * 来源 Chunk ID
          * <p>
-         * 对应 Schema 中的 `chunk_id`。
+         * 对应 Schema 中的 {@code chunkId}。
          * 用于回溯到具体的上下文块。
          * </p>
          */
         private String chunkId;
 
         /**
+         * 章节位置
+         * <p>
+         * 对应 Schema 中的 {@code chapterPosition}。
+         * LLM 从上下文块头部提取的 "(集-章)" 标识，原样填入。
+         * </p>
+         */
+        private String chapterPosition;
+
+        /**
          * 引用理由
          * <p>
-         * 对应 Schema 中的 `reason`。
+         * 对应 Schema 中的 {@code reason}。
          * 解释为何引用该块，增强可解释性。
          * </p>
          */

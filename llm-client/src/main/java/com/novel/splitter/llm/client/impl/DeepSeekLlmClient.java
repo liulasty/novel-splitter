@@ -73,7 +73,10 @@ public class DeepSeekLlmClient implements LlmClient {
                 if (block.getSceneMetadata() != null) {
                     userContent.append("Source: ").append(block.getSceneMetadata().getChapterTitle()).append("\n");
                 }
-                userContent.append("Content: ").append(block.getContent()).append("\n");
+                String chapterTag = block.getSceneMetadata() != null && block.getSceneMetadata().getChapterTitle() != null
+                    ? "(" + block.getSceneMetadata().getChapterTitle() + ") "
+                    : "";
+                userContent.append("Content: ").append(chapterTag).append(block.getContent()).append("\n");
                 userContent.append("---\n");
             }
             userContent.append("\n");
