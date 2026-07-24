@@ -12,7 +12,7 @@ import { SelectMenu, type SelectMenuOption } from '@/components/ui/select-menu';
 import { cn } from '@/lib/utils';
 import {
     Copy, BugPlay, Search, Layers, Terminal, Database, ChevronRight,
-    Loader2, CheckCircle2, XCircle, Settings2,
+    Loader2, CheckCircle2, XCircle, Settings2, Info,
 } from 'lucide-react';
 import type { NovelSummaryDto } from '@/api/novelApi';
 
@@ -35,6 +35,7 @@ const TABS = [
     { id: 'retrieval', label: '检索结果', icon: Search, badge: (r: RagDebugResponse | null) => r?.retrievedScenes.length },
     { id: 'context', label: '上下文', icon: Layers, badge: (r: RagDebugResponse | null) => r?.contextBlocks.length },
     { id: 'prompt', label: '提示词', icon: Terminal, badge: null },
+    { id: 'params', label: '参数说明', icon: Info, badge: null },
 ] as const;
 
 /* ── Utils ── */
@@ -137,7 +138,6 @@ export default function RagDebugPage() {
                 })()
             ]);
             setResult(data);
-            setActiveTab('retrieval');
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : '调试请求失败');
         } finally { setLoading(false); }
@@ -257,8 +257,8 @@ export default function RagDebugPage() {
                                 {[
                                     { label: 'TopK', value: topK, set: setTopK, min: 1, max: 50 },
                                     { label: 'Scenes', value: maxScenes, set: setMaxScenes, min: 1, max: 50 },
-                                    { label: 'CTX Tok', value: maxContextTokens, set: setMaxContextTokens, min: 500, max: 16000 },
-                                    { label: 'Ans Tok', value: maxAnswerTokens, set: setMaxAnswerTokens, min: 0, max: 4000 },
+                                    { label: 'CTX Tok', value: maxContextTokens, set: setMaxContextTokens, min: 500, max: 48000 },
+                                    { label: 'Ans Tok', value: maxAnswerTokens, set: setMaxAnswerTokens, min: 0, max: 16000 },
                                 ].map(p => (
                                     <div key={p.label}>
                                         <label className="mb-1 block text-xs font-medium text-[#6B7280]" style={mono}>{p.label}</label>
@@ -334,8 +334,11 @@ export default function RagDebugPage() {
                                 {activeTab === 'retrieval' && <RetrievalTab result={result} />}
                                 {activeTab === 'context' && <ContextTab result={result} />}
                                 {activeTab === 'prompt' && <PromptTab result={result} prompt={generateFullPrompt()} totalTokens={totalTokens} />}
+                                {activeTab === 'params' && <ParamsTab />}
                             </div>
                         </>
+                    ) : activeTab === 'params' ? (
+                        <ParamsTab />
                     ) : (
                         <div className="flex flex-1 flex-col items-center justify-center">
                             <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-dashed border-[#D1D5DB] bg-white">
@@ -477,6 +480,108 @@ function PromptTab({ result, prompt, totalTokens }: { result: RagDebugResponse; 
                         </pre>
                     </CollapseCard>
                 ))}
+            </div>
+        </div>
+    );
+}
+
+function ParamsTab() {
+    const params = [
+        { name: 'TopK', label: '检索数量', desc: '从向量库中召回的最相似文本块数量。值越大上下文越丰富，但会增加 Token 消耗和噪声。推荐 5~15。' },
+        { name: 'Scenes', label: '场景上限', desc: '经过重排序、去重、合并后最终送入 LLM 的场景块数量上限。限制此值可控制上下文长度。推荐 3~10。' },
+        { name: 'CTX Tok', label: '上下文 Token 预算', desc: '所有上下文块占用的总 Token 上限（含重叠合并后的文本）。超出部分按分数截断。推荐 3000~8000，最大 48000。' },
+        { name: 'Ans Tok', label: '回答 Token 预算', desc: '留给 LLM 生成回答的 Token 数上限。设为 0 则使用模型默认值。推荐 1000~4000，最大 16000。过大可能导致上下文被截断。' },
+        { name: 'Novel', label: '小说选择', desc: '选择已向量化完成的小说。只有状态为 COMPLETED 的书目可检索。' },
+        { name: 'Dataset', label: '数据集版本', desc: '同一小说可有多组切片参数（块大小/重叠），不同版本对应不同场景数据集。切换版本可对比不同切片效果。' },
+        { name: 'Query', label: '检索问题', desc: '输入自然语言问题，系统将其嵌入为向量后检索相似场景。支持多轮追问参考（暂未实现上下文记忆）。' },
+    ];
+    return (
+        <div className="max-w-2xl mx-auto space-y-3 pt-2">
+            {params.map(p => (
+                <div key={p.name} className="rounded-lg border border-[#E2DDD4] bg-white px-4 py-3">
+                    <div className="flex items-center gap-2 mb-1">
+                        <span className="rounded bg-[#D97706]/10 px-2 py-0.5 text-xs font-bold text-[#D97706]" style={mono}>{p.name}</span>
+                        <span className="text-sm font-medium text-[#1A1A1A]">{p.label}</span>
+                    </div>
+                    <p className="text-sm text-[#6B7280] leading-relaxed">{p.desc}</p>
+                </div>
+            ))}
+            <div className="rounded-lg border border-amber-200 bg-amber-50/50 px-4 py-3 text-sm text-[#6B7280] leading-relaxed">
+                <span className="font-medium text-amber-800">提示：</span>
+                所有参数修改后需重新点击 <span className="font-medium text-[#D97706]" style={mono}>DEBUG</span> 按钮生效。
+                Debug 模式仅展示检索与组装结果，<strong>不调用 LLM</strong> 生成最终回答。
+            </div>
+
+            <div className="pt-4">
+                <h3 className="text-sm font-semibold text-[#1A1A1A] mb-3" style={mono}>正常问答参数说明</h3>
+                <div className="space-y-3">
+                    <div className="rounded-lg border border-[#E2DDD4] bg-white px-4 py-3">
+                        <div className="flex items-center gap-2 mb-1">
+                            <span className="rounded bg-[#2563EB]/10 px-2 py-0.5 text-xs font-bold text-[#2563EB]" style={mono}>TopK</span>
+                            <span className="text-sm font-medium text-[#1A1A1A]">检索数量</span>
+                        </div>
+                        <p className="text-sm text-[#6B7280] leading-relaxed">
+                            从向量库中召回的候选场景块数。调大（10~20）可覆盖更多片段但噪声增加；调小（3~5）精度高但可能遗漏关键内容。
+                            默认 5。<br />
+                            <span className="text-[#9CA3AF] text-xs">适用场景：宽泛问题用高值，精确问题用低值。</span>
+                        </p>
+                    </div>
+                    <div className="rounded-lg border border-[#E2DDD4] bg-white px-4 py-3">
+                        <div className="flex items-center gap-2 mb-1">
+                            <span className="rounded bg-[#2563EB]/10 px-2 py-0.5 text-xs font-bold text-[#2563EB]" style={mono}>MaxScenes</span>
+                            <span className="text-sm font-medium text-[#1A1A1A]">场景上限</span>
+                        </div>
+                        <p className="text-sm text-[#6B7280] leading-relaxed">
+                            经重排序、去重、合并后最终送入 LLM 的场景块数。调大（10~20）上下文更完整但消耗更多 Token；调小（3~5）回答聚焦但可能缺乏细节。
+                            默认 5。<br />
+                            <span className="text-[#9CA3AF] text-xs">适用场景：综合概述用高值，单点事实用低值。</span>
+                        </p>
+                    </div>
+                    <div className="rounded-lg border border-[#E2DDD4] bg-white px-4 py-3">
+                        <div className="flex items-center gap-2 mb-1">
+                            <span className="rounded bg-[#2563EB]/10 px-2 py-0.5 text-xs font-bold text-[#2563EB]" style={mono}>MaxContextTokens</span>
+                            <span className="text-sm font-medium text-[#1A1A1A]">上下文 Token 预算</span>
+                        </div>
+                        <p className="text-sm text-[#6B7280] leading-relaxed">
+                            所有上下文块的总 Token 上限。调大（8000~16000）可容纳更多场景但 LLM 注意力可能分散；调小（2000~3000）回答更聚焦但信息量有限。
+                            默认 12000。<br />
+                            <span className="text-[#9CA3AF] text-xs">适用场景：长文本分析用高值，简短问答用低值。</span>
+                        </p>
+                    </div>
+                    <div className="rounded-lg border border-[#E2DDD4] bg-white px-4 py-3">
+                        <div className="flex items-center gap-2 mb-1">
+                            <span className="rounded bg-[#2563EB]/10 px-2 py-0.5 text-xs font-bold text-[#2563EB]" style={mono}>MaxAnswerTokens</span>
+                            <span className="text-sm font-medium text-[#1A1A1A]">回答 Token 预算</span>
+                        </div>
+                        <p className="text-sm text-[#6B7280] leading-relaxed">
+                            留给 LLM 生成回答的最大 Token 数。调大（2000~4000）回答详尽但可能冗余；调小（500~1000）回答简洁但可能遗漏细节。
+                            设为 0 则使用模型默认值。<br />
+                            <span className="text-[#9CA3AF] text-xs">适用场景：人物分析用高值，简单事实查询用低值。</span>
+                        </p>
+                    </div>
+                    <div className="rounded-lg border border-[#E2DDD4] bg-white px-4 py-3">
+                        <div className="flex items-center gap-2 mb-1">
+                            <span className="rounded bg-[#2563EB]/10 px-2 py-0.5 text-xs font-bold text-[#2563EB]" style={mono}>ChunkSize / Overlap</span>
+                            <span className="text-sm font-medium text-[#1A1A1A]">场景块大小 / 重叠</span>
+                        </div>
+                        <p className="text-sm text-[#6B7280] leading-relaxed">
+                            切分场景时的滑窗参数（字符数）。大块（1000~2000）语义完整但粒度粗；小块（300~500）粒度细但可能切断语义。
+                            重叠（64~256）用于缓解切断问题。这些在 Dataset 创建时固定，问答阶段不可修改。<br />
+                            <span className="text-[#9CA3AF] text-xs">适用场景：需要细腻分析用小块，概述性问答用大块。</span>
+                        </p>
+                    </div>
+                    <div className="rounded-lg border border-[#E2DDD4] bg-white px-4 py-3">
+                        <div className="flex items-center gap-2 mb-1">
+                            <span className="rounded bg-[#2563EB]/10 px-2 py-0.5 text-xs font-bold text-[#2563EB]" style={mono}>Version</span>
+                            <span className="text-sm font-medium text-[#1A1A1A]">数据集版本</span>
+                        </div>
+                        <p className="text-sm text-[#6B7280] leading-relaxed">
+                            同一小说可有多组切片参数并存，用 version 区分。切换版本可对比不同块大小/重叠策略对检索质量的影响。
+                            默认 v1。<br />
+                            <span className="text-[#9CA3AF] text-xs">适用场景：测试不同切片策略效果时切换版本对比。</span>
+                        </p>
+                    </div>
+                </div>
             </div>
         </div>
     );
