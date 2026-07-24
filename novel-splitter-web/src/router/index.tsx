@@ -3,6 +3,7 @@ import Layout from '@/components/Layout';
 import ChatPage from '@/pages/ChatPage';
 import KnowledgePage from '@/pages/KnowledgePage';
 import IngestPage from '@/pages/IngestPage';
+import ProcessPage from '@/pages/ProcessPage';
 import TasksPage from '@/pages/TasksPage';
 import DlqMonitorPanel from '@/pages/System/DlqMonitorPanel';
 import TaskLoadPage from '@/pages/tasks/TaskLoadPage';
@@ -32,6 +33,10 @@ export const router = createBrowserRouter([
       {
         path: 'ingest',
         element: <IngestPage />,
+      },
+      {
+        path: 'process',
+        element: <ProcessPage />,
       },
       {
         path: 'tasks',

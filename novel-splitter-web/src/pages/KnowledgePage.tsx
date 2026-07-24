@@ -76,8 +76,8 @@ export default function KnowledgePage() {
               本页拉取<strong className="text-slate-600 font-medium">全部已登记书目</strong>并按状态分区，便于在同一页看到「已上传但未跑完流水线」的书。
               <strong className="text-slate-600 font-medium">对话页</strong>里可选的书与 RAG 调试页一致，仅包含<strong className="text-slate-600 font-medium">向量化已完成</strong>（后端状态 COMPLETED）的书目。
               刚上传尚未切分时会出现于「等待切分 / 解析」分区，请从
-              <Link to="/ingest" className="inline-flex items-center gap-0.5 mx-1 text-indigo-600 font-medium hover:text-indigo-800 hover:underline underline-offset-2 transition-colors">
-                入库处理<ChevronRight className="w-3.5 h-3.5" />
+              <Link to="/process" className="inline-flex items-center gap-0.5 mx-1 text-indigo-600 font-medium hover:text-indigo-800 hover:underline underline-offset-2 transition-colors">
+                场景处理<ChevronRight className="w-3.5 h-3.5" />
               </Link>
               继续（链接可带 novelId 深链）。
             </p>
@@ -122,7 +122,7 @@ export default function KnowledgePage() {
                     </div>
                     <p className="text-sm font-medium text-slate-600 mb-1">暂无已登记的小说</p>
                     <p className="text-xs text-slate-400">
-                      前往<Link to="/ingest" className="mx-1 text-indigo-500 hover:underline">入库处理</Link>页面上传文件
+                      前往<Link to="/ingest" className="mx-1 text-indigo-500 hover:underline">上传入库</Link>页面上传文件
                     </p>
                   </div>
               ) : (

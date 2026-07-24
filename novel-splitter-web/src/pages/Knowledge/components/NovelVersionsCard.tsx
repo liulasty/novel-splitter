@@ -133,7 +133,7 @@ export function NovelVersionsCard({
 
     const versionCount = splitProfiles?.length ?? 0;
     const badge = phaseBadge(phase);
-    const ingestLink = `/ingest?novelId=${encodeURIComponent(novelId)}`;
+    const ingestLink = `/process?novelId=${encodeURIComponent(novelId)}`;
     const secondaryTaskLink = '/tasks/pipeline';
 
     return (
@@ -200,7 +200,7 @@ export function NovelVersionsCard({
                         className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-800 hover:underline"
                     >
                         <FileInput className="w-3.5 h-3.5" />
-                        {phase === 'ready' ? '继续入库 / 维护' : '去入库处理'}
+                        {phase === 'ready' ? '继续处理 / 维护' : '去场景处理'}
                     </Link>
                     {(phase === 'awaitingSplit' || phase === 'awaitingEmbed' || phase === 'failed' || phase === 'processing') && (
                         <Link

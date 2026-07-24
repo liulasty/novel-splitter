@@ -74,7 +74,7 @@ export default function TasksPage() {
             className="inline-flex items-center gap-2 h-9 px-4 rounded-full text-sm font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
-            返回入库
+            返回上传入库
           </Link>
         </div>
       </div>
