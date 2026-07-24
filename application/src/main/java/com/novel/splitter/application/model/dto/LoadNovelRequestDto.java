@@ -13,4 +13,6 @@ public class LoadNovelRequestDto {
     private boolean force;
     /** 可选：章节标题行 Java 正则（整行匹配） */
     private String chapterTitleRegex;
+    /** 识别策略：PLAIN / VOLUME_CHAPTER / CUSTOM；默认 PLAIN */
+    private String strategy;
 }

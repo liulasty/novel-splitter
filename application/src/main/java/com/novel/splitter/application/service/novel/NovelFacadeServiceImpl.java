@@ -242,7 +242,9 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         int maxScenes = request != null && request.getMaxScenes() > 0 ? request.getMaxScenes() : Integer.MAX_VALUE;
         String version = normalizeVersion(request != null ? request.getVersion() : null);
         TaskSubmitResponseDto dto = startChapterParseTask(
-                id, version, maxScenes, false, request != null ? request.getChapterTitleRegex() : null);
+                id, version, maxScenes, false,
+                request != null ? request.getChapterTitleRegex() : null,
+                request != null ? request.getStrategy() : null);
         log.info("章节解析任务已投递 Load 队列, taskId={}", dto.getTaskId());
         return dto;
     }
@@ -310,9 +312,11 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         SplitTaskMessage message = new SplitTaskMessage(taskId, id, 0, version, false);
         message.setForceReload(force);
         message.setChapterTitleRegex(trimToNull(request != null ? request.getChapterTitleRegex() : null));
+        message.setRecognitionStrategy(request != null ? request.getStrategy() : null);
         message.setTaskTypeForRecovery(TaskType.LOAD.name());
         taskQueuePort.sendLoad(message);
-        log.info("Sent taskId {} to load queue (standalone LOAD)", taskId);
+        log.info("Sent taskId {} to load queue (standalone LOAD, strategy={})", taskId,
+                request != null ? request.getStrategy() : "PLAIN");
 
         return TaskSubmitResponseDto.builder()
                 .message("Load 任务已提交到队列")
@@ -395,7 +399,8 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
                     return sceneTask;
                 case "CHAPTER_RELOAD": {
                     TaskSubmitResponseDto chapterTask = startChapterParseTask(
-                            id, version, maxScenes, true, request.getChapterTitleRegex());
+                            id, version, maxScenes, true, request.getChapterTitleRegex(),
+                                    request.getStrategy());
                     if (hasEmbed) {
                         chapterTask.setMessage(chapterTask.getMessage()
                                 + "。向量化请在场景切分完成后触发 EMBED，或使用 POST /scene-split 且 triggerEmbed=true。");
@@ -404,7 +409,8 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
                 }
                 default: {
                     TaskSubmitResponseDto chapterTask = startChapterParseTask(
-                            id, version, maxScenes, false, request.getChapterTitleRegex());
+                            id, version, maxScenes, false, request.getChapterTitleRegex(),
+                                    request.getStrategy());
                     if (hasEmbed) {
                         chapterTask.setMessage(chapterTask.getMessage()
                                 + "。完整流水线：解析完成后请调用 POST /scene-split（可 triggerEmbed 串联向量化）。");
@@ -457,7 +463,9 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         int maxScenes = request != null && request.getMaxScenes() > 0 ? request.getMaxScenes() : Integer.MAX_VALUE;
         String version = normalizeVersion(request != null ? request.getVersion() : null);
         return startChapterParseTask(
-                id, version, maxScenes, true, request != null ? request.getChapterTitleRegex() : null);
+                id, version, maxScenes, true,
+                request != null ? request.getChapterTitleRegex() : null,
+                request != null ? request.getStrategy() : null);
     }
 
     @Override
@@ -563,7 +571,8 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
      * 章节解析 → Load 队列（完成后不自动场景切分）。
      */
     private TaskSubmitResponseDto startChapterParseTask(
-            String novelId, String version, int maxScenes, boolean forceReload, String chapterTitleRegex)
+            String novelId, String version, int maxScenes, boolean forceReload,
+            String chapterTitleRegex, String strategy)
             throws IOException {
         ensureChapterTitleRegexValid(chapterTitleRegex);
         String taskId = UUID.randomUUID().toString();
@@ -572,6 +581,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         message.setTaskTypeForRecovery(TaskType.CHAPTER_PARSE.name());
         message.setForceReload(forceReload);
         message.setChapterTitleRegex(trimToNull(chapterTitleRegex));
+        message.setRecognitionStrategy(strategy);
         taskQueuePort.sendLoad(message);
         return TaskSubmitResponseDto.builder()
                 .taskId(taskId)

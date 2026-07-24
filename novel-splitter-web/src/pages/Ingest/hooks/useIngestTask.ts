@@ -32,6 +32,7 @@ export function useIngestTask() {
     const ingestInitRef = useRef(false);
     const [chapterReviewAck, setChapterReviewAck] = useState(false);
     const [chapterTitleRegex, setChapterTitleRegex] = useState('');
+    const [recognitionStrategy, setRecognitionStrategy] = useState('PLAIN');
     const chapterParseWasRunningRef = useRef(false);
 
     /** 与 URL、sessionStorage 同步，便于刷新/深链后续切分 */
@@ -172,6 +173,7 @@ export function useIngestTask() {
                 version,
                 maxScenes: 0,
                 ...(chapterTitleRegex.trim() !== '' ? { chapterTitleRegex: chapterTitleRegex.trim() } : {}),
+                strategy: recognitionStrategy,
             }),
         onSuccess: (data) => {
             const msg = `章节解析已提交：${data.message}`;
@@ -325,6 +327,7 @@ export function useIngestTask() {
                 force: true,
                 version,
                 ...(chapterTitleRegex.trim() !== '' ? { chapterTitleRegex: chapterTitleRegex.trim() } : {}),
+                strategy: recognitionStrategy,
             })
             .then((data) => {
                 toast.success(data.message || "强制重解析已提交");
@@ -375,6 +378,7 @@ export function useIngestTask() {
             currentNovelId,
             chapterReviewAck,
             chapterTitleRegex,
+            recognitionStrategy,
             ingestStatus,
             isError,
             tasks,
@@ -396,6 +400,7 @@ export function useIngestTask() {
             setSelectedTaskId,
             setDownloadUrl,
             setChapterTitleRegex,
+            setRecognitionStrategy,
             acknowledgeChapterReview: () => setChapterReviewAck(true),
             handleFileChange,
             handleUpload,

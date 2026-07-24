@@ -19,4 +19,8 @@ public class ChapterDto {
     private int wordCount;
     /** 该章在原文行范围内的段落行数（含空行占位） */
     private int paragraphCount;
+    /** 所属卷标题（从 title 中解析，PLAIN 策略时为 null） */
+    private String volumeTitle;
+    /** 不含卷前缀的原始章标题 */
+    private String originalTitle;
 }

@@ -27,6 +27,11 @@ public class SplitTaskMessage {
      */
     private String chapterTitleRegex;
 
+    /**
+     * 章节识别策略：PLAIN / VOLUME_CHAPTER / CUSTOM；默认 PLAIN。
+     */
+    private String recognitionStrategy;
+
     public SplitTaskMessage() {}
 
     public SplitTaskMessage(String taskId, String novelId, int maxScenes, String version) {
@@ -94,5 +99,13 @@ public class SplitTaskMessage {
 
     public void setChapterTitleRegex(String chapterTitleRegex) {
         this.chapterTitleRegex = chapterTitleRegex;
+    }
+
+    public String getRecognitionStrategy() {
+        return recognitionStrategy;
+    }
+
+    public void setRecognitionStrategy(String recognitionStrategy) {
+        this.recognitionStrategy = recognitionStrategy;
     }
 }

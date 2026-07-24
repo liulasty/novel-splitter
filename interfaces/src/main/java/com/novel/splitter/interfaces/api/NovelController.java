@@ -30,7 +30,10 @@ import com.novel.splitter.application.model.dto.ReparseChaptersRequestDto;
 import com.novel.splitter.domain.model.paging.PagedResult;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 小说文件管理控制器
@@ -219,5 +222,31 @@ public class NovelController {
     @GetMapping("/stats")
     public List<NovelStatRecordDto> getNovelStats() {
         return novelFacadeService.getNovelStats();
+    }
+
+    @Operation(summary = "获取章节识别策略列表", description = "返回系统内置的所有章节识别策略，供前端下拉选择")
+    @GetMapping("/chapter-strategies")
+    public List<Map<String, String>> listChapterStrategies() {
+        List<Map<String, String>> strategies = new ArrayList<>();
+
+        Map<String, String> plain = new LinkedHashMap<>();
+        plain.put("key", "PLAIN");
+        plain.put("label", "普通章节");
+        plain.put("description", "仅识别 [第X章] 格式，适用于常规无分卷小说");
+        strategies.add(plain);
+
+        Map<String, String> volume = new LinkedHashMap<>();
+        volume.put("key", "VOLUME_CHAPTER");
+        volume.put("label", "分卷章节");
+        volume.put("description", "识别 [卷：标题] + [第X章]，自动拼合全局唯一章节名");
+        strategies.add(volume);
+
+        Map<String, String> custom = new LinkedHashMap<>();
+        custom.put("key", "CUSTOM");
+        custom.put("label", "自定义正则");
+        custom.put("description", "自行输入整行匹配正则，适配特殊章节格式");
+        strategies.add(custom);
+
+        return strategies;
     }
 }

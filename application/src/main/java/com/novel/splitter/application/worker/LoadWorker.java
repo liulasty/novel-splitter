@@ -110,7 +110,7 @@ public class LoadWorker {
 
             Novel novel = loadNovelUseCase.load(novelId, rawPath, (progress, info) -> {
                 taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, progress, info);
-            }, message.getChapterTitleRegex());
+            }, message.getChapterTitleRegex(), message.getRecognitionStrategy());
 
             Novel novelEntity = novelService.getNovelById(novelId);
             List<Chapter> chapterEntities = novel.getChapters().stream()

@@ -55,6 +55,8 @@ export interface NovelChapterDto {
   endParagraphIndex: number;
   wordCount: number;
   paragraphCount: number;
+  volumeTitle?: string | null;
+  originalTitle?: string | null;
 }
 
 /** @deprecated 使用 NovelChapterDto */
@@ -114,9 +116,16 @@ export interface NovelPipelineRequestDto {
   chapterTitleRegex?: string;
 }
 
+export interface ChapterStrategy {
+  key: string;
+  label: string;
+  description: string;
+}
+
 export interface ReparseChaptersRequest {
   version?: string;
   chapterTitleRegex?: string;
+  strategy?: string;
   maxScenes?: number;
 }
 
@@ -173,7 +182,7 @@ export const novelApi = {
   /** 后端 IngestRequest 要求 fileName 非空，占位即可（实际以 novelId 对应 DB 为准） */
   splitNovel: async (
     novelId: string,
-    request: { maxScenes?: number; version?: string; chapterTitleRegex?: string }
+    request: { maxScenes?: number; version?: string; chapterTitleRegex?: string; strategy?: string }
   ): Promise<TaskSubmitResponse> => {
     const response = await apiClient.post<ApiEnvelope<TaskSubmitResponse>, TaskSubmitResponse>(
       `/novels/${encodeURIComponent(novelId)}/split`,
@@ -183,6 +192,9 @@ export const novelApi = {
         version: request.version ?? 'v1',
         ...(request.chapterTitleRegex != null && request.chapterTitleRegex !== ''
           ? { chapterTitleRegex: request.chapterTitleRegex }
+          : {}),
+        ...(request.strategy != null && request.strategy !== ''
+          ? { strategy: request.strategy }
           : {}),
       }
     );
@@ -202,11 +214,18 @@ export const novelApi = {
 
   loadNovel: async (
     novelId: string,
-    body?: { version?: string; force?: boolean; chapterTitleRegex?: string }
+    body?: { version?: string; force?: boolean; chapterTitleRegex?: string; strategy?: string }
   ): Promise<TaskSubmitResponse> => {
     const response = await apiClient.post<ApiEnvelope<TaskSubmitResponse>, TaskSubmitResponse>(
       `/novels/${encodeURIComponent(novelId)}/load`,
       body ?? {}
+    );
+    return response;
+  },
+
+  listChapterStrategies: async (): Promise<ChapterStrategy[]> => {
+    const response = await apiClient.get<ApiEnvelope<ChapterStrategy[]>, ChapterStrategy[]>(
+      '/novels/chapter-strategies'
     );
     return response;
   },

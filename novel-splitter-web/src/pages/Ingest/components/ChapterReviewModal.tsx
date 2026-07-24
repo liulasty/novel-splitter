@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { novelApi } from '@/api/novelApi';
+import { novelApi, type ChapterStrategy } from '@/api/novelApi';
 import { Loader2, BookOpen, X, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -25,6 +25,7 @@ export function ChapterReviewModal({
   onReparseTaskCreated,
 }: ChapterReviewModalProps) {
   const queryClient = useQueryClient();
+  const [strategy, setStrategy] = useState('PLAIN');
   const [regex, setRegex] = useState('');
   const [reparsePending, setReparsePending] = useState(false);
 
@@ -34,13 +35,22 @@ export function ChapterReviewModal({
     enabled: open && !!novelId,
   });
 
+  const { data: strategies = [] } = useQuery({
+    queryKey: ['chapter-strategies'],
+    queryFn: () => novelApi.listChapterStrategies(),
+    staleTime: Infinity,
+  });
+
+  const isCustomStrategy = strategy === 'CUSTOM';
+
   const handleReparse = async () => {
     setReparsePending(true);
     try {
       const data = await novelApi.reparseChapters(novelId, {
         version,
         maxScenes: 0,
-        ...(regex.trim() !== '' ? { chapterTitleRegex: regex.trim() } : {}),
+        strategy,
+        ...(isCustomStrategy && regex.trim() !== '' ? { chapterTitleRegex: regex.trim() } : {}),
       });
       toast.success(data.message ?? '已提交章节重解析');
       if (data.taskId) onReparseTaskCreated?.(data.taskId);
@@ -86,19 +96,39 @@ export function ChapterReviewModal({
 
         <div className="px-5 py-4 space-y-4 overflow-y-auto flex-1">
           <p className="text-sm text-slate-600 leading-relaxed">
-            请核对左侧章节列表与正文是否一致。若分章不准，可填写<strong>整行匹配</strong>的 Java 正则后点击「按正则重解析」（会清理旧章节产物后重新 Load）。
+            请核对章节列表与正文是否一致。选<strong>分卷章节</strong>可自动识别「卷：标题」卷头并拼接全局唯一章节名；选<strong>自定义正则</strong>可填写 Java 正则后重新 Load。
           </p>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">章节标题正则（可选）</label>
-            <input
-              type="text"
-              value={regex}
-              onChange={(e) => setRegex(e.target.value)}
-              placeholder="例如：^第\\d+章.*"
-              className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400"
-            />
+            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">识别策略</label>
+            <select
+              value={strategy}
+              onChange={(e) => setStrategy(e.target.value)}
+              className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            >
+              {strategies.map((s: ChapterStrategy) => (
+                <option key={s.key} value={s.key}>{s.label}</option>
+              ))}
+            </select>
+            {strategies.length > 0 && (
+              <p className="text-xs text-slate-400 mt-1">
+                {strategies.find((s: ChapterStrategy) => s.key === strategy)?.description}
+              </p>
+            )}
           </div>
+
+          {isCustomStrategy && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">章节标题正则（整行匹配）</label>
+              <input
+                type="text"
+                value={regex}
+                onChange={(e) => setRegex(e.target.value)}
+                placeholder="例如：^第\\d+章.*"
+                className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              />
+            </div>
+          )}
 
           <div className="flex flex-wrap gap-2">
             <button
@@ -111,7 +141,7 @@ export function ChapterReviewModal({
               )}
             >
               {reparsePending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-              按正则重解析
+              按{isCustomStrategy ? '正则' : '策略'}重解析
             </button>
           </div>
 

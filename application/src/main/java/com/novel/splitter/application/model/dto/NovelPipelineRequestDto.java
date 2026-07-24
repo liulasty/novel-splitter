@@ -22,4 +22,6 @@ public class NovelPipelineRequestDto {
     private Integer chunkOverlap;
     /** 章节解析阶段可选：章节标题行 Java 正则（整行匹配） */
     private String chapterTitleRegex;
+    /** 识别策略：PLAIN / VOLUME_CHAPTER / CUSTOM；默认 PLAIN */
+    private String strategy;
 }

@@ -1,5 +1,4 @@
 import { useQuery } from '@tanstack/react-query';
-import { Card, CardContent } from "@/components/ui/card";
 import {
     Loader2,
     BookOpen,
@@ -16,7 +15,7 @@ import { novelApi } from "@/api/novelApi";
 import { taskApi } from "@/api/taskApi";
 import type { SplitTask } from "@/api/taskApi";
 import { cn } from "@/lib/utils";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 
 /* ────────── JetBrains Mono font ────────── */
 const FONT_ID = "jetbrains-mono-font";

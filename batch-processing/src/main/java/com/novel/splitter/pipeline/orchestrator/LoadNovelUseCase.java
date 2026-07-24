@@ -29,9 +29,23 @@ public class LoadNovelUseCase {
             Path novelPath,
             BiConsumer<Integer, String> progressCallback,
             String chapterTitleRegex) throws Exception {
-        log.info("=== Start Load Phase for: {} (novelId: {}) ===", novelPath, novelId);
+        return load(novelId, novelPath, progressCallback, chapterTitleRegex, null);
+    }
+
+    /**
+     * @param chapterTitleRegex 可选，覆盖默认章节标题正则
+     * @param recognitionStrategy 识别策略：PLAIN / VOLUME_CHAPTER / CUSTOM
+     */
+    public Novel load(
+            String novelId,
+            Path novelPath,
+            BiConsumer<Integer, String> progressCallback,
+            String chapterTitleRegex,
+            String recognitionStrategy) throws Exception {
+        log.info("=== Start Load Phase for: {} (novelId: {}, strategy: {}) ===", novelPath, novelId,
+                recognitionStrategy != null ? recognitionStrategy : "PLAIN");
         progressCallback.accept(IngestProgress.LOAD_START, "开始读取文件...");
-        Novel novel = novelLoader.load(novelId, novelPath, chapterTitleRegex);
+        Novel novel = novelLoader.load(novelId, novelPath, chapterTitleRegex, recognitionStrategy);
         progressCallback.accept(IngestProgress.LOAD_END, String.format("文件读取完成，共 %d 个章节", novel.getChapters().size()));
         return novel;
     }

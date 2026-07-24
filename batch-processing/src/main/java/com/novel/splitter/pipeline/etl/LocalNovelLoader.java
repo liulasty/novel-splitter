@@ -2,6 +2,7 @@ package com.novel.splitter.pipeline.etl;
 
 import com.novel.splitter.core.ChapterRecognizer;
 import com.novel.splitter.core.NovelLineNoiseFilter;
+import com.novel.splitter.core.VolumeChapterRecognizer;
 import com.novel.splitter.domain.model.Chapter;
 import com.novel.splitter.domain.model.Novel;
 import com.novel.splitter.domain.model.RawParagraph;
@@ -28,16 +29,29 @@ public class LocalNovelLoader {
     }
 
     public Novel load(String novelId, Path path) throws IOException {
-        return load(novelId, path, null);
+        return load(novelId, path, null, null);
+    }
+
+    public Novel load(String novelId, Path path, String chapterTitleRegex) throws IOException {
+        return load(novelId, path, chapterTitleRegex, null);
     }
 
     /**
      * @param chapterTitleRegex 可选；非空时作为<strong>整行匹配</strong>的 Java 正则覆盖默认章节标题规则
+     * @param strategyType      识别策略：PLAIN / VOLUME_CHAPTER / CUSTOM；null 或 PLAIN 使用原有逻辑
      */
-    public Novel load(String novelId, Path path, String chapterTitleRegex) throws IOException {
-        log.info("Loading novel from: {} (custom chapter regex: {})", path, chapterTitleRegex != null && !chapterTitleRegex.isBlank());
+    public Novel load(String novelId, Path path, String chapterTitleRegex, String strategyType) throws IOException {
+        boolean isVolumeChapter = "VOLUME_CHAPTER".equalsIgnoreCase(strategyType);
+        log.info("Loading novel from: {} (strategy: {}, custom regex: {})",
+                path, strategyType != null ? strategyType : "PLAIN",
+                chapterTitleRegex != null && !chapterTitleRegex.isBlank());
+
         Pattern pattern = ChapterRecognizer.compileUserPattern(chapterTitleRegex);
         ChapterRecognizer chapterRecognizer = new ChapterRecognizer(pattern);
+        VolumeChapterRecognizer volumeRecognizer = null;
+        if (isVolumeChapter) {
+            volumeRecognizer = new VolumeChapterRecognizer(pattern, null);
+        }
 
         String fileName = path.getFileName().toString();
         String title = fileName.replace(".txt", "");
@@ -59,6 +73,7 @@ public class LocalNovelLoader {
         List<Chapter> chapters = new ArrayList<>();
         List<RawParagraph> currentChapterParagraphs = new ArrayList<>();
         int currentWordCount = 0;
+        String currentVolumeTitle = "";
 
         Chapter.ChapterBuilder currentChapterBuilder = null;
         boolean hasContentSinceLastTitle = false;
@@ -71,9 +86,27 @@ public class LocalNovelLoader {
             }
             boolean isEmpty = content.isEmpty();
 
+            // VOLUME_CHAPTER 模式：检测卷头行
+            if (isVolumeChapter && !isEmpty && volumeRecognizer.isVolumeTitleLine(content)) {
+                currentVolumeTitle = volumeRecognizer.extractVolumeName(content);
+                continue;
+            }
+
             if (!isEmpty && chapterRecognizer.isLikelyChapterTitle(content)) {
                 if (currentChapterBuilder != null && hasContentSinceLastTitle) {
-                    Chapter finishedChapter = currentChapterBuilder
+                    String fullTitle = isVolumeChapter && !currentVolumeTitle.isEmpty()
+                            ? volumeRecognizer.buildFullChapterTitle(currentVolumeTitle,
+                                    currentChapterBuilder.build().getTitle())
+                            : currentChapterBuilder.build().getTitle();
+                    String originalTitle = isVolumeChapter
+                            ? (currentChapterBuilder.build().getTitle())
+                            : null;
+                    Chapter finishedChapter = Chapter.builder()
+                            .index(chapters.size() + 1)
+                            .title(fullTitle)
+                            .volumeTitle(isVolumeChapter && !currentVolumeTitle.isEmpty() ? currentVolumeTitle : null)
+                            .originalTitle(isVolumeChapter ? originalTitle : null)
+                            .startParagraphIndex(currentChapterBuilder.build().getStartParagraphIndex())
                             .endParagraphIndex(lineIndex - 1)
                             .wordCount(currentWordCount)
                             .build();
@@ -123,7 +156,19 @@ public class LocalNovelLoader {
 
         if (currentChapterBuilder != null) {
             int endIdx = rawLines.isEmpty() ? lineOffset : rawLines.size() - 1;
-            Chapter finishedChapter = currentChapterBuilder
+            String finalFullTitle = isVolumeChapter && !currentVolumeTitle.isEmpty()
+                    ? volumeRecognizer.buildFullChapterTitle(currentVolumeTitle,
+                            currentChapterBuilder.build().getTitle())
+                    : currentChapterBuilder.build().getTitle();
+            String finalOriginalTitle = isVolumeChapter
+                    ? currentChapterBuilder.build().getTitle()
+                    : null;
+            Chapter finishedChapter = Chapter.builder()
+                    .index(chapters.size() + 1)
+                    .title(finalFullTitle)
+                    .volumeTitle(isVolumeChapter && !currentVolumeTitle.isEmpty() ? currentVolumeTitle : null)
+                    .originalTitle(isVolumeChapter ? finalOriginalTitle : null)
+                    .startParagraphIndex(currentChapterBuilder.build().getStartParagraphIndex())
                     .endParagraphIndex(endIdx)
                     .wordCount(currentWordCount)
                     .build();

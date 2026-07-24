@@ -46,4 +46,14 @@ public class Chapter {
      * 字数
      */
     private int wordCount;
+
+    /**
+     * 所属卷标题（VOLUME_CHAPTER 策略时设置，用于构建复合 title）
+     */
+    private String volumeTitle;
+
+    /**
+     * 不含卷前缀的原始章节标题（VOLUME_CHAPTER 策略时设置）
+     */
+    private String originalTitle;
 }

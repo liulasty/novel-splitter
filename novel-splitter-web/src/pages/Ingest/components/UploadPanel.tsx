@@ -20,6 +20,7 @@ interface UploadPanelProps {
         currentNovelId: string;
         chapterReviewAck: boolean;
         chapterTitleRegex: string;
+        recognitionStrategy: string;
         ingestStatus: string;
         isError: boolean;
         tasks: SplitTask[];
@@ -52,6 +53,7 @@ interface UploadPanelProps {
         setMaxTokens: (tokens: number) => void;
         setOverlapTokens: (tokens: number) => void;
         setChapterTitleRegex: (v: string) => void;
+        setRecognitionStrategy: (v: string) => void;
         acknowledgeChapterReview: () => void;
         selectNovelById: (novelId: string) => void;
         clearSelectedNovel: () => void;
@@ -73,6 +75,7 @@ export function UploadPanel({ state, actions }: UploadPanelProps) {
         currentNovelId,
         chapterReviewAck,
         chapterTitleRegex,
+        recognitionStrategy,
         ingestStatus,
         isError,
         tasks,
@@ -301,16 +304,32 @@ export function UploadPanel({ state, actions }: UploadPanelProps) {
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         <div className="space-y-1.5 sm:col-span-2 lg:col-span-3">
                             <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
-                                章节标题正则（可选）
+                                识别策略
                             </label>
-                            <input
-                                type="text"
-                                value={chapterTitleRegex}
-                                onChange={(e) => actions.setChapterTitleRegex(e.target.value)}
-                                placeholder="整行匹配 Java 正则，留空用默认"
-                                className="w-full h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm font-mono text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-400"
-                            />
+                            <select
+                                value={recognitionStrategy}
+                                onChange={(e) => actions.setRecognitionStrategy(e.target.value)}
+                                className="w-full h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                            >
+                                <option value="PLAIN">普通章节</option>
+                                <option value="VOLUME_CHAPTER">分卷章节</option>
+                                <option value="CUSTOM">自定义正则</option>
+                            </select>
                         </div>
+                        {recognitionStrategy === 'CUSTOM' && (
+                            <div className="space-y-1.5 sm:col-span-2 lg:col-span-3">
+                                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                                    章节标题正则（可选）
+                                </label>
+                                <input
+                                    type="text"
+                                    value={chapterTitleRegex}
+                                    onChange={(e) => actions.setChapterTitleRegex(e.target.value)}
+                                    placeholder="整行匹配 Java 正则，留空用默认"
+                                    className="w-full h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm font-mono text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                />
+                            </div>
+                        )}
                         <div className="space-y-1.5">
                             <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">小说名称</label>
                             <input
@@ -342,16 +361,32 @@ export function UploadPanel({ state, actions }: UploadPanelProps) {
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div className="space-y-1.5 sm:col-span-3">
                             <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
-                                章节标题正则（可选，整行匹配）
+                                识别策略
                             </label>
-                            <input
-                                type="text"
-                                value={chapterTitleRegex}
-                                onChange={(e) => actions.setChapterTitleRegex(e.target.value)}
-                                placeholder="留空则用默认规则；示例 ^第\\d+章.*"
-                                className="w-full h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm font-mono text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-400"
-                            />
+                            <select
+                                value={recognitionStrategy}
+                                onChange={(e) => actions.setRecognitionStrategy(e.target.value)}
+                                className="w-full h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                            >
+                                <option value="PLAIN">普通章节</option>
+                                <option value="VOLUME_CHAPTER">分卷章节</option>
+                                <option value="CUSTOM">自定义正则</option>
+                            </select>
                         </div>
+                        {recognitionStrategy === 'CUSTOM' && (
+                            <div className="space-y-1.5 sm:col-span-3">
+                                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                                    章节标题正则（可选，整行匹配）
+                                </label>
+                                <input
+                                    type="text"
+                                    value={chapterTitleRegex}
+                                    onChange={(e) => actions.setChapterTitleRegex(e.target.value)}
+                                    placeholder="留空则用默认规则；示例 ^第\\d+章.*"
+                                    className="w-full h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm font-mono text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                />
+                            </div>
+                        )}
                         <div className="space-y-1.5">
                             <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">场景版本标识</label>
                             <input
