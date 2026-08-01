@@ -42,6 +42,7 @@ export function NovelTableRow({ novel, hasRunningTasks, stats, expanded, onToggl
     onSuccess: (_, p) => {
       toast.success(`数据集 "${splitProfileLabel(p)}" 已删除`);
       queryClient.invalidateQueries({ queryKey: ['splitProfiles', novel.novelId] });
+      queryClient.invalidateQueries({ queryKey: ['novelStats'] });
     },
     onError: (error: any) => {
       if (error?.message === 'legacy_missing_chunk') {
@@ -60,18 +61,21 @@ export function NovelTableRow({ novel, hasRunningTasks, stats, expanded, onToggl
 
   return (
     <>
-      <tr
-        onClick={onToggleExpand}
-        className="cursor-pointer transition-colors hover:bg-slate-50/80"
-      >
+      <tr className="transition-colors hover:bg-slate-50/80">
         <td className="px-4 py-3">
-          <div className="flex items-center gap-2 min-w-0">
+          <button
+            type="button"
+            onClick={onToggleExpand}
+            aria-expanded={expanded}
+            aria-controls={`novel-expand-${novel.novelId}`}
+            className="flex items-center gap-2 min-w-0 w-full text-left"
+          >
             {expanded ? <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" /> : <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />}
-            <div className="min-w-0">
-              <div className="font-medium text-slate-800 truncate">{novel.title || novel.novelId}</div>
-              <div className="text-xs font-mono text-slate-400 truncate">{novel.novelId}</div>
-            </div>
-          </div>
+            <span className="min-w-0">
+              <span className="block font-medium text-slate-800 truncate">{novel.title || novel.novelId}</span>
+              <span className="block text-xs font-mono text-slate-400 truncate">{novel.novelId}</span>
+            </span>
+          </button>
         </td>
         <td className="px-4 py-3">
           <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${badge.className}`}>{badge.label}</span>
@@ -87,7 +91,6 @@ export function NovelTableRow({ novel, hasRunningTasks, stats, expanded, onToggl
           <div className="flex items-center justify-end gap-2">
             <Link
               to={`/process?novelId=${encodeURIComponent(novel.novelId)}`}
-              onClick={(e) => e.stopPropagation()}
               className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-800 hover:underline"
             >
               <FileInput className="w-3.5 h-3.5" />
@@ -95,9 +98,10 @@ export function NovelTableRow({ novel, hasRunningTasks, stats, expanded, onToggl
             </Link>
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); onDelete(novel); }}
+              onClick={() => onDelete(novel)}
               disabled={hasRunningTasks}
               className="inline-flex items-center gap-1 p-1 rounded-md text-slate-300 hover:text-red-500 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              aria-label="删除知识库"
               title={hasRunningTasks ? "存在运行中任务，暂不可删除" : "删除知识库"}
             >
               <Trash2 className="w-4 h-4" />
@@ -106,7 +110,7 @@ export function NovelTableRow({ novel, hasRunningTasks, stats, expanded, onToggl
         </td>
       </tr>
       {expanded && (
-        <tr>
+        <tr id={`novel-expand-${novel.novelId}`}>
           <td colSpan={5} className="px-4 pb-4 bg-slate-50/40">
             {isLoading ? (
               <div className="flex justify-center py-3"><Loader2 className="w-4 h-4 animate-spin text-slate-300" /></div>
