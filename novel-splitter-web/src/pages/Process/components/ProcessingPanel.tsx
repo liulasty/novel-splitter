@@ -313,7 +313,7 @@ export function ProcessingPanel({ state, actions }: ProcessingPanelProps) {
       {/* Modals */}
       {currentNovelId && (
         <>
-          <SplitPreviewModal isOpen={previewOpen} onClose={() => setPreviewOpen(false)} novelId={currentNovelId} />
+          <SplitPreviewModal isOpen={previewOpen} onClose={() => setPreviewOpen(false)} novelId={currentNovelId} version={version} />
           <ChapterReviewModal
             open={chapterReviewOpen}
             novelId={currentNovelId}

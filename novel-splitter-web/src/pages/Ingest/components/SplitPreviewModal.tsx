@@ -8,9 +8,10 @@ interface SplitPreviewModalProps {
     isOpen: boolean;
     onClose: () => void;
     novelId: string;
+    version?: string;
 }
 
-export function SplitPreviewModal({ isOpen, onClose, novelId }: SplitPreviewModalProps) {
+export function SplitPreviewModal({ isOpen, onClose, novelId, version }: SplitPreviewModalProps) {
     const [selectedChapterId, setSelectedChapterId] = useState<string | null>(null);
     const [scenePage, setScenePage] = useState(0);
     const scenePageSize = 200;
@@ -29,8 +30,8 @@ export function SplitPreviewModal({ isOpen, onClose, novelId }: SplitPreviewModa
     });
 
     const { data: scenesPageData, isLoading: isScenesLoading } = useQuery({
-        queryKey: ['scenes', novelId, selectedChapterId, scenePage],
-        queryFn: () => novelApi.getScenes(novelId, selectedChapterId!, undefined, scenePage, scenePageSize),
+        queryKey: ['scenes', novelId, version, selectedChapterId, scenePage],
+        queryFn: () => novelApi.getScenes(novelId, selectedChapterId!, version, scenePage, scenePageSize),
         enabled: isOpen && !!novelId && !!selectedChapterId,
     });
     const scenes = scenesPageData?.content ?? [];
