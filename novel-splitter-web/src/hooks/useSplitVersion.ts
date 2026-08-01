@@ -21,6 +21,7 @@ export function useSplitVersion(novelId: string | undefined) {
   const [version, setVersionState] = useState<string>('');
   const originRef = useRef<'explicit' | 'auto'>('auto');
   const novelRef = useRef<string | undefined>(undefined);
+  const switchPendingRef = useRef(false);
 
   const { data: profiles = [], isPending: isDiscovering, isError } = useQuery({
     queryKey: ['splitProfiles', novelId],
@@ -53,6 +54,7 @@ export function useSplitVersion(novelId: string | undefined) {
     originRef.current = 'auto';
     setVersionState('');
     if (prevNovel && prevNovel !== novelId) {
+      switchPendingRef.current = true;
       clearUrlVersion();
       try { sessionStorage.removeItem(SESSION_PREFIX + prevNovel); } catch { /* ignore */ }
     }
@@ -67,7 +69,7 @@ export function useSplitVersion(novelId: string | undefined) {
     const urlVersion = searchParams.get('version')?.trim();
     const urlValid = !!urlVersion && (profiles.length === 0 || exists(urlVersion));
 
-    if (urlVersion && urlValid) {
+    if (urlVersion && urlValid && !switchPendingRef.current) {
       if (urlVersion !== version) {
         setVersionState(urlVersion);
         originRef.current = 'explicit';
@@ -77,6 +79,8 @@ export function useSplitVersion(novelId: string | undefined) {
       }
       return;
     }
+    // 切换小说后的首个解析窗口：忽略上个小说残留的 URL 版本，改走 session/最新。
+    switchPendingRef.current = false;
 
     if (originRef.current === 'explicit') return;
 
