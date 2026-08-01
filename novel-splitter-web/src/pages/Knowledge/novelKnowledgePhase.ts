@@ -58,25 +58,6 @@ export function sectionTitleForPhase(phase: NovelKnowledgePhase): string {
   }
 }
 
-export function sectionHintForPhase(phase: NovelKnowledgePhase): string {
-  switch (phase) {
-    case 'processing':
-      return '任务执行期间请稍候；也可在任务页查看进度。';
-    case 'awaitingSplit':
-      return '已登记到书库，尚未完成场景切分或未产生向量版本。';
-    case 'awaitingEmbed':
-      return '切分已完成，需在入库页发起向量化或跑 Pipeline。';
-    case 'failed':
-      return '上次流水线失败，请到入库页重试或查看任务详情。';
-    case 'ready':
-      return '与对话页「可选书籍」一致（COMPLETED），可正常检索。';
-    case 'unknown':
-      return '后端返回了未识别的状态字段，请核对服务版本。';
-    default:
-      return '';
-  }
-}
-
 export function phaseBadge(phase: NovelKnowledgePhase): { label: string; className: string } {
     switch (phase) {
         case 'ready':

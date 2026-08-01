@@ -76,16 +76,17 @@ export default function KnowledgePage() {
   const nonReadyCount = novelList.length - readyCount;
 
   const deleteNovelMutation = useMutation({
-    mutationFn: ({ novel, purge }: { novel: NovelSummaryDto; purge: boolean }) => (async () => {
+    mutationFn: async ({ novel, purge }: { novel: NovelSummaryDto; purge: boolean }) => {
       const cleanupTaskId = await knowledgeApi.deleteKnowledgeBaseById(novel.novelId, purge);
       await novelApi.softDeleteNovel(novel.novelId);
       return { novel, cleanupTaskId };
-    })(),
+    },
     onSuccess: ({ novel, cleanupTaskId }, vars) => {
       const extra = vars.purge ? '；已清理本书终态任务记录' : '';
       toast.success(`知识库 "${novel.title}" 已删除，清理任务：${cleanupTaskId}${extra}`);
       setDeleteNovelTarget(null);
       queryClient.invalidateQueries({ queryKey: ['novelSummaries'] });
+      queryClient.invalidateQueries({ queryKey: ['novelStats'] });
       if (vars.purge) queryClient.invalidateQueries({ queryKey: ['tasks'] });
     },
     onError: (error: any) => {
