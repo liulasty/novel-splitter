@@ -30,7 +30,7 @@ export function SplitPreviewModal({ isOpen, onClose, novelId }: SplitPreviewModa
 
     const { data: scenesPageData, isLoading: isScenesLoading } = useQuery({
         queryKey: ['scenes', novelId, selectedChapterId, scenePage],
-        queryFn: () => novelApi.getScenes(novelId, selectedChapterId!, scenePage, scenePageSize),
+        queryFn: () => novelApi.getScenes(novelId, selectedChapterId!, undefined, scenePage, scenePageSize),
         enabled: isOpen && !!novelId && !!selectedChapterId,
     });
     const scenes = scenesPageData?.content ?? [];

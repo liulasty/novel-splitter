@@ -272,10 +272,12 @@ export const novelApi = {
     return response;
   },
 
-  getScenes: async (novelId: string, chapterId: string, page = 0, size = 200): Promise<DomainPagedResult<SceneDto>> => {
+  getScenes: async (novelId: string, chapterId: string, version?: string, page = 0, size = 200): Promise<DomainPagedResult<SceneDto>> => {
+    const params: Record<string, string | number> = { page, size };
+    if (version) params.version = version;
     const response = await apiClient.get<ApiEnvelope<DomainPagedResult<SceneDto>>, DomainPagedResult<SceneDto>>(
       `/novels/${novelId}/chapters/${chapterId}/scenes`,
-      { params: { page, size } }
+      { params }
     );
     return response;
   },
