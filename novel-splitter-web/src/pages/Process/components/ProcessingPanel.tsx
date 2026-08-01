@@ -9,48 +9,12 @@ import { cn } from "@/lib/utils";
 import { SplitPreviewModal } from '@/pages/Ingest/components/SplitPreviewModal';
 import { ChapterReviewModal } from '@/pages/Ingest/components/ChapterReviewModal';
 import { TaskPollerStatus } from '@/pages/Ingest/components/TaskPollerStatus';
-import type { SplitTask } from "@/api/taskApi";
-import { splitProfileLabel, type SceneSplitProfileDto } from '@/api/knowledgeApi';
+import { splitProfileLabel } from '@/api/knowledgeApi';
+import type { ProcessState, ProcessActions } from './ProcessTypes';
 
 interface ProcessingPanelProps {
-  state: {
-    currentNovelId: string;
-    version: string;
-    profiles: SceneSplitProfileDto[];
-    currentProfile?: SceneSplitProfileDto;
-    maxTokens: number;
-    overlapTokens: number;
-    chapterReviewAck: boolean;
-    chapterTitleRegex: string;
-    recognitionStrategy: string;
-    tasks: SplitTask[];
-    activeTasks: SplitTask[];
-    poller: {
-      errorCount: number;
-      isPaused: boolean;
-      stuckTaskIds: string[];
-      timeoutTaskIds: string[];
-    };
-    isChapterParsing: boolean;
-    isSceneSplitting: boolean;
-    isEmbedding: boolean;
-  };
-  actions: {
-    setVersion: (v: string) => void;
-    setMaxTokens: (v: number) => void;
-    setOverlapTokens: (v: number) => void;
-    setChapterTitleRegex: (v: string) => void;
-    setRecognitionStrategy: (v: string) => void;
-    acknowledgeChapterReview: () => void;
-    handleChapterParse: () => void;
-    handleSceneSplit: (triggerEmbed: boolean) => void;
-    handleForceReparseChapters: () => void;
-    handleEmbed: () => void;
-    manualRefresh: () => Promise<void>;
-    selectNovelById: (novelId: string) => void;
-    clearSelectedNovel: () => void;
-    addActiveTask: (taskId: string) => void;
-  };
+  state: ProcessState;
+  actions: ProcessActions;
 }
 
 export function ProcessingPanel({ state, actions }: ProcessingPanelProps) {
