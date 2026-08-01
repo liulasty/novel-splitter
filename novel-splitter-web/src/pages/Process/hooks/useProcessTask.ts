@@ -194,7 +194,8 @@ export function useProcessTask() {
         for (const t of tasks) {
             if (t.novelId !== currentNovelId) continue;
             if (t.taskType !== 'SCENE_SPLIT' && t.taskType !== 'EMBED') continue;
-            if (t.status !== 'SUCCESS' && t.status !== 'FAILED') continue;
+            // 仅 SUCCESS 会生成新的版本 profile；挂载时对既有终态任务的刷新有意保留（进入页面即发现最新版本）。
+            if (t.status !== 'SUCCESS') continue;
             const key = `${t.taskId}:${t.status}`;
             if (!completedTaskKeysRef.current.has(key)) {
                 completedTaskKeysRef.current.add(key);
