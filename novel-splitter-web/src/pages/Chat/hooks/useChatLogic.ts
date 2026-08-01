@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { novelApi } from "@/api/novelApi";
-import { knowledgeApi, type SceneSplitProfileDto, splitProfileLabel } from "@/api/knowledgeApi";
+import { splitProfileLabel } from "@/api/knowledgeApi";
 import { chatApi } from "@/api/chatApi";
+import { useSplitVersion } from '@/hooks/useSplitVersion';
 import type { Citation } from "@/types/api";
 import type { NovelSummaryDto } from "@/api/novelApi";
 
@@ -15,8 +16,8 @@ export interface Message {
 
 export function useChatLogic() {
     const [selectedNovel, setSelectedNovel] = useState<string>(""); // novelId
-    /** 选中 {@link splitProfiles} 的下标 */
-    const [selectedProfileIndex, setSelectedProfileIndex] = useState<number>(0);
+    const { version: selectedVersion, setVersion: setSelectedVersion,
+            profiles: splitProfiles, currentProfile } = useSplitVersion(selectedNovel);
     const [topK, setTopK] = useState<number>(3);
     const [maxScenes, setMaxScenes] = useState<number>(5);
     const [maxContextTokens, setMaxContextTokens] = useState<number>(3000);
@@ -35,20 +36,10 @@ export function useChatLogic() {
         queryFn: () => novelApi.getNovelSummaries('embed_ready'),
     });
     const novels: Array<Pick<NovelSummaryDto, 'novelId' | 'title' | 'status'>> = novelSummaries?.map(n => ({ novelId: n.novelId, title: n.title, status: n.status })) ?? [];
-    const { data: splitProfiles } = useQuery({
-        queryKey: ['splitProfiles', selectedNovel],
-        queryFn: () => knowledgeApi.listSplitProfilesByNovelId(selectedNovel),
-        enabled: !!selectedNovel,
-    });
 
     useEffect(() => {
         if (novels.length && !selectedNovel) setSelectedNovel(novels[0].novelId);
     }, [novels, selectedNovel]);
-
-    useEffect(() => {
-        if (splitProfiles?.length) setSelectedProfileIndex(splitProfiles.length - 1);
-        else setSelectedProfileIndex(0);
-    }, [splitProfiles]);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -74,18 +65,17 @@ export function useChatLogic() {
     });
 
     const handleSend = () => {
-        const profile: SceneSplitProfileDto | undefined = splitProfiles?.[selectedProfileIndex];
-        if (!inputValue.trim() || !selectedNovel || !profile?.version) return;
+        if (!inputValue.trim() || !selectedNovel || !selectedVersion) return;
         setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', content: inputValue }]);
         const q = inputValue;
         setInputValue("");
         chatMutation.mutate({
             question: q,
             novelId: selectedNovel,
-            version: profile.version,
+            version: selectedVersion,
             topK,
-            chunkSize: profile.chunkSize ?? undefined,
-            chunkOverlap: profile.chunkOverlap ?? undefined,
+            chunkSize: currentProfile?.chunkSize ?? undefined,
+            chunkOverlap: currentProfile?.chunkOverlap ?? undefined,
             maxScenes,
             maxContextTokens,
             maxAnswerTokens: maxAnswerTokens > 0 ? maxAnswerTokens : undefined,
@@ -99,15 +89,15 @@ export function useChatLogic() {
         }
     };
 
-    const profileOptions: { index: number; label: string }[] =
-        (splitProfiles ?? []).map((p, index) => ({ index, label: splitProfileLabel(p) }));
+    const profileOptions: { value: string; label: string }[] =
+        (splitProfiles ?? []).map((p) => ({ value: p.version, label: splitProfileLabel(p) }));
     const selectedProfileLabel =
-        profileOptions.find((o) => o.index === selectedProfileIndex)?.label ?? "";
+        profileOptions.find((o) => o.value === selectedVersion)?.label ?? "";
 
     return {
         state: {
             selectedNovel,
-            selectedProfileIndex,
+            selectedVersion,
             selectedProfileLabel,
             topK,
             inputValue,
@@ -121,6 +111,6 @@ export function useChatLogic() {
             isPending: chatMutation.isPending,
         },
         refs: { messagesEndRef },
-        actions: { setSelectedNovel, setSelectedProfileIndex, setTopK, setMaxScenes, setMaxContextTokens, setMaxAnswerTokens, setInputValue, handleSend, handleKeyDown },
+        actions: { setSelectedNovel, setSelectedVersion, setTopK, setMaxScenes, setMaxContextTokens, setMaxAnswerTokens, setInputValue, handleSend, handleKeyDown },
     };
 }

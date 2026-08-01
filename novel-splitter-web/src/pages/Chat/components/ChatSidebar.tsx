@@ -6,9 +6,9 @@ interface ChatSidebarProps {
     state: {
         novels: Array<Pick<NovelSummaryDto, 'novelId' | 'title' | 'status'>> | undefined;
         splitProfiles: SceneSplitProfileDto[];
-        profileOptions: { index: number; label: string }[];
+        profileOptions: { value: string; label: string }[];
         selectedNovel: string;
-        selectedProfileIndex: number;
+        selectedVersion: string;
         topK: number;
         maxScenes: number;
         maxContextTokens: number;
@@ -16,7 +16,7 @@ interface ChatSidebarProps {
     };
     actions: {
         setSelectedNovel: (val: string) => void;
-        setSelectedProfileIndex: (val: number) => void;
+        setSelectedVersion: (val: string) => void;
         setTopK: (val: number) => void;
         setMaxScenes: (val: number) => void;
         setMaxContextTokens: (val: number) => void;
@@ -31,8 +31,8 @@ export function ChatSidebar({ state, actions }: ChatSidebarProps) {
         description: n.status ? `状态: ${n.status}` : undefined,
     }));
 
-    const profileOptions: SelectMenuOption[] = state.splitProfiles.map((p, i) => ({
-        value: String(i),
+    const profileOptions: SelectMenuOption[] = state.splitProfiles.map((p) => ({
+        value: p.version,
         label: p.version,
         description: p.chunkSize != null && p.chunkOverlap != null
             ? `chunk: ${p.chunkSize} / overlap: ${p.chunkOverlap}`
@@ -67,8 +67,8 @@ export function ChatSidebar({ state, actions }: ChatSidebarProps) {
                     <div className="space-y-1.5">
                         <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">数据集（版本 / 滑窗）</label>
                         <SelectMenu
-                            value={profileOptions.length ? String(state.selectedProfileIndex) : ''}
-                            onValueChange={(v) => actions.setSelectedProfileIndex(Number(v))}
+                            value={state.selectedVersion}
+                            onValueChange={actions.setSelectedVersion}
                             options={profileOptions}
                             placeholder="-- 请选择 --"
                             disabled={!state.selectedNovel || !profileOptions.length}
