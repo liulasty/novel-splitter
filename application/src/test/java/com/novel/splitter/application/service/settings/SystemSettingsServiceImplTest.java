@@ -9,6 +9,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.env.ConfigurableEnvironment;
+import org.springframework.core.env.MutablePropertySources;
 
 import java.util.Collections;
 
@@ -27,6 +28,7 @@ public class SystemSettingsServiceImplTest {
 
     @BeforeEach
     void setUp() {
+        when(env.getPropertySources()).thenReturn(new MutablePropertySources());
         service = new SystemSettingsServiceImpl(repo, env);
     }
 
