@@ -138,11 +138,15 @@ export function ProcessingPanel({ state, actions }: ProcessingPanelProps) {
       </div>
 
       {/* Tab 栏 */}
-      <div className="mb-5 flex gap-1 rounded-xl border border-slate-200 bg-white/80 p-1">
+      <div role="tablist" aria-label="处理阶段" className="mb-5 flex gap-1 rounded-xl border border-slate-200 bg-white/80 p-1">
         {TABS.map((t) => (
           <button
             key={t.id}
             type="button"
+            role="tab"
+            id={`tab-${t.id}`}
+            aria-selected={activeTab === t.id}
+            aria-controls={`panel-${t.id}`}
             onClick={() => setActiveTab(t.id)}
             className={cn(
               'flex-1 h-9 rounded-lg text-sm font-medium transition-colors',
@@ -155,7 +159,7 @@ export function ProcessingPanel({ state, actions }: ProcessingPanelProps) {
       </div>
 
       {/* 活动 tab 内容 */}
-      <div className="mb-5">
+      <div role="tabpanel" id={`panel-${activeTab}`} aria-labelledby={`tab-${activeTab}`} className="mb-5">
         {activeTab === 'parse' && <ParseTab state={state} actions={actions} gates={gates} currentNovelStatus={currentMeta?.status ?? undefined} />}
         {activeTab === 'split' && <SplitTab state={state} actions={actions} gates={gates} currentNovelStatus={currentMeta?.status ?? undefined} />}
         {activeTab === 'embed' && <EmbedTab state={state} actions={actions} />}
