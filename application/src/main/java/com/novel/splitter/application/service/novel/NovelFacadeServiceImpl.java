@@ -113,6 +113,17 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
                 .filter(t -> t.getNovelId() != null)
                 .collect(Collectors.groupingBy(SplitTask::getNovelId));
 
+        // 宽容标题查找：软删/不存在的小说不在 listNovels()（@SQLRestriction is_deleted=false），
+        // 用 map 兜底避免 getNovelById 对已删小说抛 "Novel not found" 导致整个 stats 端点 400。
+        Map<String, String> novelTitles = new HashMap<>();
+        for (Novel n : novelService.listNovels()) {
+            String id = n.getId();
+            if (id == null) {
+                continue;
+            }
+            novelTitles.put(id, n.getTitle() != null && !n.getTitle().isBlank() ? n.getTitle() : id);
+        }
+
         List<NovelStatRecordDto> stats = new ArrayList<>();
 
         // Merge data
@@ -139,7 +150,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
                 status = latestTask.getStatus() != null ? latestTask.getStatus().name() : "UNKNOWN";
             }
 
-            String titleForDisplay = novelService.getNovelById(novelId) != null ? novelService.getNovelById(novelId).getTitle() : novelId;
+            String titleForDisplay = novelTitles.getOrDefault(novelId, novelId);
 
             NovelStatRecordDto dto = NovelStatRecordDto.builder()
                     .novelId(novelId)
@@ -156,6 +167,9 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         // Add novels that have tasks but no scenes yet
         for (Map.Entry<String, List<SplitTask>> entry : tasksByNovel.entrySet()) {
             String novelId = entry.getKey();
+            if (!novelTitles.containsKey(novelId)) {
+                continue; // 软删/孤儿任务引用的小说：跳过，不出现在 stats 中
+            }
             if (!novelProfileCounts.containsKey(novelId)) {
                 SplitTask latestTask = entry.getValue().stream()
                         .max(Comparator.comparing(SplitTask::getCreatedAt))
@@ -169,7 +183,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
                     status = latestTask.getStatus() != null ? latestTask.getStatus().name() : "UNKNOWN";
                 }
 
-                String titleForDisplay = novelService.getNovelById(novelId) != null ? novelService.getNovelById(novelId).getTitle() : novelId;
+                String titleForDisplay = novelTitles.getOrDefault(novelId, novelId);
                 NovelStatRecordDto dto = NovelStatRecordDto.builder()
                         .novelId(novelId)
                         .novelName(titleForDisplay)
