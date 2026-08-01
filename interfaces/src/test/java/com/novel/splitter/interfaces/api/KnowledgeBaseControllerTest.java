@@ -47,4 +47,15 @@ class KnowledgeBaseControllerTest {
 
         verify(knowledgeBaseService).getScenesByNovelId("n1", "v2");
     }
+
+    @Test
+    void getScenesByNovelId_omitsVersion_whenAbsent() throws Exception {
+        when(knowledgeBaseService.getScenesByNovelId("n1", null)).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/knowledge/id/n1/scenes"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200));
+
+        verify(knowledgeBaseService).getScenesByNovelId("n1", null);
+    }
 }
