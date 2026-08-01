@@ -138,14 +138,15 @@ public class NovelController {
         return novelFacadeService.getChapters(novelId);
     }
 
-    @Operation(summary = "获取章节片段", description = "获取某章节下的所有切分片段 (Scenes)")
+    @Operation(summary = "获取章节片段", description = "获取某章节下的所有切分片段 (Scenes)；可选 version 过滤，不传则返回全部版本")
     @GetMapping("/{novelId}/chapters/{chapterId}/scenes")
     public PagedResult<SceneDto> getScenesByChapter(
             @PathVariable("novelId") String novelId,
             @PathVariable("chapterId") Long chapterId,
+            @RequestParam(value = "version", required = false) String version,
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "200") int size) {
-        return novelFacadeService.getScenesByChapter(novelId, chapterId, null, page, size);
+        return novelFacadeService.getScenesByChapter(novelId, chapterId, version, page, size);
     }
     @Operation(summary = "章节解析（CHAPTER_PARSE）", description = "投递 Load 队列：原文正则章节边界 → chapters 与 parsed JSON 落库；不自动场景切分，完成后请调用 scene-split")
     @PostMapping("/{novelId}/split")

@@ -133,4 +133,28 @@ class NovelControllerTest {
 
         verify(novelFacadeService).sceneSplit(eq("n1"), any(SceneSplitRequestDto.class));
     }
+
+    @Test
+    void getScenesByChapter_passesVersionToFacade() throws Exception {
+        when(novelFacadeService.getScenesByChapter("n1", 5L, "v2", 0, 200))
+                .thenReturn(com.novel.splitter.domain.model.paging.PagedResult.of(List.of(), 0, 200, 0));
+
+        mockMvc.perform(get("/api/novels/n1/chapters/5/scenes").param("version", "v2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200));
+
+        verify(novelFacadeService).getScenesByChapter("n1", 5L, "v2", 0, 200);
+    }
+
+    @Test
+    void getScenesByChapter_omitsVersion_whenAbsent() throws Exception {
+        when(novelFacadeService.getScenesByChapter("n1", 5L, null, 0, 200))
+                .thenReturn(com.novel.splitter.domain.model.paging.PagedResult.of(List.of(), 0, 200, 0));
+
+        mockMvc.perform(get("/api/novels/n1/chapters/5/scenes"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200));
+
+        verify(novelFacadeService).getScenesByChapter("n1", 5L, null, 0, 200);
+    }
 }
