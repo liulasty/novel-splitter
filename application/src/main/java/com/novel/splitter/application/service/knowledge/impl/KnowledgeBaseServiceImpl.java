@@ -139,7 +139,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                 .build();
         
         applicationEventPublisher.publishEvent(new CleanupTaskCreatedEvent(message));
-        log.info("Sent cleanup task {} to MQ", savedTask.getId());
+        log.info("Published cleanup event for cleanup task {}", savedTask.getId());
         maybePurgeTerminalSplitTasks(novelId, version != null ? version.trim() : null, purgeTerminalSplitTasks);
         return savedTask.getId();
     }
@@ -173,7 +173,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                 .build();
         
         applicationEventPublisher.publishEvent(new CleanupTaskCreatedEvent(message));
-        log.info("Sent cleanup task {} to MQ", savedTask.getId());
+        log.info("Published cleanup event for cleanup task {}", savedTask.getId());
         maybePurgeTerminalSplitTasks(novelId, null, purgeTerminalSplitTasks);
         return savedTask.getId();
     }
@@ -212,7 +212,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                 .build();
 
         applicationEventPublisher.publishEvent(new CleanupTaskCreatedEvent(message));
-        log.info("Sent cleanup task {} to MQ for novelId {}", savedTask.getId(), normalizedNovelId);
+        log.info("Published cleanup event for cleanup task {} for novelId {}", savedTask.getId(), normalizedNovelId);
         maybePurgeTerminalSplitTasks(normalizedNovelId, null, purgeTerminalSplitTasks);
         return savedTask.getId();
     }
@@ -293,14 +293,24 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                 .build();
 
         applicationEventPublisher.publishEvent(new CleanupTaskCreatedEvent(message));
-        log.info("Sent cleanup task {} to MQ for novelId {} profile {}", savedTask.getId(), normalizedNovelId, trimmedVersion);
+        log.info("Published cleanup event for cleanup task {} for novelId {} profile {}", savedTask.getId(), normalizedNovelId, trimmedVersion);
         maybePurgeTerminalSplitTasks(normalizedNovelId, trimmedVersion, purgeTerminalSplitTasks);
         return savedTask.getId();
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onCleanupTaskCreated(CleanupTaskCreatedEvent event) {
-        rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "cleanup", event.getMessage());
+        CleanupTaskMessage message = event.getMessage();
+        try {
+            rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "cleanup", message);
+        } catch (Exception e) {
+            log.error("Failed to send cleanup task {} to MQ after commit", message.getCleanupTaskId(), e);
+            cleanupTaskRepository.findById(message.getCleanupTaskId()).ifPresent(task -> {
+                task.setStatus("FAILED");
+                task.setErrorMessage("MQ send failed: " + e.getMessage());
+                cleanupTaskRepository.save(task);
+            });
+        }
     }
 
     private void maybePurgeTerminalSplitTasks(String novelId, String versionOrNull, boolean purge) {
