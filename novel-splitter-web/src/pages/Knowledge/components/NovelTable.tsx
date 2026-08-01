@@ -13,14 +13,14 @@ interface NovelTableProps {
 export function NovelTable({ novels, runningNovelIds, statsMap, expandedNovelId, onToggleExpand, onDelete }: NovelTableProps) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-      <table className="w-full text-sm">
+      <table className="w-full text-sm" aria-label="知识库列表">
         <thead>
           <tr className="border-b border-slate-200 bg-slate-50/50 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">
-            <th className="px-4 py-3">小说</th>
-            <th className="px-4 py-3 w-28">状态 / 版本</th>
-            <th className="px-4 py-3 w-32">场景 / 向量</th>
-            <th className="px-4 py-3 w-40">更新时间</th>
-            <th className="px-4 py-3 w-32 text-right">操作</th>
+            <th scope="col" className="px-4 py-3">小说</th>
+            <th scope="col" className="px-4 py-3 w-28">状态 / 版本</th>
+            <th scope="col" className="px-4 py-3 w-32">场景 / 向量</th>
+            <th scope="col" className="px-4 py-3 w-40">更新时间</th>
+            <th scope="col" className="px-4 py-3 w-32 text-right">操作</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
