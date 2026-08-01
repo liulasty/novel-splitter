@@ -108,7 +108,7 @@ interface UseSplitVersionResult {
 
 | 页面 | 改动 |
 |---|---|
-| **Process** | `useProcessTask` 用 `useSplitVersion(currentNovelId)` 替换 `useState("v1")`；版本输入框保留（支持新建版本），选中已有 profile 时用 `currentProfile` 回填/展示 chunkSize、chunkOverlap（"后续信息传递和显示"）；`SplitPreviewModal` 的 `getScenes` 传 version；切分任务完成后调用 `refresh()` 使新版本浮现 |
+| **Process** | `useProcessTask` 用 `useSplitVersion(currentNovelId)` 替换 `useState("v1")`；版本选择器改为**复合控件**：下拉展示发现器返回的已有 profile（标签如 `v2 (512/64)`，含 `currentProfile` 的 chunk 参数回填/展示），保留自由输入框用于**新建版本**；`SplitPreviewModal` 的 `getScenes` 传 version；切分任务完成后调用 `refresh()` 使新版本浮现 |
 | **Chat** | `useChatLogic` 用 hook 替换 `selectedProfileIndex`；按 version 选择，`currentProfile` 提供 chunkSize/chunkOverlap 传给 `chatApi.sendMessage`；下拉标签用 `splitProfileLabel(currentProfile)`（如 `v2 (512/64)`） |
 | **RagDebug** | 同上，version 传给 `/v1/rag` |
 | **Ingest** | `useIngestTask` 用 hook 替换 `useState("v1")` |
