@@ -71,7 +71,7 @@ public interface NovelFacadeService {
 
     List<ChapterDto> getChapters(String novelId);
 
-    com.novel.splitter.domain.model.paging.PagedResult<SceneDto> getScenesByChapter(String novelId, Long chapterId, int page, int size);
+    com.novel.splitter.domain.model.paging.PagedResult<SceneDto> getScenesByChapter(String novelId, Long chapterId, String version, int page, int size);
 
     void softDeleteNovel(String novelId);
 }

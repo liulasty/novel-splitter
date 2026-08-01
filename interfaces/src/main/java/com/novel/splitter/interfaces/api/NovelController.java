@@ -145,7 +145,7 @@ public class NovelController {
             @PathVariable("chapterId") Long chapterId,
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "200") int size) {
-        return novelFacadeService.getScenesByChapter(novelId, chapterId, page, size);
+        return novelFacadeService.getScenesByChapter(novelId, chapterId, null, page, size);
     }
     @Operation(summary = "章节解析（CHAPTER_PARSE）", description = "投递 Load 队列：原文正则章节边界 → chapters 与 parsed JSON 落库；不自动场景切分，完成后请调用 scene-split")
     @PostMapping("/{novelId}/split")

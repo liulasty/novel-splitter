@@ -504,7 +504,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
     }
 
     @Override
-    public PagedResult<com.novel.splitter.application.model.dto.SceneDto> getScenesByChapter(String novelId, Long chapterId, int page, int size) {
+    public PagedResult<com.novel.splitter.application.model.dto.SceneDto> getScenesByChapter(String novelId, Long chapterId, String version, int page, int size) {
         com.novel.splitter.domain.model.Novel novel = novelService.getNovelById(novelId);
         if (novel == null) {
             throw new IllegalArgumentException("Novel not found: " + novelId);
@@ -512,8 +512,13 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         novel.checkCanReadChapters();
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 500);
+        if (version == null || version.isBlank()) {
+            return sceneRepository
+                    .findByNovelIdAndChapterId(novelId, chapterId, PageQuery.of(safePage, safeSize))
+                    .map(dtoMapper::toSceneDto);
+        }
         return sceneRepository
-                .findByNovelIdAndChapterId(novelId, chapterId, PageQuery.of(safePage, safeSize))
+                .findByNovelIdAndChapterIdAndVersion(novelId, chapterId, version.trim(), PageQuery.of(safePage, safeSize))
                 .map(dtoMapper::toSceneDto);
     }
 
