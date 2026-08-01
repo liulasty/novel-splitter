@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
 import { novelApi } from '@/api/novelApi';
-import { knowledgeApi, type SceneSplitProfileDto } from '@/api/knowledgeApi';
 import { ragApi } from '@/api/ragApi';
 import { chromaAdminApi } from '@/api/chromaAdminApi';
 import type { ChromaCollection } from '@/api/chromaAdminApi';
@@ -10,6 +9,7 @@ import { toast } from 'sonner';
 import { CollapseCard } from '@/components/ui/collapse-card';
 import { SelectMenu, type SelectMenuOption } from '@/components/ui/select-menu';
 import { cn } from '@/lib/utils';
+import { useSplitVersion } from '@/hooks/useSplitVersion';
 import {
     Copy, BugPlay, Search, Layers, Terminal, Database, ChevronRight,
     Loader2, CheckCircle2, XCircle, Settings2, Info,
@@ -66,9 +66,8 @@ export default function RagDebugPage() {
 
     /* state */
     const [novels, setNovels] = useState<Array<Pick<NovelSummaryDto, 'novelId' | 'title' | 'status'>>>([]);
-    const [splitProfiles, setSplitProfiles] = useState<SceneSplitProfileDto[]>([]);
-    const [selectedProfileIndex, setSelectedProfileIndex] = useState(0);
     const [selectedNovel, setSelectedNovel] = useState('');
+    const { version, setVersion, profiles: splitProfiles, currentProfile } = useSplitVersion(selectedNovel);
     const [question, setQuestion] = useState('');
     const [topK, setTopK] = useState(5);
     const [maxScenes, setMaxScenes] = useState(5);
@@ -89,25 +88,17 @@ export default function RagDebugPage() {
             .then(list => setNovels(list.map(n => ({ novelId: n.novelId, title: n.title, status: n.status }))))
             .catch(console.error);
     }, []);
-    useEffect(() => {
-        if (selectedNovel) {
-            knowledgeApi.listSplitProfilesByNovelId(selectedNovel)
-                .then(list => { setSplitProfiles(list); setSelectedProfileIndex(list.length - 1); })
-                .catch(console.error);
-        } else { setSplitProfiles([]); setSelectedProfileIndex(0); }
-    }, [selectedNovel]);
-
     /* debug action */
     const handleDebug = async () => {
         if (!question) return;
         setLoading(true); setError(null); setResult(null);
         setChromaCollection(null); setCollectionCount(null); setVersionRecordCount(null);
         try {
-            const profile = splitProfiles[selectedProfileIndex];
-            if (!profile?.version) { setError('请选择有效的数据集'); setLoading(false); return; }
+            const profile = currentProfile;
+            if (!version) { setError('请选择有效的数据集'); setLoading(false); return; }
             const request: ChatRequest = {
-                question, novelId: selectedNovel, version: profile.version, topK,
-                chunkSize: profile.chunkSize ?? undefined, chunkOverlap: profile.chunkOverlap ?? undefined,
+                question, novelId: selectedNovel, version, topK,
+                chunkSize: profile?.chunkSize ?? undefined, chunkOverlap: profile?.chunkOverlap ?? undefined,
                 maxScenes, maxContextTokens,
                 maxAnswerTokens: maxAnswerTokens > 0 ? maxAnswerTokens : undefined,
             };
@@ -120,12 +111,12 @@ export default function RagDebugPage() {
                         if (!c) return;
                         setChromaCollection(c);
                         setCollectionCount(await chromaAdminApi.countDocuments(c.id));
-                        const prof = splitProfiles[selectedProfileIndex];
-                        if (selectedNovel && prof?.version) {
+                        const prof = currentProfile;
+                        if (selectedNovel && version) {
                             const andClauses: Record<string, { $eq: string | number }>[] = [
-                                { novelId: { $eq: selectedNovel } }, { version: { $eq: prof.version } },
+                                { novelId: { $eq: selectedNovel } }, { version: { $eq: version } },
                             ];
-                            if (prof.chunkSize != null && prof.chunkOverlap != null) {
+                            if (prof?.chunkSize != null && prof?.chunkOverlap != null) {
                                 andClauses.push({ chunkSize: { $eq: prof.chunkSize } });
                                 andClauses.push({ chunkOverlap: { $eq: prof.chunkOverlap } });
                             }
@@ -164,8 +155,9 @@ export default function RagDebugPage() {
         [novels]
     );
     const profileOptions: SelectMenuOption[] = useMemo(
-        () => splitProfiles.map((p, i) => ({
-            value: String(i), label: p.version,
+        () => splitProfiles.map((p) => ({
+            value: p.version,
+            label: p.version,
             description: p.chunkSize != null ? `chunk: ${p.chunkSize} / overlap: ${p.chunkOverlap}` : undefined,
             badge: p.chunkSize != null ? `${p.chunkSize}/${p.chunkOverlap}` : undefined,
         })),
@@ -239,8 +231,7 @@ export default function RagDebugPage() {
                             {/* Dataset */}
                             <div>
                                 <label className="mb-1 block text-xs font-medium text-[#6B7280]" style={mono}>Dataset</label>
-                                <SelectMenu value={splitProfiles.length ? String(selectedProfileIndex) : ''}
-                                    onValueChange={v => setSelectedProfileIndex(Number(v))} options={profileOptions}
+                                <SelectMenu value={version} onValueChange={setVersion} options={profileOptions}
                                     placeholder={selectedNovel ? '选择切片配置…' : '—'} disabled={!selectedNovel || !splitProfiles.length}
                                     className="w-full" emptyMessage="暂无切片配置" />
                             </div>
