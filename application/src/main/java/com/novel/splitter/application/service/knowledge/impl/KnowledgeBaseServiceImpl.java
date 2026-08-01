@@ -15,7 +15,8 @@ import com.novel.splitter.domain.repository.SceneRepository;
 import com.novel.splitter.application.model.dto.SceneSplitProfileDto;
 import com.novel.splitter.application.model.dto.VectorPreviewRecordDto;
 import com.novel.splitter.domain.model.SceneSplitProfile;
-import com.novel.splitter.embedding.api.VectorStore;
+import com.novel.splitter.application.service.knowledge.CleanupTaskCreatedEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -24,15 +25,16 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * 知识库管理服务实现。
- * <p>删除版本/整书时：先同步删除向量再软删场景行，避免孤儿向量；异步 cleanup 任务仍负责文件等清理，向量删除幂等。</p>
+ * <p>删除版本/整书时：同步软删场景行（DB 快），向量与文件删除由 CleanupWorker 异步执行（事务提交后发 MQ）。</p>
  */
 @Slf4j
 @Service
@@ -45,7 +47,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
     private final RabbitTemplate rabbitTemplate;
     private final DtoMapper dtoMapper;
     private final TaskService taskService;
-    private final VectorStore vectorStore;
+    private final ApplicationEventPublisher applicationEventPublisher;
     
     @org.springframework.beans.factory.annotation.Value("${splitter.storage.root-path}")
     private String novelStoragePath;
@@ -115,7 +117,6 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         }
 
         log.info("Logical deleting split profile: novelId={} version={} chunk={}/{}", novelId, version, chunkSize, chunkOverlap);
-        deleteVectorsForVersionProfile(novelId, normalizedNovelName, version, chunkSize, chunkOverlap);
         sceneRepository.deleteByProfile(novelId, version, chunkSize, chunkOverlap);
         
         CleanupTask task = CleanupTask.builder()
@@ -137,7 +138,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                 .chunkOverlap(chunkOverlap)
                 .build();
         
-        rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "cleanup", message);
+        applicationEventPublisher.publishEvent(new CleanupTaskCreatedEvent(message));
         log.info("Sent cleanup task {} to MQ", savedTask.getId());
         maybePurgeTerminalSplitTasks(novelId, version != null ? version.trim() : null, purgeTerminalSplitTasks);
         return savedTask.getId();
@@ -154,7 +155,6 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Novel has running tasks; cannot delete knowledge base right now.");
         }
         log.info("Logical deleting knowledge base for novelId={} title={}", novelId, normalizedNovelName);
-        deleteVectorsForEntireNovel(novelId, normalizedNovelName);
         sceneRepository.deleteNovelById(novelId);
         
         CleanupTask task = CleanupTask.builder()
@@ -172,7 +172,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                 .novelName(normalizedNovelName)
                 .build();
         
-        rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "cleanup", message);
+        applicationEventPublisher.publishEvent(new CleanupTaskCreatedEvent(message));
         log.info("Sent cleanup task {} to MQ", savedTask.getId());
         maybePurgeTerminalSplitTasks(novelId, null, purgeTerminalSplitTasks);
         return savedTask.getId();
@@ -194,7 +194,6 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                 .orElse(normalizedNovelId);
 
         log.info("Logical deleting knowledge base by novelId: {} (name='{}')", normalizedNovelId, novelName);
-        deleteVectorsForEntireNovel(normalizedNovelId, novelName);
         sceneRepository.deleteNovelById(normalizedNovelId);
 
         CleanupTask task = CleanupTask.builder()
@@ -212,7 +211,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                 .novelName(novelName)
                 .build();
 
-        rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "cleanup", message);
+        applicationEventPublisher.publishEvent(new CleanupTaskCreatedEvent(message));
         log.info("Sent cleanup task {} to MQ for novelId {}", savedTask.getId(), normalizedNovelId);
         maybePurgeTerminalSplitTasks(normalizedNovelId, null, purgeTerminalSplitTasks);
         return savedTask.getId();
@@ -272,7 +271,6 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         String novelNameForVectors = novelRepository.findById(normalizedNovelId)
                 .map(n -> n.getTitle() != null && !n.getTitle().isBlank() ? n.getTitle() : n.getId())
                 .orElse(normalizedNovelId);
-        deleteVectorsForVersionProfile(normalizedNovelId, novelNameForVectors, trimmedVersion, chunkSize, chunkOverlap);
         sceneRepository.deleteByProfile(normalizedNovelId, trimmedVersion, chunkSize, chunkOverlap);
 
         CleanupTask task = CleanupTask.builder()
@@ -294,66 +292,15 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                 .chunkOverlap(chunkOverlap)
                 .build();
 
-        rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "cleanup", message);
+        applicationEventPublisher.publishEvent(new CleanupTaskCreatedEvent(message));
         log.info("Sent cleanup task {} to MQ for novelId {} profile {}", savedTask.getId(), normalizedNovelId, trimmedVersion);
         maybePurgeTerminalSplitTasks(normalizedNovelId, trimmedVersion, purgeTerminalSplitTasks);
         return savedTask.getId();
     }
 
-    /**
-     * 软删场景行之前同步删掉 Chroma 中对应向量，避免出现「DB 已软删、向量仍在」的孤儿向量。
-     * 过滤条件与 {@link com.novel.splitter.application.worker.CleanupWorker} 一致；后续 cleanup 队列中的删除为幂等。
-     */
-    private void deleteVectorsForVersionProfile(
-            String novelId, String novelNameForLegacyMetadata, String version, int chunkSize, int chunkOverlap) {
-        String ver = version != null ? version.trim() : "";
-        if (ver.isEmpty()) {
-            throw new IllegalArgumentException("version must not be blank");
-        }
-        try {
-            vectorStore.delete(Map.of(
-                    "novelId", novelId,
-                    "version", ver,
-                    "chunkSize", chunkSize,
-                    "chunkOverlap", chunkOverlap));
-        } catch (Exception e) {
-            throw new IllegalStateException(
-                    "Failed to delete vectors before soft-deleting scenes: novelId=" + novelId + " version=" + ver
-                            + " chunk=" + chunkSize + "/" + chunkOverlap,
-                    e);
-        }
-        if (novelNameForLegacyMetadata != null && !novelNameForLegacyMetadata.isBlank()) {
-            try {
-                vectorStore.delete(Map.of(
-                        "novel", novelNameForLegacyMetadata,
-                        "version", ver,
-                        "chunkSize", chunkSize,
-                        "chunkOverlap", chunkOverlap));
-            } catch (Exception e) {
-                throw new IllegalStateException(
-                        "Failed to delete vectors (legacy novel metadata) before soft-deleting scenes: novel="
-                                + novelNameForLegacyMetadata + " version=" + ver,
-                        e);
-            }
-        }
-    }
-
-    private void deleteVectorsForEntireNovel(String novelId, String novelNameForLegacyMetadata) {
-        try {
-            vectorStore.delete(Map.of("novelId", novelId));
-        } catch (Exception e) {
-            throw new IllegalStateException("Failed to delete vectors before soft-deleting novel scenes: novelId=" + novelId, e);
-        }
-        if (novelNameForLegacyMetadata != null && !novelNameForLegacyMetadata.isBlank()) {
-            try {
-                vectorStore.delete(Map.of("novel", novelNameForLegacyMetadata));
-            } catch (Exception e) {
-                throw new IllegalStateException(
-                        "Failed to delete vectors (legacy novel metadata) before soft-deleting novel: novel="
-                                + novelNameForLegacyMetadata,
-                        e);
-            }
-        }
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onCleanupTaskCreated(CleanupTaskCreatedEvent event) {
+        rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "cleanup", event.getMessage());
     }
 
     private void maybePurgeTerminalSplitTasks(String novelId, String versionOrNull, boolean purge) {
