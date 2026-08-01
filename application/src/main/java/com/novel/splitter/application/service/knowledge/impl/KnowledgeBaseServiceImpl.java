@@ -80,21 +80,27 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
     }
 
     @Override
-    public List<SceneDto> getScenesByNovel(String novelName) {
+    public List<SceneDto> getScenesByNovel(String novelName, String version) {
         String normalizedNovelName = normalizeNovelName(novelName);
         String novelId = novelRepository.findByTitle(normalizedNovelName)
                 .map(n -> n.getId())
                 .orElseThrow(() -> new IllegalArgumentException("novel not found by title: " + normalizedNovelName));
-        return dtoMapper.toSceneDtos(sceneRepository.findAllByNovelId(novelId));
+        if (version == null || version.isBlank()) {
+            return dtoMapper.toSceneDtos(sceneRepository.findAllByNovelId(novelId));
+        }
+        return dtoMapper.toSceneDtos(sceneRepository.findAllByNovelIdAndVersion(novelId, version.trim()));
     }
 
     @Override
-    public List<SceneDto> getScenesByNovelId(String novelId) {
+    public List<SceneDto> getScenesByNovelId(String novelId, String version) {
         String normalizedNovelId = novelId != null ? novelId.trim() : null;
         if (normalizedNovelId == null || normalizedNovelId.isEmpty()) {
             throw new IllegalArgumentException("novelId must not be blank");
         }
-        return dtoMapper.toSceneDtos(sceneRepository.findAllByNovelId(normalizedNovelId));
+        if (version == null || version.isBlank()) {
+            return dtoMapper.toSceneDtos(sceneRepository.findAllByNovelId(normalizedNovelId));
+        }
+        return dtoMapper.toSceneDtos(sceneRepository.findAllByNovelIdAndVersion(normalizedNovelId, version.trim()));
     }
 
     @Override

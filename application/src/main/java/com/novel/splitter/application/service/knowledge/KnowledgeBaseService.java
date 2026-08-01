@@ -23,16 +23,18 @@ public interface KnowledgeBaseService {
     /**
      * 获取指定小说的所有 Scene
      * @param novelName 小说名称
+     * @param version 版本过滤（可选，为空时返回全部分区场景）
      * @return Scene 列表
      */
-    List<SceneDto> getScenesByNovel(String novelName);
+    List<SceneDto> getScenesByNovel(String novelName, String version);
 
     /**
      * 按 novelId 获取指定小说的全部 Scene
      * @param novelId novels 表主键
+     * @param version 版本过滤（可选，为空时返回全部分区场景）
      * @return Scene 列表
      */
-    List<SceneDto> getScenesByNovelId(String novelId);
+    List<SceneDto> getScenesByNovelId(String novelId, String version);
 
     /**
      * 删除指定 (version, chunkSize, chunkOverlap) 分区下的切分结果（及相关向量）

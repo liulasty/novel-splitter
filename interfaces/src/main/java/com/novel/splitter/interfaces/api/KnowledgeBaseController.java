@@ -29,14 +29,16 @@ public class KnowledgeBaseController {
 
     @Operation(summary = "获取指定小说的所有段落")
     @GetMapping("/{novelName}/scenes")
-    public List<SceneDto> getScenes(@PathVariable("novelName") String novelName) {
-        return knowledgeBaseService.getScenesByNovel(novelName);
+    public List<SceneDto> getScenes(@PathVariable("novelName") String novelName,
+            @RequestParam(value = "version", required = false) String version) {
+        return knowledgeBaseService.getScenesByNovel(novelName, version);
     }
 
     @Operation(summary = "按 novelId 获取指定小说的所有段落")
     @GetMapping("/id/{novelId}/scenes")
-    public List<SceneDto> getScenesByNovelId(@PathVariable("novelId") String novelId) {
-        return knowledgeBaseService.getScenesByNovelId(novelId);
+    public List<SceneDto> getScenesByNovelId(@PathVariable("novelId") String novelId,
+            @RequestParam(value = "version", required = false) String version) {
+        return knowledgeBaseService.getScenesByNovelId(novelId, version);
     }
 
     @Operation(summary = "获取指定小说的所有版本列表")
