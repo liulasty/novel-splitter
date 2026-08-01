@@ -6,6 +6,7 @@ import { novelApi } from "@/api/novelApi";
 import { taskApi } from "@/api/taskApi";
 import { useTaskPoller } from '@/pages/Ingest/hooks/useTaskPoller';
 import { getApiErrorMessage, handleConflict409, isHttpConflict409 } from '@/lib/apiError';
+import { useSplitVersion } from '@/hooks/useSplitVersion';
 
 const SESSION_KEY = 'kb:currentNovelId';
 
@@ -13,7 +14,6 @@ export function useProcessTask() {
     const queryClient = useQueryClient();
     const [searchParams, setSearchParams] = useSearchParams();
 
-    const [version, setVersion] = useState("v1");
     const [maxTokens, setMaxTokens] = useState(512);
     const [overlapTokens, setOverlapTokens] = useState(64);
     const [currentNovelId, setCurrentNovelId] = useState<string>("");
@@ -21,6 +21,9 @@ export function useProcessTask() {
     const [chapterTitleRegex, setChapterTitleRegex] = useState('');
     const [recognitionStrategy, setRecognitionStrategy] = useState('PLAIN');
     const initRef = useRef(false);
+
+    const { version, setVersion, profiles, currentProfile, refresh: refreshSplitProfiles } =
+        useSplitVersion(currentNovelId);
 
     const persistCurrentNovelId = useCallback(
         (novelId: string) => {
@@ -186,6 +189,20 @@ export function useProcessTask() {
         },
     });
 
+    const completedTaskKeysRef = useRef<Set<string>>(new Set());
+    useEffect(() => {
+        for (const t of tasks) {
+            if (t.novelId !== currentNovelId) continue;
+            if (t.taskType !== 'SCENE_SPLIT' && t.taskType !== 'EMBED') continue;
+            if (t.status !== 'SUCCESS' && t.status !== 'FAILED') continue;
+            const key = `${t.taskId}:${t.status}`;
+            if (!completedTaskKeysRef.current.has(key)) {
+                completedTaskKeysRef.current.add(key);
+                refreshSplitProfiles();
+            }
+        }
+    }, [tasks, currentNovelId, refreshSplitProfiles]);
+
     const handleChapterParse = () => {
         if (!currentNovelId) {
             toast.error('请先选择小说');
@@ -236,6 +253,8 @@ export function useProcessTask() {
         state: {
             currentNovelId,
             version,
+            profiles,
+            currentProfile,
             maxTokens,
             overlapTokens,
             chapterReviewAck,

@@ -10,11 +10,14 @@ import { SplitPreviewModal } from '@/pages/Ingest/components/SplitPreviewModal';
 import { ChapterReviewModal } from '@/pages/Ingest/components/ChapterReviewModal';
 import { TaskPollerStatus } from '@/pages/Ingest/components/TaskPollerStatus';
 import type { SplitTask } from "@/api/taskApi";
+import { splitProfileLabel, type SceneSplitProfileDto } from '@/api/knowledgeApi';
 
 interface ProcessingPanelProps {
   state: {
     currentNovelId: string;
     version: string;
+    profiles: SceneSplitProfileDto[];
+    currentProfile?: SceneSplitProfileDto;
     maxTokens: number;
     overlapTokens: number;
     chapterReviewAck: boolean;
@@ -52,7 +55,7 @@ interface ProcessingPanelProps {
 
 export function ProcessingPanel({ state, actions }: ProcessingPanelProps) {
   const {
-    currentNovelId, version, maxTokens, overlapTokens,
+    currentNovelId, version, profiles, currentProfile, maxTokens, overlapTokens,
     chapterReviewAck, chapterTitleRegex, recognitionStrategy,
     tasks, activeTasks, poller,
     isChapterParsing, isSceneSplitting, isEmbedding,
@@ -193,13 +196,35 @@ export function ProcessingPanel({ state, actions }: ProcessingPanelProps) {
         )}
         <div className="space-y-1.5">
           <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">版本标识</label>
+          <select
+            value={profiles.some((p) => p.version === version) ? version : ''}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (!v) return;
+              actions.setVersion(v);
+              const p = profiles.find((x) => x.version === v);
+              if (p && p.chunkSize != null) actions.setMaxTokens(p.chunkSize);
+              if (p && p.chunkOverlap != null) actions.setOverlapTokens(p.chunkOverlap);
+            }}
+            className="w-full h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+          >
+            <option value="">{profiles.length ? '选择已有版本…' : '暂无已生成版本'}</option>
+            {profiles.map((p) => (
+              <option key={p.version} value={p.version}>{splitProfileLabel(p)}</option>
+            ))}
+          </select>
           <input
             type="text"
             value={version}
             onChange={(e) => actions.setVersion(e.target.value)}
-            placeholder="v1"
+            placeholder="或输入新版本名，如 v2"
             className="w-full h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-400"
           />
+          {currentProfile && (
+            <p className="text-[11px] text-slate-400">
+              已选数据集：块大小 {currentProfile.chunkSize} · 重叠 {currentProfile.chunkOverlap}
+            </p>
+          )}
         </div>
         <div className="space-y-1.5">
           <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">场景块大小（字）</label>
