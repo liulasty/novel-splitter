@@ -83,7 +83,7 @@ export default function KnowledgePage() {
     },
     onSuccess: ({ novel, cleanupTaskId }, vars) => {
       const extra = vars.purge ? '；已清理本书终态任务记录' : '';
-      toast.success(`知识库 "${novel.title}" 已删除，清理任务：${cleanupTaskId}${extra}`);
+      toast.success(`知识库 "${novel.title}" 已删除，向量数据后台清理中（清理任务 ${cleanupTaskId}）${extra}`);
       setDeleteNovelTarget(null);
       queryClient.invalidateQueries({ queryKey: ['novelSummaries'] });
       queryClient.invalidateQueries({ queryKey: ['novelStats'] });
