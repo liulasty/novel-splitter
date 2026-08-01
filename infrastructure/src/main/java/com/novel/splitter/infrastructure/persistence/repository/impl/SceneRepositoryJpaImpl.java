@@ -228,6 +228,14 @@ public class SceneRepositoryJpaImpl implements SceneRepository {
     }
 
     @Override
+    public PagedResult<Scene> findByNovelIdAndChapterIdAndVersion(String novelId, Long chapterId, String version, PageQuery pageQuery) {
+        Page<Scene> page = jpaSceneRepository
+                .findByNovelIdAndChapterIdAndVersion(novelId, chapterId, version, toPageable(pageQuery))
+                .map(sceneMapper::toDomain);
+        return toPagedResult(page);
+    }
+
+    @Override
     public List<SceneCountByProfile> countScenesByNovelVersionAndChunk() {
         return jpaSceneRepository.countScenesByNovelVersionAndChunk();
     }

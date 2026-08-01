@@ -59,6 +59,8 @@ public interface SceneRepository {
 
     PagedResult<Scene> findByNovelIdAndChapterId(String novelId, Long chapterId, PageQuery pageQuery);
 
+    PagedResult<Scene> findByNovelIdAndChapterIdAndVersion(String novelId, Long chapterId, String version, PageQuery pageQuery);
+
     /**
      * 统计：按 novelId、version、chunk 分组后的场景数量。
      */

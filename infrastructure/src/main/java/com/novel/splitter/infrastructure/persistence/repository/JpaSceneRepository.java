@@ -67,6 +67,9 @@ public interface JpaSceneRepository extends JpaRepository<JpaSceneEntity, Long>,
     @EntityGraph(attributePaths = {"novel", "chapter"})
     Page<JpaSceneEntity> findByNovelIdAndChapterId(String novelId, Long chapterId, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"novel", "chapter"})
+    Page<JpaSceneEntity> findByNovelIdAndChapterIdAndVersion(String novelId, Long chapterId, String version, Pageable pageable);
+
     @Modifying
     @Query("UPDATE JpaSceneEntity s SET s.isDeleted = true WHERE s.novel.id = ?1 AND s.version = ?2 "
             + "AND s.chunkSize = ?3 AND s.chunkOverlap = ?4")
@@ -77,7 +80,8 @@ public interface JpaSceneRepository extends JpaRepository<JpaSceneEntity, Long>,
     @Query("UPDATE JpaSceneEntity s SET s.isDeleted = true WHERE s.novel.id = ?1")
     void deleteByNovelId(String novelId);
 
-    @Query("SELECT DISTINCT s.version, s.chunkSize, s.chunkOverlap FROM JpaSceneEntity s WHERE s.novel.id = ?1")
+    @Query("SELECT s.version, s.chunkSize, s.chunkOverlap FROM JpaSceneEntity s WHERE s.novel.id = ?1 "
+            + "GROUP BY s.version, s.chunkSize, s.chunkOverlap ORDER BY MAX(s.id) ASC")
     List<Object[]> findDistinctProfilesByNovelId(String novelId);
 
     @Query("SELECT new com.novel.splitter.domain.model.SceneCountByProfile("
