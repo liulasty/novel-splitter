@@ -13,13 +13,19 @@ export function DeleteNovelModal({ novelName, isPending, deleteDisabled, onClose
   const [purge, setPurge] = useState(false);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 sm:p-6">
+    <div
+      className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 sm:p-6"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="delete-novel-title"
+      onKeyDown={(e) => { if (e.key === 'Escape' && !isPending) onClose(); }}
+    >
       <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl p-6">
         <div className="flex items-center gap-3 mb-3">
           <div className="p-2 rounded-xl bg-red-100">
             <AlertTriangle className="w-5 h-5 text-red-600" />
           </div>
-          <h2 className="text-lg font-semibold text-slate-900">确认删除知识库</h2>
+          <h2 id="delete-novel-title" className="text-lg font-semibold text-slate-900">确认删除知识库</h2>
         </div>
         <p className="text-sm text-slate-600 mb-1">
           将删除 <span className="font-semibold text-slate-800">{novelName}</span> 的所有源文件、切分版本和向量数据，操作不可恢复。
@@ -37,6 +43,7 @@ export function DeleteNovelModal({ novelName, isPending, deleteDisabled, onClose
         </label>
         <div className="flex justify-end gap-2">
           <button
+            type="button"
             onClick={onClose}
             disabled={isPending}
             className="px-4 py-2 rounded-lg bg-white text-slate-600 text-sm font-medium border border-slate-200 hover:bg-slate-50 transition-colors disabled:opacity-50"
@@ -44,6 +51,7 @@ export function DeleteNovelModal({ novelName, isPending, deleteDisabled, onClose
             取消
           </button>
           <button
+            type="button"
             onClick={() => onConfirm(purge)}
             disabled={isPending || deleteDisabled}
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-red-500 text-white text-sm font-semibold hover:bg-red-600 disabled:opacity-60 transition-colors"
