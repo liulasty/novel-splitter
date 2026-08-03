@@ -93,6 +93,8 @@ public class SplitWorker {
             NovelVersion versionRow = resolveOrCreateVersion(novelId, version, chunkParams);
             if (isNotReenterable(versionRow)) {
                 log.warn("版本 {}/{} 当前状态 {} 不允许重新切分，跳过任务 {}", novelId, version, versionRow.getStatus(), taskId);
+                taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.SUCCESS, 100,
+                        "版本状态 " + versionRow.getStatus() + " 不允许重新切分，已跳过（幂等）");
                 return;
             }
             int startChapterIndex = versionRow.getSplitCursorChapterIndex() != null
