@@ -18,6 +18,7 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
@@ -67,14 +68,14 @@ class EmbedWorkerStaleRunTest {
 
         Scene sc = Scene.builder().persistenceId(5L).id("sid").text("hello").embedStatus(EmbedStatus.PENDING).embedRunId("run-a").build();
         when(sceneRepository.findByIds(List.of(5L))).thenReturn(List.of(sc));
-        when(embedNovelUseCase.embedBatch(List.of(5L))).thenReturn(List.of(5L));
+        when(embedNovelUseCase.embedBatch(eq(List.of(5L)), anyString())).thenReturn(List.of(5L));
 
         EmbedSceneTaskMessage msg = new EmbedSceneTaskMessage(
                 "t1", "n1", "v1", 350, 65, "run-a", 5L);
 
         embedWorker.onEmbedSceneBatch(List.of(msg));
 
-        verify(embedNovelUseCase).embedBatch(eq(List.of(5L)));
+        verify(embedNovelUseCase).embedBatch(eq(List.of(5L)), anyString());
         verify(sceneRepository).batchUpdateEmbedOutcome(eq(List.of(5L)), eq("run-a"), eq(EmbedStatus.SUCCESS), isNull());
     }
 }

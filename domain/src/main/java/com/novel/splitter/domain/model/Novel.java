@@ -33,6 +33,11 @@ public class Novel {
     private boolean isDeleted;
 
     /**
+     * 阶段三：当前被检索引用的活跃版本（version_tag）；null 表示尚未激活任何版本。
+     */
+    private String activeVersionTag;
+
+    /**
      * 章节列表
      */
     private List<Chapter> chapters;

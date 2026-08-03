@@ -44,6 +44,7 @@ public class SceneMapper {
                 .wordCount(entity.getWordCount())
                 .prefixContext(entity.getPrefixContext())
                 .canSplit(entity.isCanSplit())
+                .seq(entity.getSeq())
                 .metadata(meta)
                 .score(null)
                 .embedStatus(entity.getEmbedStatus())
@@ -77,6 +78,7 @@ public class SceneMapper {
         entity.setEmbedStatus(domain.getEmbedStatus());
         entity.setEmbedError(domain.getEmbedError());
         entity.setEmbedRunId(domain.getEmbedRunId());
+        entity.setSeq(domain.getSeq());
         // novel/chapter/version/isDeleted/legacyNovelName are handled by repository layer.
         return entity;
     }

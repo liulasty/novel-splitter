@@ -2,7 +2,10 @@ package com.novel.splitter.application.orchestration;
 
 import com.novel.splitter.application.port.out.TaskQueuePort;
 import com.novel.splitter.application.service.task.TaskService;
+import com.novel.splitter.domain.model.NovelVersion;
+import com.novel.splitter.domain.model.Scene;
 import com.novel.splitter.domain.model.SceneSplitProfile;
+import com.novel.splitter.domain.repository.NovelVersionRepository;
 import com.novel.splitter.domain.repository.SceneRepository;
 import com.novel.splitter.domain.task.EmbedSceneTaskMessage;
 import com.novel.splitter.domain.task.EmbedTaskMessage;
@@ -31,6 +34,7 @@ public class EmbedPipelineOrchestrator {
     private final VectorStore vectorStore;
     private final TaskQueuePort taskQueuePort;
     private final EmbedRunDbCoordinator embedRunDbCoordinator;
+    private final NovelVersionRepository novelVersionRepository;
 
     @Value("${splitter.embed.scene-publish-batch-size:200}")
     private int scenePublishBatchSize;
@@ -62,15 +66,12 @@ public class EmbedPipelineOrchestrator {
 
         String embedRunId = UUID.randomUUID().toString();
 
+        String colName = VectorStore.collectionNameFor(novelId, version);
         try {
-            vectorStore.delete(Map.of(
-                    "novelId", novelId,
-                    "version", version,
-                    "chunkSize", cs,
-                    "chunkOverlap", co));
+            vectorStore.deleteByCollection(colName);
         } catch (Exception e) {
             throw new IllegalStateException("Failed to cleanup vectors for novelId=" + novelId + " version=" + version
-                    + " chunk=" + cs + "/" + co, e);
+                    + " collection=" + colName, e);
         }
 
         int totalScenes = embedRunDbCoordinator.beginRunAfterVectorsCleaned(taskId, novelId, version, cs, co, embedRunId);
@@ -110,6 +111,15 @@ public class EmbedPipelineOrchestrator {
                 .orElseThrow(() -> new IllegalStateException("Cannot resolve chunk profile for embed run " + runId));
         List<Long> ids = sceneRepository.listPersistenceIdsForEmbedResume(
                 novelId, version, profile[0], profile[1], runId);
+        long cursor = embedCursorSceneSeq(novelId, version);
+        if (cursor > 0 && !ids.isEmpty()) {
+            // 只补投游标之后的 PENDING/FAILED scene（游标表示已向量化的全局 seq 水位）
+            List<Scene> scenes = sceneRepository.findByIds(ids);
+            ids = scenes.stream()
+                    .filter(s -> s.getPersistenceId() != null && s.getSeq() != null && s.getSeq() > cursor)
+                    .map(Scene::getPersistenceId)
+                    .toList();
+        }
         if (ids.isEmpty()) {
             log.info("No pending/failed scenes to resume for task {}", taskId);
             return;
@@ -144,6 +154,12 @@ public class EmbedPipelineOrchestrator {
         if (!buf.isEmpty()) {
             taskQueuePort.sendEmbedScenes(buf);
         }
+    }
+
+    /** 读取版本向量化游标；无版本行或游标为 null 视为 0（从头补投）。 */
+    private long embedCursorSceneSeq(String novelId, String version) {
+        NovelVersion v = novelVersionRepository.findById(novelId, version).orElse(null);
+        return v != null && v.getEmbedCursorSceneSeq() != null ? v.getEmbedCursorSceneSeq() : 0L;
     }
 
     private int[] resolveEmbedProfile(String novelId, String version, Integer msgChunkSize, Integer msgChunkOverlap) {

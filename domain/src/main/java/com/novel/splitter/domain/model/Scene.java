@@ -76,6 +76,12 @@ public class Scene {
     private SceneMetadata metadata;
 
     /**
+     * 全局场景序号（(novelId, version) 内单调递增），幂等落库与续传的落点。
+     * 对应 DB scenes.seq 列；为 null 时由切分/落库阶段分配。
+     */
+    private Long seq;
+
+    /**
      * 检索评分 (非持久化字段，运行时注入)
      */
     private Double score;

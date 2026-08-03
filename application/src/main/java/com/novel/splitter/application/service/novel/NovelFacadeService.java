@@ -15,6 +15,8 @@ import com.novel.splitter.application.model.dto.SceneSplitRequestDto;
 import com.novel.splitter.application.model.dto.ReparseChaptersRequestDto;
 import com.novel.splitter.application.model.dto.SplitRetryRequestDto;
 import com.novel.splitter.application.model.dto.TaskSubmitResponseDto;
+import com.novel.splitter.application.model.dto.CreateVersionRequest;
+import com.novel.splitter.application.model.dto.NovelVersionDto;
 
 import java.io.IOException;
 import java.util.List;
@@ -74,4 +76,40 @@ public interface NovelFacadeService {
     com.novel.splitter.domain.model.paging.PagedResult<SceneDto> getScenesByChapter(String novelId, Long chapterId, String version, int page, int size);
 
     void softDeleteNovel(String novelId);
+
+    /**
+     * 列出小说全部版本，并按 {@code novel.activeVersionTag} 标注 {@code active}。
+     */
+    List<NovelVersionDto> listVersions(String novelId);
+
+    /**
+     * 创建版本（PENDING 状态）：versionTag 为空自动递增 v{n+1}；splitStrategy 非法抛 400；
+     * chunkSize/chunkOverlap 为空取应用默认。
+     */
+    NovelVersionDto createVersion(String novelId, CreateVersionRequest request);
+
+    /**
+     * 版本场景切分：用版本自身 chunk 参数投 Split 队列（不自动串联 embed，触发由后续 embed 端点负责）。
+     */
+    TaskSubmitResponseDto startVersionSplit(String novelId, String versionTag) throws IOException;
+
+    /**
+     * 版本向量化：用版本自身 chunk 参数启动 EMBED 编排。
+     */
+    TaskSubmitResponseDto startVersionEmbed(String novelId, String versionTag) throws IOException;
+
+    /**
+     * 激活版本：委托 {@link NovelVersionService#activate}（原子切指针）。
+     */
+    void activateVersion(String novelId, String versionTag);
+
+    /**
+     * 删除版本：删除该版本切分数据集/向量，并删除 novel_version 行。
+     */
+    void deleteVersion(String novelId, String versionTag);
+
+    /**
+     * 基线解析（阶段一入口）：复用重解析逻辑投 Load 队列。
+     */
+    TaskSubmitResponseDto baselineParse(String novelId, ReparseChaptersRequestDto request) throws IOException;
 }

@@ -6,8 +6,11 @@ import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.domain.model.Novel;
 import com.novel.splitter.domain.repository.CleanupTaskRepository;
 import com.novel.splitter.domain.repository.NovelRepository;
+import com.novel.splitter.domain.repository.NovelVersionRepository;
 import com.novel.splitter.domain.repository.SceneRepository;
 import com.novel.splitter.domain.task.CleanupTask;
+
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -30,6 +33,7 @@ class KnowledgeBaseServiceDeleteAsyncTest {
 
     @Mock private SceneRepository sceneRepository;
     @Mock private NovelRepository novelRepository;
+    @Mock private NovelVersionRepository novelVersionRepository;
     @Mock private CleanupTaskRepository cleanupTaskRepository;
     @Mock private RabbitTemplate rabbitTemplate;
     @Mock private DtoMapper dtoMapper;
@@ -42,6 +46,7 @@ class KnowledgeBaseServiceDeleteAsyncTest {
     @Test
     void deleteKnowledgeBaseById_publishesEventAndReturnsCleanupTaskId_withoutDirectMqSend() {
         when(novelRepository.findById("n1")).thenReturn(Optional.of(Novel.builder().id("n1").title("测试书").build()));
+        when(novelVersionRepository.findByNovelId("n1")).thenReturn(List.of());
         CleanupTask task = CleanupTask.builder().id(99L).targetId("n1").targetType("NOVEL_ID").status("PENDING").build();
         when(cleanupTaskRepository.save(any(CleanupTask.class))).thenReturn(task);
 

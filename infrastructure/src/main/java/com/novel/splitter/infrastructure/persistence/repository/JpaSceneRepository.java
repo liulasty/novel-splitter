@@ -14,6 +14,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 @Repository
@@ -63,6 +64,9 @@ public interface JpaSceneRepository extends JpaRepository<JpaSceneEntity, Long>,
 
     @Query("SELECT COUNT(s) FROM JpaSceneEntity s WHERE s.novel.id = ?1 AND s.version = ?2")
     long countByNovelIdAndVersionAllChunks(String novelId, String version);
+
+    @Query("select coalesce(max(e.seq), 0) from JpaSceneEntity e where e.novel.id = :novelId and e.version = :version")
+    Optional<Long> findMaxSeq(@Param("novelId") String novelId, @Param("version") String version);
 
     @EntityGraph(attributePaths = {"novel", "chapter"})
     Page<JpaSceneEntity> findByNovelIdAndChapterId(String novelId, Long chapterId, Pageable pageable);

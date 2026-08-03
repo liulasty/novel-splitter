@@ -19,6 +19,16 @@ public interface SceneRepository {
      */
     List<Long> saveScenes(String novelId, String version, int chunkSize, int chunkOverlap, List<Scene> scenes);
 
+    /**
+     * 幂等保存：以 (novelId, version, seq) 唯一约束为界，已存在则跳过；返回实际写入的 persistenceId。
+     */
+    List<Long> saveScenesIdempotent(String novelId, String version, int chunkSize, int chunkOverlap, List<Scene> scenes);
+
+    /**
+     * 当前已存在的最大 seq；无数据返回 0（下一批从 1 起）。
+     */
+    long maxSeqByVersion(String novelId, String version);
+
     List<Scene> findByIds(List<Long> ids);
 
     List<Scene> findBySceneIds(List<String> sceneIds);

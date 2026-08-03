@@ -12,8 +12,10 @@ import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.application.service.novel.NovelService;
 import com.novel.splitter.application.support.TaskFailureFormatter;
 import com.novel.splitter.domain.enums.NovelStatus;
-import com.novel.splitter.domain.repository.SceneRepository;
-import com.novel.splitter.embedding.api.VectorStore;
+import com.novel.splitter.domain.enums.SplitStrategy;
+import com.novel.splitter.domain.enums.VersionStatus;
+import com.novel.splitter.domain.model.NovelVersion;
+import com.novel.splitter.domain.repository.NovelVersionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -21,7 +23,6 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
-import java.util.Map;
 
 @Component
 @RequiredArgsConstructor
@@ -34,8 +35,7 @@ public class SplitWorker {
     private final EmbedPipelineOrchestrator embedPipelineOrchestrator;
 
     private final NovelService novelService;
-    private final SceneRepository sceneRepository;
-    private final VectorStore vectorStore;
+    private final NovelVersionRepository novelVersionRepository;
 
     @org.springframework.beans.factory.annotation.Value("${splitter.ingestion.batch-size:10}")
     private int batchSize;
@@ -45,8 +45,10 @@ public class SplitWorker {
     @RabbitListener(queues = RabbitConfig.SPLIT_TASK_QUEUE)
     public void processSplitTask(SplitTaskMessage message) {
         String taskId = message.getTaskId();
+        String novelId = null;
+        String version = null;
         log.info("SplitWorker 接收到切分任务, taskId: {}", taskId);
-        
+
         try {
             SplitTask task = taskService.getTask(taskId);
             if (task == null) {
@@ -73,11 +75,11 @@ public class SplitWorker {
                 );
             }
 
-            String novelId = message.getNovelId();
+            novelId = message.getNovelId();
             if (novelId == null || novelId.isBlank()) {
                 throw new IllegalArgumentException("novelId must not be blank");
             }
-            String version = task.getVersion() != null && !task.getVersion().isBlank()
+            version = task.getVersion() != null && !task.getVersion().isBlank()
                     ? task.getVersion().trim()
                     : (message.getVersion() != null ? message.getVersion().trim() : "");
             if (version.isBlank()) {
@@ -87,28 +89,24 @@ public class SplitWorker {
             ResolvedChunkingParams chunkParams =
                     splitNovelUseCase.resolveChunkingParams(message.getChunkSize(), message.getChunkOverlap());
 
-            // 先删向量再删 DB：向量删除失败时库内场景仍在，MQ 重试可幂等继续；若先删 DB 则向量删除失败会留下孤儿向量。
-            taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, 1, "幂等清理：删除旧向量与旧场景...");
-            try {
-                vectorStore.delete(Map.of(
-                        "novelId", novelId,
-                        "version", version,
-                        "chunkSize", chunkParams.chunkSize(),
-                        "chunkOverlap", chunkParams.chunkOverlap()));
-            } catch (Exception e) {
-                throw new IllegalStateException("Failed to cleanup Chroma vectors for novelId=" + novelId + " version=" + version
-                        + " chunk=" + chunkParams.chunkSize() + "/" + chunkParams.chunkOverlap(), e);
+            // 版本行不存在则创建（PENDING，chunk 参数用解析后的有效值），再按游标续传。
+            NovelVersion versionRow = resolveOrCreateVersion(novelId, version, chunkParams);
+            if (isNotReenterable(versionRow)) {
+                log.warn("版本 {}/{} 当前状态 {} 不允许重新切分，跳过任务 {}", novelId, version, versionRow.getStatus(), taskId);
+                return;
             }
-            try {
-                sceneRepository.deleteByProfile(novelId, version, chunkParams.chunkSize(), chunkParams.chunkOverlap());
-            } catch (Exception e) {
-                throw new IllegalStateException("Failed to cleanup DB scenes for novelId=" + novelId + " version=" + version
-                        + " chunk=" + chunkParams.chunkSize() + "/" + chunkParams.chunkOverlap(), e);
-            }
+            int startChapterIndex = versionRow.getSplitCursorChapterIndex() != null
+                    ? versionRow.getSplitCursorChapterIndex() + 1 : 0;
+            long startSceneSeq = versionRow.getSplitCursorSceneSeq() != null ? versionRow.getSplitCursorSceneSeq() : 0L;
 
-            String novelTitle = novelId != null ? novelService.getNovelById(novelId).getTitle() : null;
+            taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, 1,
+                    "切分任务处理中（游标续传，从第 " + (startChapterIndex + 1) + " 章开始）...");
+            versionRow.startSplit();
+            novelVersionRepository.save(versionRow);
 
-            List<Long> sceneIds = splitNovelUseCase.split(
+            String novelTitle = novelService.getNovelById(novelId).getTitle();
+
+            SplitNovelUseCase.SplitProgress progress = splitNovelUseCase.split(
                     taskId,
                     novelId,
                     novelTitle,
@@ -116,38 +114,49 @@ public class SplitWorker {
                     version,
                     message.getChunkSize(),
                     message.getChunkOverlap(),
-                    (progress, info) -> taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, progress, info));
+                    startChapterIndex,
+                    startSceneSeq,
+                    (p, info) -> taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.PROCESSING, p, info));
 
+            List<Long> sceneIds = progress.sceneIds();
             if (sceneIds == null || sceneIds.isEmpty()) {
-                log.warn("任务 {} 切分后没有场景，直接标记为成功", taskId);
+                // 无新增场景：可能续传已到最后一章（或本次确无有效场景），均视为切分完成。
+                log.warn("任务 {} 切分后没有新场景，视为切分完成（无重复写入）", taskId);
+                versionRow.completeSplit();
+                novelVersionRepository.save(versionRow);
                 taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.SUCCESS, 100, "切分完成，无有效场景");
-                if (message.getNovelId() != null) {
-                    novelService.updateNovelStatus(message.getNovelId(), NovelStatus.SPLIT_COMPLETED);
+                if (novelId != null) {
+                    novelService.updateNovelStatus(novelId, NovelStatus.SPLIT_COMPLETED);
                 }
                 return;
             }
+
+            // 更新游标并置 SPLIT_DONE
+            versionRow.advanceSplitCursor(progress.lastChapterIndex(), progress.lastSceneSeq());
+            versionRow.completeSplit();
+            novelVersionRepository.save(versionRow);
 
             // 更新总场景数
             task.setTotalScenes(sceneIds.size());
             task.getCompletedScenes().set(sceneIds.size());
             taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.SUCCESS, 100, "切分阶段完成，数据已落盘");
-            
-            if (message.getNovelId() != null) {
-                novelService.updateNovelStatus(message.getNovelId(), NovelStatus.SPLIT_COMPLETED);
+
+            if (novelId != null) {
+                novelService.updateNovelStatus(novelId, NovelStatus.SPLIT_COMPLETED);
                 if (message.isTriggerEmbed()) {
                     String embedTaskId = java.util.UUID.randomUUID().toString();
                     taskService.createTask(
                             embedTaskId,
                             TaskType.EMBED,
-                            message.getNovelId(),
-                            message.getNovelId(),
+                            novelId,
+                            novelId,
                             Integer.MAX_VALUE,
-                            message.getVersion()
+                            version
                     );
                     embedPipelineOrchestrator.startNewEmbedRun(
                             embedTaskId,
-                            message.getNovelId(),
-                            message.getVersion(),
+                            novelId,
+                            version,
                             chunkParams.chunkSize(),
                             chunkParams.chunkOverlap());
                     log.info("任务 {} 已自动串联 EMBED 阶段（编排），embedTaskId={}", taskId, embedTaskId);
@@ -157,14 +166,14 @@ public class SplitWorker {
                     rabbitTemplate.convertAndSend(
                             RabbitConfig.EXCHANGE_NAME,
                             "enrich",
-                            new EnrichTaskMessage(taskId, message.getNovelId(), message.getVersion(), sceneIds)
+                            new EnrichTaskMessage(taskId, novelId, version, sceneIds)
                     );
                     log.info("任务 {} 已发送 ENRICH 语义增强任务", taskId);
                 }
             }
-            
+
             log.info("任务 {} Split 阶段完成，共处理 {} 个场景", taskId, sceneIds.size());
-            
+
         } catch (Exception e) {
             log.error("处理任务 {} 时发生异常", taskId, e);
             String failMsg = TaskFailureFormatter.format("SPLIT",
@@ -173,6 +182,51 @@ public class SplitWorker {
             if (message.getNovelId() != null) {
                 novelService.updateNovelStatus(message.getNovelId(), NovelStatus.FAILED);
             }
+            if (novelId != null && version != null) {
+                markVersionFailed(novelId, version);
+            }
+        }
+    }
+
+    private NovelVersion resolveOrCreateVersion(String novelId, String version, ResolvedChunkingParams chunkParams) {
+        return novelVersionRepository.findById(novelId, version).orElseGet(() -> {
+            NovelVersion created = NovelVersion.builder()
+                    .novelId(novelId)
+                    .versionTag(version)
+                    .splitStrategy(SplitStrategy.OVERLAP_CHUNK)
+                    .chunkSize(chunkParams.chunkSize())
+                    .chunkOverlap(chunkParams.chunkOverlap())
+                    .status(VersionStatus.PENDING)
+                    .createdAt(System.currentTimeMillis())
+                    .updatedAt(System.currentTimeMillis())
+                    .build();
+            novelVersionRepository.save(created);
+            return created;
+        });
+    }
+
+    /**
+     * 并发/状态乐观守卫：版本已进入切分之后的生命周期（向量化中/完成/激活/废弃）时，
+     * 不允许再重入切分，直接跳过。PENDING / SPLITTING / SPLIT_DONE / FAILED 均允许
+     * （含中断后从游标续传的场景）。
+     */
+    private boolean isNotReenterable(NovelVersion v) {
+        VersionStatus s = v.getStatus();
+        return s == VersionStatus.EMBEDDING
+                || s == VersionStatus.EMBED_DONE
+                || s == VersionStatus.ACTIVE
+                || s == VersionStatus.ABANDONED;
+    }
+
+    private void markVersionFailed(String novelId, String version) {
+        try {
+            NovelVersion v = novelVersionRepository.findById(novelId, version).orElse(null);
+            if (v != null) {
+                v.fail();
+                novelVersionRepository.save(v);
+            }
+        } catch (Exception ex) {
+            log.warn("标记版本失败时出错 novelId={} version={}: {}", novelId, version, ex.toString());
         }
     }
 }

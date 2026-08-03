@@ -11,7 +11,9 @@ import com.novel.splitter.domain.model.paging.PageQuery;
 import com.novel.splitter.domain.model.paging.PagedResult;
 import com.novel.splitter.domain.repository.CleanupTaskRepository;
 import com.novel.splitter.domain.repository.NovelRepository;
+import com.novel.splitter.domain.repository.NovelVersionRepository;
 import com.novel.splitter.domain.repository.SceneRepository;
+import com.novel.splitter.embedding.api.VectorStore;
 import com.novel.splitter.application.model.dto.SceneSplitProfileDto;
 import com.novel.splitter.application.model.dto.VectorPreviewRecordDto;
 import com.novel.splitter.domain.model.SceneSplitProfile;
@@ -43,6 +45,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
 
     private final SceneRepository sceneRepository;
     private final NovelRepository novelRepository;
+    private final NovelVersionRepository novelVersionRepository;
     private final CleanupTaskRepository cleanupTaskRepository;
     private final RabbitTemplate rabbitTemplate;
     private final DtoMapper dtoMapper;
@@ -118,7 +121,10 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
 
         log.info("Logical deleting split profile: novelId={} version={} chunk={}/{}", novelId, version, chunkSize, chunkOverlap);
         sceneRepository.deleteByProfile(novelId, version, chunkSize, chunkOverlap);
-        
+        if (version != null && !version.isBlank()) {
+            novelVersionRepository.delete(novelId, version.trim());
+        }
+
         CleanupTask task = CleanupTask.builder()
                 .targetId(novelId)
                 .targetType("VERSION")
@@ -155,8 +161,10 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Novel has running tasks; cannot delete knowledge base right now.");
         }
         log.info("Logical deleting knowledge base for novelId={} title={}", novelId, normalizedNovelName);
+        List<String> versionCollections = collectVersionCollections(novelId);
         sceneRepository.deleteNovelById(novelId);
-        
+        novelVersionRepository.deleteByNovelId(novelId);
+
         CleanupTask task = CleanupTask.builder()
                 .targetId(novelId)
                 .targetType("NOVEL")
@@ -170,6 +178,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                 .targetType("NOVEL")
                 .novelId(novelId)
                 .novelName(normalizedNovelName)
+                .collectionNames(versionCollections)
                 .build();
         
         applicationEventPublisher.publishEvent(new CleanupTaskCreatedEvent(message));
@@ -194,7 +203,9 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                 .orElse(normalizedNovelId);
 
         log.info("Logical deleting knowledge base by novelId: {} (name='{}')", normalizedNovelId, novelName);
+        List<String> versionCollections = collectVersionCollections(normalizedNovelId);
         sceneRepository.deleteNovelById(normalizedNovelId);
+        novelVersionRepository.deleteByNovelId(normalizedNovelId);
 
         CleanupTask task = CleanupTask.builder()
                 .targetId(normalizedNovelId)
@@ -209,6 +220,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                 .targetType("NOVEL_ID")
                 .novelId(normalizedNovelId)
                 .novelName(novelName)
+                .collectionNames(versionCollections)
                 .build();
 
         applicationEventPublisher.publishEvent(new CleanupTaskCreatedEvent(message));
@@ -272,6 +284,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                 .map(n -> n.getTitle() != null && !n.getTitle().isBlank() ? n.getTitle() : n.getId())
                 .orElse(normalizedNovelId);
         sceneRepository.deleteByProfile(normalizedNovelId, trimmedVersion, chunkSize, chunkOverlap);
+        novelVersionRepository.delete(normalizedNovelId, trimmedVersion);
 
         CleanupTask task = CleanupTask.builder()
                 .targetId(normalizedNovelId)
@@ -329,6 +342,16 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                 .chunkSize(p.chunkSize())
                 .chunkOverlap(p.chunkOverlap())
                 .build();
+    }
+
+    /**
+     * 删除版本行之前捕获该小说全部版本集合名，供异步整书清理按集合整删。
+     * <p>版本行在 deleteByNovelId 后已消失，无法在 CleanupWorker 阶段再枚举，因此删除时快照进消息。</p>
+     */
+    private List<String> collectVersionCollections(String novelId) {
+        return novelVersionRepository.findByNovelId(novelId).stream()
+                .map(v -> VectorStore.collectionNameFor(novelId, v.getVersionTag()))
+                .toList();
     }
 
     private String normalizeNovelName(String novelName) {

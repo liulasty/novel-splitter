@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
+import java.util.List;
 
 @Data
 @Builder
@@ -29,4 +30,7 @@ public class CleanupTaskMessage implements Serializable {
     /** 与场景分区一致；非空时仅清理该滑窗配置对应的向量 */
     private Integer chunkSize;
     private Integer chunkOverlap;
+
+    /** 整书删除时捕获的该小说全部版本集合名；版本行已同步删除，供 CleanupWorker 按集合整删。 */
+    private List<String> collectionNames;
 }

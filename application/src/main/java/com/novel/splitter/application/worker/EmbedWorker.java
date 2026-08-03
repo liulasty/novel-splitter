@@ -5,11 +5,15 @@ import com.novel.splitter.application.orchestration.EmbedPipelineOrchestrator;
 import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.application.support.TaskFailureFormatter;
 import com.novel.splitter.domain.enums.EmbedStatus;
+import com.novel.splitter.domain.enums.VersionStatus;
+import com.novel.splitter.domain.model.NovelVersion;
 import com.novel.splitter.domain.model.Scene;
+import com.novel.splitter.domain.repository.NovelVersionRepository;
 import com.novel.splitter.domain.repository.SceneRepository;
 import com.novel.splitter.domain.task.EmbedSceneTaskMessage;
 import com.novel.splitter.domain.task.EmbedTaskMessage;
 import com.novel.splitter.domain.task.SplitTask;
+import com.novel.splitter.embedding.api.VectorStore;
 import com.novel.splitter.pipeline.orchestrator.EmbedNovelUseCase;
 import com.google.common.util.concurrent.RateLimiter;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +39,7 @@ public class EmbedWorker {
     private final TaskService taskService;
     private final SceneRepository sceneRepository;
     private final EmbedPipelineOrchestrator embedPipelineOrchestrator;
+    private final NovelVersionRepository novelVersionRepository;
 
     @Value("${splitter.ingestion.embedding-rate-limit.enabled:false}")
     private boolean embeddingRateLimitEnabled;
@@ -91,6 +96,8 @@ public class EmbedWorker {
         String novelId = sample.getNovelId();
         String version = sample.getVersion();
         String embedRunId = sample.getEmbedRunId();
+        int chunkSize = sample.getChunkSize();
+        int chunkOverlap = sample.getChunkOverlap();
 
         try {
             SplitTask task = taskService.getTask(taskId);
@@ -146,7 +153,7 @@ public class EmbedWorker {
             int subSize = Math.max(1, embedSubBatchSize);
             for (int i = 0; i < toEmbed.size(); i += subSize) {
                 List<Long> subIds = toEmbed.subList(i, Math.min(i + subSize, toEmbed.size()));
-                processEmbedSubBatch(subIds, sceneByPid, taskId, novelId, version, embedRunId);
+                processEmbedSubBatch(subIds, sceneByPid, taskId, novelId, version, chunkSize, chunkOverlap, embedRunId);
             }
         } catch (Exception e) {
             log.error("embed scene group failed taskId={}", taskId, e);
@@ -160,15 +167,21 @@ public class EmbedWorker {
             String taskId,
             String novelId,
             String version,
+            int chunkSize,
+            int chunkOverlap,
             String embedRunId) {
         try {
-            List<Long> written = embedNovelUseCase.embedBatch(subIds);
+            String colName = VectorStore.collectionNameFor(novelId, version);
+            List<Long> written = embedNovelUseCase.embedBatch(subIds, colName);
             if (written.isEmpty()) {
                 markNoWriteOutcomes(subIds, sceneByPid, embedRunId);
             } else {
                 sceneRepository.batchUpdateEmbedOutcome(written, embedRunId, EmbedStatus.SUCCESS, null);
                 log.debug("embed sub-batch ok taskId={} embedRunId={} subBatchSize={} written={}",
                         taskId, embedRunId, subIds.size(), written.size());
+                // 推进版本向量化游标，并判定该 run 是否全量完成 → EMBED_DONE
+                advanceEmbedCursorAndCheckCompletion(
+                        novelId, version, chunkSize, chunkOverlap, embedRunId, maxSeqOf(sceneByPid, written));
             }
         } catch (Exception e) {
             log.error("embed sub-batch failed taskId={} embedRunId={} subBatchSize={} scenePids={}",
@@ -185,6 +198,69 @@ public class EmbedWorker {
             } catch (RuntimeException ex) {
                 log.warn("Failed to persist embed failure batch scenePids={}: {}", subIds, ex.toString());
             }
+            failVersion(novelId, version);
+        }
+    }
+
+    private long maxSeqOf(Map<Long, Scene> sceneByPid, List<Long> pids) {
+        long max = 0L;
+        for (Long pid : pids) {
+            Scene s = sceneByPid.get(pid);
+            if (s != null && s.getSeq() != null) {
+                max = Math.max(max, s.getSeq());
+            }
+        }
+        return max;
+    }
+
+    /**
+     * 推进 NovelVersion.embedCursorSceneSeq（取该批已成功 scene 的最大 seq，不回退），
+     * 并在该 run 下 SUCCESS 计数达到 profile 总量时置 EMBED_DONE。best-effort：任何异常仅记日志。
+     */
+    private void advanceEmbedCursorAndCheckCompletion(
+            String novelId, String version, int chunkSize, int chunkOverlap, String embedRunId, long maxSeq) {
+        try {
+            NovelVersion v = novelVersionRepository.findById(novelId, version).orElse(null);
+            if (v == null) {
+                return;
+            }
+            long cur = v.getEmbedCursorSceneSeq() == null ? 0L : v.getEmbedCursorSceneSeq();
+            v.setEmbedCursorSceneSeq(Math.max(cur, maxSeq));
+
+            // 写入集合名（首次落盘后即可查询）
+            if (v.getCollectionName() == null || v.getCollectionName().isBlank()) {
+                v.setCollectionName(VectorStore.collectionNameFor(novelId, version));
+            }
+
+            long success = sceneRepository.countEmbedByRunAndStatus(
+                    novelId, version, chunkSize, chunkOverlap, embedRunId, EmbedStatus.SUCCESS);
+            long total = sceneRepository.countByProfile(novelId, version, chunkSize, chunkOverlap);
+            if (total > 0 && success >= total) {
+                if (v.getStatus() == VersionStatus.EMBEDDING) {
+                    v.completeEmbed();
+                    log.info("版本 {}/{} 向量化全部完成 -> EMBED_DONE", novelId, version);
+                } else if (v.getStatus() == VersionStatus.FAILED) {
+                    // 失败后有批次补跑成功且全量达成：直接升级 EMBED_DONE（保留游标）
+                    v.setStatus(VersionStatus.EMBED_DONE);
+                }
+            }
+            novelVersionRepository.save(v);
+        } catch (Exception e) {
+            log.warn("Failed to advance embed cursor novelId={} version={}: {}", novelId, version, e.toString());
+        }
+    }
+
+    /** 单批 embed 失败 → 版本标记 FAILED（保留已向量化批次与游标，可续传）。best-effort。 */
+    private void failVersion(String novelId, String version) {
+        try {
+            NovelVersion v = novelVersionRepository.findById(novelId, version).orElse(null);
+            if (v != null) {
+                v.fail();
+                novelVersionRepository.save(v);
+                log.warn("版本 {}/{} 标记 FAILED（可续传）", novelId, version);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to mark version failed novelId={} version={}: {}", novelId, version, e.toString());
         }
     }
 

@@ -20,6 +20,7 @@ import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -65,36 +66,9 @@ public class SceneRepositoryJpaImpl implements SceneRepository {
 
         final JpaNovelEntity finalNovelEntity = novelEntity;
 
-        List<JpaSceneEntity> entities = scenes.stream().map(scene -> {
-            if (scene.getMetadata() != null) {
-                scene.getMetadata().setVersion(version);
-                scene.getMetadata().setChunkSize(chunkSize);
-                scene.getMetadata().setChunkOverlap(chunkOverlap);
-            } else {
-                SceneMetadata meta = SceneMetadata.builder()
-                        .version(version)
-                        .chunkSize(chunkSize)
-                        .chunkOverlap(chunkOverlap)
-                        .build();
-                scene.setMetadata(meta);
-            }
-
-            JpaSceneEntity entity = sceneMapper.toEntity(scene);
-            entity.setVersion(version);
-            entity.setChunkSize(chunkSize);
-            entity.setChunkOverlap(chunkOverlap);
-            entity.setLegacyNovelName(novelId);
-
-            if (finalNovelEntity != null) {
-                entity.setNovel(finalNovelEntity);
-            }
-            JpaChapterEntity chapterEntity = chapterMap.get(scene.getChapterIndex());
-            if (chapterEntity != null) {
-                entity.setChapter(chapterEntity);
-            }
-
-            return entity;
-        }).collect(Collectors.toList());
+        List<JpaSceneEntity> entities = scenes.stream()
+                .map(scene -> assembleEntity(scene, novelId, version, chunkSize, chunkOverlap, finalNovelEntity, chapterMap))
+                .collect(Collectors.toList());
 
         List<Long> savedIds = new ArrayList<>();
         int batchSize = Math.max(1, jdbcBatchSize);
@@ -107,6 +81,90 @@ public class SceneRepositoryJpaImpl implements SceneRepository {
             savedBatch.forEach(entity -> savedIds.add(entity.getId()));
         }
         return savedIds;
+    }
+
+    /**
+     * 幂等保存：以 (novelId, version, seq) 唯一约束为界，已存在则跳过；返回实际写入的 persistenceId。
+     * 逐条 saveAndFlush 并捕获唯一约束冲突（IDENTITY 主键在 persist 时即执行 INSERT，失败不会污染持久化上下文）。
+     * 单事务处理整个批次，保证重复跳过时 {@code entityManager.clear()} 在有效持久化上下文内执行。
+     */
+    @Override
+    @Transactional
+    public List<Long> saveScenesIdempotent(String novelId, String version, int chunkSize, int chunkOverlap, List<Scene> scenes) {
+        if (scenes == null || scenes.isEmpty()) {
+            return List.of();
+        }
+
+        JpaNovelEntity novelEntity = null;
+        Map<Integer, JpaChapterEntity> chapterMap = new HashMap<>();
+        if (novelId != null && !novelId.isEmpty()) {
+            novelEntity = jpaNovelRepository.findById(novelId).orElse(null);
+            List<JpaChapterEntity> chapterEntities = jpaChapterRepository.findByNovelIdOrderByIndexNumAsc(novelId);
+            if (chapterEntities != null) {
+                for (JpaChapterEntity c : chapterEntities) {
+                    chapterMap.put(c.getIndexNum(), c);
+                }
+            }
+        }
+        final JpaNovelEntity finalNovelEntity = novelEntity;
+
+        List<Long> savedIds = new ArrayList<>();
+        for (Scene s : scenes) {
+            JpaSceneEntity entity = assembleEntity(s, novelId, version, chunkSize, chunkOverlap, finalNovelEntity, chapterMap);
+            try {
+                jpaSceneRepository.saveAndFlush(entity);
+                savedIds.add(entity.getId());
+            } catch (DataIntegrityViolationException dup) {
+                // (novelId, version, seq) 唯一约束冲突 → 该 seq 已落库，幂等跳过。
+                // 失败实体残留在持久化上下文中会导致后续 flush 报 "don't flush after an exception"，
+                // 故必须清空上下文（IDENTITY 主键在 persist 时已执行 INSERT，失败即未写入）。
+                log.debug("Scene seq={} already exists for novelId={} version={}, skipped idempotently",
+                        s.getSeq(), novelId, version);
+                entityManager.clear();
+            }
+        }
+        return savedIds;
+    }
+
+    @Override
+    public long maxSeqByVersion(String novelId, String version) {
+        return jpaSceneRepository.findMaxSeq(novelId, version).orElse(0L);
+    }
+
+    /**
+     * 与 {@link #saveScenes} 相同的 entity 装配方式：补 metadata/version/chunk 列、novel 与 chapter 关联、seq。
+     */
+    private JpaSceneEntity assembleEntity(Scene scene, String novelId, String version, int chunkSize, int chunkOverlap,
+                                          JpaNovelEntity novelEntity, Map<Integer, JpaChapterEntity> chapterMap) {
+        if (scene.getMetadata() != null) {
+            scene.getMetadata().setVersion(version);
+            scene.getMetadata().setChunkSize(chunkSize);
+            scene.getMetadata().setChunkOverlap(chunkOverlap);
+        } else {
+            SceneMetadata meta = SceneMetadata.builder()
+                    .version(version)
+                    .chunkSize(chunkSize)
+                    .chunkOverlap(chunkOverlap)
+                    .build();
+            scene.setMetadata(meta);
+        }
+
+        JpaSceneEntity entity = sceneMapper.toEntity(scene);
+        entity.setVersion(version);
+        entity.setChunkSize(chunkSize);
+        entity.setChunkOverlap(chunkOverlap);
+        entity.setLegacyNovelName(novelId);
+        entity.setSeq(scene.getSeq());
+
+        if (novelEntity != null) {
+            entity.setNovel(novelEntity);
+        }
+        JpaChapterEntity chapterEntity = chapterMap.get(scene.getChapterIndex());
+        if (chapterEntity != null) {
+            entity.setChapter(chapterEntity);
+        }
+
+        return entity;
     }
 
     @Override

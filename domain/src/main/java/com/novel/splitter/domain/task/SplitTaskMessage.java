@@ -28,7 +28,7 @@ public class SplitTaskMessage {
     private String chapterTitleRegex;
 
     /**
-     * 章节识别策略：PLAIN / VOLUME_CHAPTER / CUSTOM；默认 PLAIN。
+     * 章节识别策略：CN_CHAPTER / CN_BACK / CN_SECTION / EN_CHAPTER / PROLOGUE / VOLUME_CHAPTER / CUSTOM。
      */
     private String recognitionStrategy;
 

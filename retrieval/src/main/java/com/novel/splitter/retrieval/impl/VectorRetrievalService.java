@@ -1,11 +1,13 @@
 package com.novel.splitter.retrieval.impl;
 
+import com.novel.splitter.domain.model.Novel;
 import com.novel.splitter.domain.model.Scene;
 import com.novel.splitter.retrieval.dto.RetrievalQuery;
 import com.novel.splitter.domain.model.embedding.VectorRecord;
 import com.novel.splitter.embedding.api.EmbeddingService;
 import com.novel.splitter.embedding.api.VectorStore;
 import com.novel.splitter.domain.model.SceneSplitProfile;
+import com.novel.splitter.domain.repository.NovelRepository;
 import com.novel.splitter.domain.repository.SceneRepository;
 import com.novel.splitter.retrieval.api.RetrievalService;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +39,7 @@ public class VectorRetrievalService implements RetrievalService {
     private final EmbeddingService embeddingService;
     private final VectorStore vectorStore;
     private final SceneRepository sceneRepository;
+    private final NovelRepository novelRepository;
 
     /**
      * 根据检索查询对象执行向量检索，并返回相关的场景列表
@@ -57,22 +60,34 @@ public class VectorRetrievalService implements RetrievalService {
 
         log.info("Processing retrieval query: '{}' (topK={})", query.getQuestion(), query.getTopK());
 
+        final String novelId = query.getNovelId();
+        final String version = resolveVersion(novelId, query.getVersion());
+
+        // 版本化检索：定位向量集合
+        String collectionName = null;
+        if (novelId != null && !novelId.isBlank() && version != null && !version.isBlank()) {
+            collectionName = VectorStore.collectionNameFor(novelId, version);
+            if (!vectorStore.collectionExists(collectionName)) {
+                log.warn("Vector collection {} not found for novelId={} version={}, returning empty results",
+                        collectionName, novelId, version);
+                return Collections.emptyList();
+            }
+        }
+
         // 1. Embedding：调用嵌入服务，将用户的自然语言问题转化为稠密向量
         float[] queryVector = embeddingService.embedBatch(Collections.singletonList(query.getQuestion())).get(0);
 
         // 2. Vector Search：构建元数据过滤条件，在向量库中查找最相似的记录
         Map<String, Object> filter = new HashMap<>();
-        if (query.getNovelId() != null && !query.getNovelId().isBlank()) {
-            filter.put(META_NOVEL_ID, query.getNovelId());
+        if (novelId != null && !novelId.isBlank()) {
+            filter.put(META_NOVEL_ID, novelId);
         }
-        if (query.getVersion() != null && !query.getVersion().isBlank()) {
-            filter.put(META_VERSION, query.getVersion());
+        if (version != null && !version.isBlank()) {
+            filter.put(META_VERSION, version);
         }
 
         Integer chunkSize = query.getChunkSize();
         Integer chunkOverlap = query.getChunkOverlap();
-        String novelId = query.getNovelId();
-        String version = query.getVersion();
         if (novelId != null && !novelId.isBlank() && version != null && !version.isBlank()
                 && (chunkSize == null || chunkOverlap == null)) {
             java.util.List<SceneSplitProfile> sameVersion = sceneRepository.listSplitProfilesByNovelId(novelId).stream()
@@ -96,10 +111,21 @@ public class VectorRetrievalService implements RetrievalService {
             filter.put(META_CHUNK_OVERLAP, chunkOverlap);
         }
 
-        log.info("Executing vector search with filter: {}", filter);
+        log.info("Executing vector search with filter: {} collection={}", filter,
+                collectionName != null ? collectionName : "(default)");
 
-        // 执行向量搜索
-        List<VectorRecord> records = vectorStore.search(queryVector, query.getTopK(), filter);
+        // 执行向量搜索（降级：异常时返回空）
+        List<VectorRecord> records;
+        try {
+            if (collectionName != null) {
+                records = vectorStore.search(queryVector, query.getTopK(), filter, collectionName);
+            } else {
+                records = vectorStore.search(queryVector, query.getTopK(), filter);
+            }
+        } catch (Exception e) {
+            log.warn("Vector search failed for collection {}: {}", collectionName, e.toString());
+            return Collections.emptyList();
+        }
         log.debug("Found {} vector matches", records.size());
 
         // 3. Hydrate (Vector -> Scene)：将向量搜索结果还原为包含完整文本的 Scene 实体
@@ -188,5 +214,27 @@ public class VectorRetrievalService implements RetrievalService {
         }
         
         return resultList;
+    }
+
+    /**
+     * 解析检索请求中的版本：无显式指定则从 Novel.activeVersionTag 获取。
+     */
+    private String resolveVersion(String novelId, String explicitVersion) {
+        if (explicitVersion != null && !explicitVersion.isBlank()) {
+            return explicitVersion;
+        }
+        if (novelId == null || novelId.isBlank()) {
+            return null;
+        }
+        try {
+            Novel novel = novelRepository.findById(novelId).orElse(null);
+            if (novel != null && novel.getActiveVersionTag() != null && !novel.getActiveVersionTag().isBlank()) {
+                log.debug("Resolved active version {} for novel {}", novel.getActiveVersionTag(), novelId);
+                return novel.getActiveVersionTag();
+            }
+        } catch (Exception e) {
+            log.warn("Failed to resolve active version for novel {}: {}", novelId, e.toString());
+        }
+        return null;
     }
 }

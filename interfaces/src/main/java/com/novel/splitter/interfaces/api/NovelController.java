@@ -13,6 +13,8 @@ import com.novel.splitter.application.model.dto.SceneDto;
 import com.novel.splitter.application.model.dto.SceneSplitRequestDto;
 import com.novel.splitter.application.model.dto.SplitRetryRequestDto;
 import com.novel.splitter.application.model.dto.TaskSubmitResponseDto;
+import com.novel.splitter.application.model.dto.CreateVersionRequest;
+import com.novel.splitter.application.model.dto.NovelVersionDto;
 import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -225,13 +227,67 @@ public class NovelController {
         return novelFacadeService.getNovelStats();
     }
 
+    @Operation(summary = "获取小说版本列表", description = "返回该小说的全部版本，并按 novel.activeVersionTag 标注 active")
+    @GetMapping("/{novelId}/versions")
+    public List<NovelVersionDto> listVersions(@PathVariable("novelId") String novelId) {
+        return novelFacadeService.listVersions(novelId);
+    }
+
+    @Operation(summary = "创建小说版本", description = "创建 PENDING 版本；versionTag 为空自动递增 v{n+1}；splitStrategy 非法返回 400")
+    @PostMapping("/{novelId}/versions")
+    public NovelVersionDto createVersion(
+            @PathVariable("novelId") String novelId,
+            @RequestBody(required = false) CreateVersionRequest request) {
+        return novelFacadeService.createVersion(novelId, request != null ? request : new CreateVersionRequest());
+    }
+
+    @Operation(summary = "基线解析（阶段一）", description = "投递 Load 队列强制重解析章节为 chapters + parsed JSON，不自动场景切分；完成后调用版本 split")
+    @PostMapping("/{novelId}/baseline")
+    public TaskSubmitResponseDto baselineParse(
+            @PathVariable("novelId") String novelId,
+            @RequestBody(required = false) ReparseChaptersRequestDto request) throws IOException {
+        return novelFacadeService.baselineParse(novelId, request != null ? request : new ReparseChaptersRequestDto());
+    }
+
+    @Operation(summary = "版本场景切分", description = "用版本自身 chunk 参数投 Split 队列（不自动串联向量化）")
+    @PostMapping("/{novelId}/versions/{versionTag}/split")
+    public TaskSubmitResponseDto startVersionSplit(
+            @PathVariable("novelId") String novelId,
+            @PathVariable("versionTag") String versionTag) throws IOException {
+        return novelFacadeService.startVersionSplit(novelId, versionTag);
+    }
+
+    @Operation(summary = "版本向量化", description = "用版本自身 chunk 参数启动 EMBED 编排")
+    @PostMapping("/{novelId}/versions/{versionTag}/embed")
+    public TaskSubmitResponseDto startVersionEmbed(
+            @PathVariable("novelId") String novelId,
+            @PathVariable("versionTag") String versionTag) throws IOException {
+        return novelFacadeService.startVersionEmbed(novelId, versionTag);
+    }
+
+    @Operation(summary = "激活版本", description = "将指定版本激活为检索所用活跃版本（仅 EMBED_DONE 可激活）")
+    @PostMapping("/{novelId}/versions/{versionTag}/activate")
+    public void activateVersion(
+            @PathVariable("novelId") String novelId,
+            @PathVariable("versionTag") String versionTag) {
+        novelFacadeService.activateVersion(novelId, versionTag);
+    }
+
+    @Operation(summary = "删除版本", description = "删除该版本切分数据集/向量，并删除 novel_version 行")
+    @DeleteMapping("/{novelId}/versions/{versionTag}")
+    public void deleteVersion(
+            @PathVariable("novelId") String novelId,
+            @PathVariable("versionTag") String versionTag) {
+        novelFacadeService.deleteVersion(novelId, versionTag);
+    }
+
     @Operation(summary = "获取章节识别策略列表", description = "返回系统内置的所有章节识别策略，供前端下拉选择")
     @GetMapping("/chapter-strategies")
     public List<Map<String, String>> listChapterStrategies() {
         List<Map<String, String>> strategies = new ArrayList<>();
 
         Map<String, String> plain = new LinkedHashMap<>();
-        plain.put("key", "PLAIN");
+        plain.put("key", "CN_CHAPTER");
         plain.put("label", "普通章节");
         plain.put("description", "仅识别 [第X章] 格式，适用于常规无分卷小说");
         strategies.add(plain);

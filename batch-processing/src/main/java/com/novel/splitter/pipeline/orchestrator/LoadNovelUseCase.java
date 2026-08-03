@@ -33,8 +33,8 @@ public class LoadNovelUseCase {
     }
 
     /**
-     * @param chapterTitleRegex 可选，覆盖默认章节标题正则
-     * @param recognitionStrategy 识别策略：PLAIN / VOLUME_CHAPTER / CUSTOM
+     * @param chapterTitleRegex 可选，仅 CUSTOM 策略下覆盖章节标题正则
+     * @param recognitionStrategy 识别策略字符串；null 默认 CN_CHAPTER，未知值抛 IllegalArgumentException
      */
     public Novel load(
             String novelId,
@@ -43,7 +43,7 @@ public class LoadNovelUseCase {
             String chapterTitleRegex,
             String recognitionStrategy) throws Exception {
         log.info("=== Start Load Phase for: {} (novelId: {}, strategy: {}) ===", novelPath, novelId,
-                recognitionStrategy != null ? recognitionStrategy : "PLAIN");
+                recognitionStrategy != null ? recognitionStrategy : "CN_CHAPTER");
         progressCallback.accept(IngestProgress.LOAD_START, "开始读取文件...");
         Novel novel = novelLoader.load(novelId, novelPath, chapterTitleRegex, recognitionStrategy);
         progressCallback.accept(IngestProgress.LOAD_END, String.format("文件读取完成，共 %d 个章节", novel.getChapters().size()));

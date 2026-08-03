@@ -26,6 +26,17 @@ public class ChapterServiceImpl implements ChapterService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void replaceAll(String novelId, List<Chapter> chapters) {
+        chapterRepository.deleteByNovelId(novelId);
+        if (chapters != null && !chapters.isEmpty()) {
+            chapterRepository.saveAll(chapters);
+        }
+        log.info("Replaced chapters baseline for novel {} ({} chapters)", novelId,
+                chapters != null ? chapters.size() : 0);
+    }
+
+    @Override
     public List<Chapter> getChaptersByNovelId(String novelId) {
         return chapterRepository.findByNovelId(novelId);
     }

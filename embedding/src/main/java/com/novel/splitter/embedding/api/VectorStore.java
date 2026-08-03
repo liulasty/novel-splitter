@@ -3,7 +3,9 @@ package com.novel.splitter.embedding.api;
 import com.novel.splitter.domain.model.Scene;
 import com.novel.splitter.domain.model.embedding.VectorRecord;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 向量存储接口 (Vector Store)
@@ -98,4 +100,74 @@ public interface VectorStore {
      * @return 当前存储库中向量记录的总条数
      */
     long count();
+
+    // ──────────── 集合生命周期（默认 no‑op，Chroma 实现需覆写）────────────
+
+    /**
+     * 创建一个新集合（collection / index），幂等：已存在则不做任何事。
+     */
+    default void createCollection(String name) {
+        // no-op: 仅 Chroma 等远程向量库需要
+    }
+
+    /**
+     * 删除一个集合及其包含的全部向量；集合不存在视为成功。
+     */
+    default void deleteCollection(String name) {
+        // no-op
+    }
+
+    /**
+     * 判断指定集合是否存在。
+     */
+    default boolean collectionExists(String name) {
+        return true; // 保守默认：内存实现始终返回 true
+    }
+
+    // ──────────── 集合感知写 / 删 / 查（默认委托无集合版本）────────────
+
+    /**
+     * 批量保存到指定集合。
+     * 默认委托 {@link #saveBatch(List, List)}（忽略集合参数），Chrom​​a 实现需覆写。
+     */
+    default void saveBatch(List<Scene> scenes, List<float[]> embeddings, String collectionName) {
+        saveBatch(scenes, embeddings);
+    }
+
+    /**
+     * 在指定集合搜索。
+     * 默认委托 {@link #search(float[], int, Map)}，Chrom​​a 实现需覆写。
+     */
+    default List<VectorRecord> search(float[] queryEmbedding, int topK, java.util.Map<String, Object> filter,
+                                      String collectionName) {
+        return search(queryEmbedding, topK, filter);
+    }
+
+    /**
+     * 按集合粒度整体删除（不依赖 metadata filter）。
+     * 默认通过 {@link #deleteCollection(String)} 实现，Chrom​​a 实现可直接覆写一次 API 调用完成。
+     */
+    default void deleteByCollection(String collectionName) {
+        deleteCollection(collectionName);
+    }
+
+    // ──────────── 集合名规范化 ────────────
+
+    /**
+     * 根据小说 ID 与版本号计算出 Chroma-safe 集合名。
+     * <ul>
+     *   <li>仅保留 {@code [a-z0-9_]}；</li>
+     *   <li>前缀 {@code c_}；</li>
+     *   <li>novelId 取前 8 字符，version 取前 40 字符；</li>
+     *   <li>总长度不超过 63。</li>
+     * </ul>
+     */
+    static String collectionNameFor(String novelId, String version) {
+        String nid = novelId.replaceAll("[^a-zA-Z0-9_]", "").toLowerCase();
+        String ver = version.replaceAll("[^a-zA-Z0-9_]", "").toLowerCase();
+        String id8 = nid.length() > 8 ? nid.substring(0, 8) : nid;
+        String verShort = ver.length() > 40 ? ver.substring(0, 40) : ver;
+        String name = "c_" + id8 + "_" + verShort;
+        return name.length() > 63 ? name.substring(0, 63) : name;
+    }
 }

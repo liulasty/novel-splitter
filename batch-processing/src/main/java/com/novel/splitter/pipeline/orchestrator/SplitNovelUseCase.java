@@ -10,7 +10,6 @@ import com.novel.splitter.domain.strategy.OverlapChunkingStrategy;
 import com.novel.splitter.domain.task.IngestProgress;
 import com.novel.splitter.domain.repository.ChapterRepository;
 import com.novel.splitter.domain.repository.SceneRepository;
-import com.novel.splitter.domain.model.SceneMetadata;
 import com.novel.splitter.pipeline.model.ResolvedChunkingParams;
 import com.novel.splitter.validation.core.SceneQualityScoreWriter;
 import lombok.RequiredArgsConstructor;
@@ -51,6 +50,13 @@ public class SplitNovelUseCase {
     @Value("${splitter.split.scene-persist-batch-size:1000}")
     private int scenePersistBatchSize;
 
+    /**
+     * 切分终点：本次实际写入的 persistenceId 列表、最后贡献场景的章节索引、本章结束后的全局 seq。
+     * 下一次续传从 {@code (lastChapterIndex + 1, lastSceneSeq)} 开始。
+     */
+    public record SplitProgress(List<Long> sceneIds, int lastChapterIndex, long lastSceneSeq) {
+    }
+
     private List<Scene> filterByLength(List<Scene> scenes) {
         List<Scene> valid = new ArrayList<>();
         for (Scene s : scenes) {
@@ -76,18 +82,6 @@ public class SplitNovelUseCase {
             return Integer.MAX_VALUE;
         }
         return Math.max(0, maxScenes - savedCount - batchSize);
-    }
-
-    private void assignChapterSequence(List<Scene> scenes) {
-        int seq = 0;
-        for (Scene s : scenes) {
-            SceneMetadata meta = s.getMetadata();
-            if (meta == null) {
-                meta = new SceneMetadata();
-                s.setMetadata(meta);
-            }
-            meta.setSequenceNum(seq++);
-        }
     }
 
     /**
@@ -119,6 +113,24 @@ public class SplitNovelUseCase {
     public List<Long> split(String taskId, String novelId, String novelTitle, int maxScenes, String version,
                             Integer overrideChunkSize, Integer overrideChunkOverlap,
                             BiConsumer<Integer, String> progressCallback) {
+        return split(taskId, novelId, novelTitle, maxScenes, version, overrideChunkSize, overrideChunkOverlap,
+                0, 0L, progressCallback).sceneIds();
+    }
+
+    /**
+     * 每章 checkpoint 续传的切分入口：从 {@code startChapterIndex} 章开始，全局 seq 从 {@code startSceneSeq} 起
+     * 为每个有效场景单调 +1；落库使用 {@code saveScenesIdempotent}（以 (novelId, version, seq) 唯一约束为界），
+     * 因此重复执行/从中断处续传均无副作用。
+     *
+     * @param startChapterIndex 起始章节索引（含），续传时传上次 {@link SplitProgress#lastChapterIndex()} + 1
+     * @param startSceneSeq     起始全局 seq，续传时传上次 {@link SplitProgress#lastSceneSeq()}（首个新场景 = +1）
+     * @return 切分终点：sceneIds=本次实际写入的 persistenceId；lastChapterIndex=最后贡献场景的章节索引；
+     *         lastSceneSeq=结束后的全局 seq
+     */
+    public SplitProgress split(String taskId, String novelId, String novelTitle, int maxScenes, String version,
+                               Integer overrideChunkSize, Integer overrideChunkOverlap,
+                               int startChapterIndex, long startSceneSeq,
+                               BiConsumer<Integer, String> progressCallback) {
         log.info("=== Start Split Phase for novelId={} title={} ===", novelId, novelTitle);
 
         int persistBatch = effectivePersistBatchSize();
@@ -129,9 +141,13 @@ public class SplitNovelUseCase {
         int scenesCount = 0;
         int totalValidAccepted = 0;
         int lastProgress = IngestProgress.CHAPTER_END;
+        long seq = startSceneSeq;
+        int lastChapterIndex = -1;
+        int fromChapter = Math.max(0, startChapterIndex);
 
         if (progressCallback != null) {
-            progressCallback.accept(lastProgress, String.format("准备逐章切分，共 %d 章", totalChapters));
+            progressCallback.accept(lastProgress, String.format("准备逐章切分，共 %d 章，从第 %d 章续传（起始 seq=%d）",
+                    totalChapters, fromChapter + 1, startSceneSeq));
         }
 
         ResolvedChunkingParams resolved = resolveChunkingParams(overrideChunkSize, overrideChunkOverlap);
@@ -143,7 +159,7 @@ public class SplitNovelUseCase {
 
         boolean savePhaseStarted = false;
 
-        for (int i = 0; i < totalChapters; i++) {
+        for (int i = fromChapter; i < totalChapters; i++) {
             if (maxScenes > 0 && allSavedSceneIds.size() >= maxScenes) {
                 break;
             }
@@ -169,7 +185,6 @@ public class SplitNovelUseCase {
             List<Scene> validScenes = filterByLength(chunkedScenes);
 
             SceneQualityScoreWriter.apply(validScenes, minLength, maxLength);
-            assignChapterSequence(validScenes);
 
             int cap = capRemaining(maxScenes, allSavedSceneIds.size(), batchScenes.size());
             if (cap <= 0) {
@@ -178,6 +193,16 @@ public class SplitNovelUseCase {
             if (validScenes.size() > cap) {
                 validScenes = new ArrayList<>(validScenes.subList(0, cap));
             }
+
+            // 全局连续 seq：每个有效场景分配唯一 (novelId, version, seq)；同时回写 metadata.sequenceNum 保持同步
+            for (Scene s : validScenes) {
+                seq += 1;
+                s.setSeq(seq);
+                if (s.getMetadata() != null) {
+                    s.getMetadata().setSequenceNum((int) seq);
+                }
+            }
+            lastChapterIndex = i;
 
             batchScenes.addAll(validScenes);
             totalValidAccepted += validScenes.size();
@@ -190,7 +215,7 @@ public class SplitNovelUseCase {
                 }
                 List<Scene> toSave = new ArrayList<>(batchScenes.subList(0, persistBatch));
                 batchScenes.subList(0, persistBatch).clear();
-                allSavedSceneIds.addAll(sceneRepository.saveScenes(
+                allSavedSceneIds.addAll(sceneRepository.saveScenesIdempotent(
                         novelId, finalVersion, effectiveChunk, effectiveOverlap, toSave));
                 if (progressCallback != null) {
                     int denom = Math.max(1, Math.max(totalValidAccepted, allSavedSceneIds.size()));
@@ -240,7 +265,7 @@ public class SplitNovelUseCase {
                 lastProgress = Math.max(lastProgress, IngestProgress.SAVE_START);
                 progressCallback.accept(lastProgress, "正在保存剩余场景到本地存储...");
             }
-            allSavedSceneIds.addAll(sceneRepository.saveScenes(
+            allSavedSceneIds.addAll(sceneRepository.saveScenesIdempotent(
                     novelId, finalVersion, effectiveChunk, effectiveOverlap, batchScenes));
             batchScenes.clear();
         }
@@ -251,7 +276,7 @@ public class SplitNovelUseCase {
                 lastProgress = Math.max(lastProgress, IngestProgress.SAVE_END);
                 progressCallback.accept(lastProgress, "无有效场景落盘");
             }
-            return new ArrayList<>();
+            return new SplitProgress(new ArrayList<>(), lastChapterIndex, seq);
         }
 
         if (progressCallback != null) {
@@ -259,6 +284,6 @@ public class SplitNovelUseCase {
             progressCallback.accept(lastProgress, String.format("本地存储完成，共 %d 个场景", allSavedSceneIds.size()));
         }
 
-        return allSavedSceneIds;
+        return new SplitProgress(allSavedSceneIds, lastChapterIndex, seq);
     }
 }

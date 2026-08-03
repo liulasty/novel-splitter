@@ -14,6 +14,15 @@ public interface ChapterService {
     void saveChapters(List<Chapter> chapters);
 
     /**
+     * 原子整体替换小说的章节基准：清空旧 chapters + 写入新 chapters 在<strong>同一事务</strong>内完成，
+     * 要么新基准全量落库，要么旧基准全量保留（用于强制重解析时避免出现半成品基准）。
+     *
+     * @param novelId  小说ID
+     * @param chapters 新的完整章节集合（可为空，表示清空基准）
+     */
+    void replaceAll(String novelId, List<Chapter> chapters);
+
+    /**
      * 获取指定小说的所有章节，按序号升序
      *
      * @param novelId 小说ID

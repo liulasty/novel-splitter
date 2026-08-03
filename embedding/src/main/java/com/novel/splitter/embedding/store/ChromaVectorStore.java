@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -60,6 +61,9 @@ public class ChromaVectorStore implements VectorStore {
     private static final String DEFAULT_DATABASE = "default_database";
 
     private volatile String collectionId;
+
+    /** 按集合名缓存 Chroma UUID；用于多集合版本化管理 */
+    private final ConcurrentHashMap<String, String> collectionIdByCollection = new ConcurrentHashMap<>();
 
     private static final String CHROMA_HINT_ZH =
             "向量库 Chroma 操作失败。常见原因：Chroma 中 collection 被删除/重建后，本进程仍缓存旧的 collection UUID。"
@@ -639,5 +643,265 @@ public class ChromaVectorStore implements VectorStore {
             return Map.of("$in", list);
         }
         return Map.of("$eq", value);
+    }
+
+    // ──────────── 多集合：按名称解析 Chroma UUID ────────────
+
+    /**
+     * 按集合名称懒绑定 / 创建，返回 Chroma UUID。
+     */
+    private String resolveOrCreateCollectionId(String colName) {
+        String cached = collectionIdByCollection.get(colName);
+        if (cached != null) {
+            return cached;
+        }
+        synchronized (this) {
+            cached = collectionIdByCollection.get(colName);
+            if (cached != null) {
+                return cached;
+            }
+            // 特殊路径：如果 colName 就是默认 collectionName，直接用已有绑定
+            if (colName.equals(collectionName) && collectionId != null) {
+                collectionIdByCollection.put(colName, collectionId);
+                return collectionId;
+            }
+            // GET by name
+            ChromaCollection existing = getCollectionByNameOrNull(colName);
+            if (existing != null && existing.getId() != null) {
+                assertCollectionDistance(existing);
+                collectionIdByCollection.put(colName, existing.getId());
+                if (colName.equals(collectionName)) {
+                    this.collectionId = existing.getId();
+                }
+                log.info("Bound ChromaDB collection '{}' -> id {}", colName, existing.getId());
+                return existing.getId();
+            }
+            // POST create
+            Map<String, Object> createBody = Map.of(
+                    "name", colName,
+                    "metadata", Map.of(CHROMA_HNSW_SPACE_KEY, hnswSpace)
+            );
+            try {
+                ChromaCollection created = restClient.post()
+                        .uri(collectionsBasePath())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(createBody)
+                        .retrieve()
+                        .body(ChromaCollection.class);
+                if (created != null && created.getId() != null) {
+                    collectionIdByCollection.put(colName, created.getId());
+                    if (colName.equals(collectionName)) {
+                        this.collectionId = created.getId();
+                    }
+                    log.info("Created ChromaDB collection: {} -> id {}", colName, created.getId());
+                    return created.getId();
+                }
+            } catch (RestClientResponseException e) {
+                if (e.getStatusCode().is4xxClientError()) {
+                    ChromaCollection race = getCollectionByNameOrNull(colName);
+                    if (race != null && race.getId() != null) {
+                        assertCollectionDistance(race);
+                        collectionIdByCollection.put(colName, race.getId());
+                        if (colName.equals(collectionName)) {
+                            this.collectionId = race.getId();
+                        }
+                        log.info("Bound existing ChromaDB collection after create race: {} -> {}", colName, race.getId());
+                        return race.getId();
+                    }
+                }
+                throw new IllegalStateException("Failed to create ChromaDB collection '" + colName + "': HTTP "
+                        + e.getStatusCode().value() + " " + e.getResponseBodyAsString(), e);
+            } catch (Exception e) {
+                throw new IllegalStateException("Failed to create ChromaDB collection: " + colName, e);
+            }
+            throw new IllegalStateException("Failed to initialize ChromaDB collection " + colName);
+        }
+    }
+
+    private ChromaCollection getCollectionByNameOrNull(String colName) {
+        try {
+            return restClient.get()
+                    .uri(collectionsBasePath() + "/" + UriUtils.encodePathSegment(colName, StandardCharsets.UTF_8))
+                    .retrieve()
+                    .body(ChromaCollection.class);
+        } catch (RestClientResponseException e) {
+            if (HttpStatus.NOT_FOUND.equals(e.getStatusCode())) {
+                return null;
+            }
+            throw new IllegalStateException("Failed to GET Chroma collection '" + colName + "': HTTP "
+                    + e.getStatusCode().value() + " " + e.getResponseBodyAsString(), e);
+        }
+    }
+
+    private String collectionUri(String colId, String suffix) {
+        String base = collectionsBasePath() + "/" + colId;
+        if (suffix == null || suffix.isBlank()) {
+            return base;
+        }
+        return base + suffix;
+    }
+
+    @Override
+    public void deleteByCollection(String colName) {
+        String colId = collectionIdByCollection.get(colName);
+        if (colId == null) {
+            ChromaCollection existing = getCollectionByNameOrNull(colName);
+            if (existing == null || existing.getId() == null) {
+                log.info("Collection '{}' does not exist, deleteByCollection treated as success", colName);
+                return;
+            }
+            colId = existing.getId();
+            collectionIdByCollection.put(colName, colId);
+        }
+        try {
+            restClient.delete()
+                    .uri(collectionsBasePath() + "/" + UriUtils.encodePathSegment(colName, StandardCharsets.UTF_8))
+                    .retrieve()
+                    .toBodilessEntity();
+            log.info("Deleted ChromaDB collection: {}", colName);
+        } catch (RestClientResponseException e) {
+            if (HttpStatus.NOT_FOUND.equals(e.getStatusCode())) {
+                log.info("Chroma collection '{}' already deleted (ok)", colName);
+            } else {
+                throw new IllegalStateException("Failed to delete Chroma collection '" + colName + "': HTTP "
+                        + e.getStatusCode().value(), e);
+            }
+        }
+        collectionIdByCollection.remove(colName);
+        if (colName.equals(collectionName)) {
+            synchronized (this) {
+                this.collectionId = null;
+            }
+        }
+    }
+
+    // ──────────── 集合感知的写 / 查 ────────────
+
+    @Override
+    public void saveBatch(List<Scene> scenes, List<float[]> embeddings, String colName) {
+        if (scenes.isEmpty()) {
+            return;
+        }
+
+        String colId = resolveOrCreateCollectionId(colName);
+
+        List<String> ids = scenes.stream().map(Scene::getId).collect(Collectors.toList());
+        List<Map<String, Object>> metadatas = scenes.stream()
+                .map(this::buildChromaMetadata)
+                .collect(Collectors.toList());
+        List<String> documents = scenes.stream().map(Scene::getText).collect(Collectors.toList());
+        List<List<Double>> embeddingsList = embeddings.stream()
+                .map(this::toDoubleList)
+                .collect(Collectors.toList());
+
+        Map<String, Object> request = new HashMap<>();
+        request.put("ids", ids);
+        request.put("embeddings", embeddingsList);
+        request.put("metadatas", metadatas);
+        request.put("documents", documents);
+
+        log.debug("Saving {} scenes to ChromaDB collection '{}'", scenes.size(), colName);
+
+        try {
+            restClient.post()
+                    .uri(collectionUri(colId, "/add"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(request)
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (RestClientResponseException e) {
+            throw chromaUserVisibleFailure("写入向量(/add) collection=" + colName, e);
+        }
+
+        log.info("Saved {} vectors to ChromaDB collection '{}'", scenes.size(), colName);
+    }
+
+    @Override
+    public List<VectorRecord> search(float[] queryEmbedding, int topK, Map<String, Object> filter,
+                                     String colName) {
+        String colId = resolveOrCreateCollectionId(colName);
+
+        List<Double> embeddingList = toDoubleList(queryEmbedding);
+
+        Map<String, Object> request = new HashMap<>();
+        request.put("query_embeddings", Collections.singletonList(embeddingList));
+        request.put("n_results", topK);
+        request.put("include", Arrays.asList("distances", "metadatas"));
+
+        if (filter != null && !filter.isEmpty()) {
+            request.put("where", buildWhereClause(filter));
+        }
+
+        ChromaQueryResponse response;
+        try {
+            response = restClient.post()
+                    .uri(collectionUri(colId, "/query"))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(request)
+                    .retrieve()
+                    .body(ChromaQueryResponse.class);
+        } catch (RestClientResponseException e) {
+            throw chromaUserVisibleFailure("检索(/query) collection=" + colName, e);
+        }
+
+        if (response == null || response.getIds() == null || response.getIds().isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<String> resultIds = response.getIds().get(0);
+        List<Double> distances = response.getDistances().get(0);
+        List<Map<String, Object>> resultMetas =
+                (response.getMetadatas() != null && !response.getMetadatas().isEmpty()) ? response.getMetadatas().get(0) : null;
+
+        return IntStream.range(0, resultIds.size())
+                .mapToObj(i -> {
+                    Map<String, Object> meta = null;
+                    if (resultMetas != null && i < resultMetas.size()) {
+                        meta = resultMetas.get(i);
+                    }
+                    return new VectorRecord(
+                            resultIds.get(i),
+                            1.0 - distances.get(i),
+                            meta
+                    );
+                })
+                .collect(Collectors.toList());
+    }
+
+    // ──────────── 集合生命周期 ────────────
+
+    @Override
+    public void createCollection(String name) {
+        try {
+            resolveOrCreateCollectionId(name);
+            log.info("Collection '{}' ready (created or already exists)", name);
+        } catch (Exception e) {
+            log.warn("Failed to create collection '{}': {}", name, e.getMessage());
+            throw new IllegalStateException("Failed to create collection: " + name, e);
+        }
+    }
+
+    @Override
+    public void deleteCollection(String name) {
+        deleteByCollection(name);
+    }
+
+    @Override
+    public boolean collectionExists(String name) {
+        String cached = collectionIdByCollection.get(name);
+        if (cached != null) {
+            return true;
+        }
+        try {
+            ChromaCollection col = getCollectionByNameOrNull(name);
+            if (col != null && col.getId() != null) {
+                collectionIdByCollection.put(name, col.getId());
+                return true;
+            }
+            return false;
+        } catch (Exception e) {
+            log.warn("Failed to check collection existence for '{}': {}", name, e.getMessage());
+            return false;
+        }
     }
 }

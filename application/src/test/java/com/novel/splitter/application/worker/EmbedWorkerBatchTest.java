@@ -76,7 +76,7 @@ class EmbedWorkerBatchTest {
         }
         when(sceneRepository.findByIds(pids)).thenReturn(scenes);
 
-        when(embedNovelUseCase.embedBatch(anyList())).thenAnswer(inv -> inv.getArgument(0));
+        when(embedNovelUseCase.embedBatch(anyList(), anyString())).thenAnswer(inv -> inv.getArgument(0));
 
         List<EmbedSceneTaskMessage> batch = new ArrayList<>();
         for (Long pid : pids) {
@@ -84,7 +84,7 @@ class EmbedWorkerBatchTest {
         }
         embedWorker.onEmbedSceneBatch(batch);
 
-        verify(embedNovelUseCase, times(4)).embedBatch(embedBatchIdsCaptor.capture());
+        verify(embedNovelUseCase, times(4)).embedBatch(embedBatchIdsCaptor.capture(), anyString());
         assertThat(embedBatchIdsCaptor.getAllValues().get(0)).containsExactly(1L, 2L, 3L);
         assertThat(embedBatchIdsCaptor.getAllValues().get(1)).containsExactly(4L, 5L, 6L);
         assertThat(embedBatchIdsCaptor.getAllValues().get(2)).containsExactly(7L, 8L, 9L);
@@ -107,7 +107,7 @@ class EmbedWorkerBatchTest {
                 .embedRunId("run-a")
                 .build();
         when(sceneRepository.findByIds(List.of(7L))).thenReturn(List.of(emptyText));
-        when(embedNovelUseCase.embedBatch(List.of(7L))).thenReturn(List.of());
+        when(embedNovelUseCase.embedBatch(eq(List.of(7L)), anyString())).thenReturn(List.of());
 
         embedWorker.onEmbedSceneBatch(List.of(
                 new EmbedSceneTaskMessage("t1", "n1", "v1", 350, 65, "run-a", 7L)));
@@ -128,7 +128,7 @@ class EmbedWorkerBatchTest {
         embedWorker.onEmbedSceneBatch(List.of(
                 new EmbedSceneTaskMessage("t1", "n1", "v1", 350, 65, "run-a", 1L)));
 
-        verify(embedNovelUseCase, times(0)).embedBatch(anyList());
+        verify(embedNovelUseCase, times(0)).embedBatch(anyList(), anyString());
     }
 
     @Test
@@ -151,7 +151,7 @@ class EmbedWorkerBatchTest {
         embedWorker.onEmbedSceneBatch(List.of(
                 new EmbedSceneTaskMessage("t1", "n1", "v1", 350, 65, "run-a", 9L)));
 
-        verify(embedNovelUseCase, times(0)).embedBatch(anyList());
+        verify(embedNovelUseCase, times(0)).embedBatch(anyList(), anyString());
     }
 
     @Test
@@ -170,12 +170,12 @@ class EmbedWorkerBatchTest {
                 .embedRunId("run-a")
                 .build();
         when(sceneRepository.findByIds(List.of(3L))).thenReturn(List.of(staleSuccess));
-        when(embedNovelUseCase.embedBatch(List.of(3L))).thenReturn(List.of(3L));
+        when(embedNovelUseCase.embedBatch(eq(List.of(3L)), anyString())).thenReturn(List.of(3L));
 
         embedWorker.onEmbedSceneBatch(List.of(
                 new EmbedSceneTaskMessage("t1", "n1", "v1", 350, 65, "run-b", 3L)));
 
-        verify(embedNovelUseCase).embedBatch(List.of(3L));
+        verify(embedNovelUseCase).embedBatch(eq(List.of(3L)), anyString());
         verify(sceneRepository).batchUpdateEmbedOutcome(List.of(3L), "run-b", EmbedStatus.SUCCESS, null);
     }
 
@@ -195,7 +195,7 @@ class EmbedWorkerBatchTest {
                 .embedRunId("run-a")
                 .build();
         when(sceneRepository.findByIds(List.of(2L))).thenReturn(List.of(sc));
-        when(embedNovelUseCase.embedBatch(List.of(2L))).thenThrow(new RuntimeException("onnx boom"));
+        when(embedNovelUseCase.embedBatch(eq(List.of(2L)), anyString())).thenThrow(new RuntimeException("onnx boom"));
 
         embedWorker.onEmbedSceneBatch(List.of(
                 new EmbedSceneTaskMessage("t1", "n1", "v1", 350, 65, "run-a", 2L)));

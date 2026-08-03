@@ -55,6 +55,9 @@ public class JpaNovelEntity {
     @Builder.Default
     private boolean isDeleted = false;
 
+    @Column(name = "active_version_tag", length = 64)
+    private String activeVersionTag;
+
     @Override
     public final boolean equals(Object o) {
         if (this == o) return true;

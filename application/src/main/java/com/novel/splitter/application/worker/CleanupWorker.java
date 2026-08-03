@@ -13,6 +13,7 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -90,6 +91,12 @@ public class CleanupWorker {
                     log.info("Physically deleting ChromaDB vectors for novel='{}' version={}", novelName, version);
                     vectorStore.delete(filterByName);
                 }
+                // 按专属集合整删（多集合版本化后的主路径）
+                if (novelId != null && version != null) {
+                    String collectionName = VectorStore.collectionNameFor(novelId, version);
+                    log.info("Deleting version collection '{}' (novelId={} version={})", collectionName, novelId, version);
+                    vectorStore.deleteByCollection(collectionName);
+                }
             } else if ("NOVEL".equals(message.getTargetType())) {
                 String novelName = firstNonBlank(message.getNovelName(), message.getTargetId());
                 if (novelName == null) {
@@ -97,6 +104,8 @@ public class CleanupWorker {
                 }
                 log.info("Physically deleting ChromaDB vectors for novel='{}'", novelName);
                 vectorStore.delete(Map.of("novel", novelName));
+
+                deleteCapturedVersionCollections(message);
 
                 deleteRawFileByName(novelName);
             } else if ("NOVEL_ID".equals(message.getTargetType())) {
@@ -115,6 +124,9 @@ public class CleanupWorker {
                     log.info("Physically deleting ChromaDB vectors (compat) for novel='{}'", novelName);
                     vectorStore.delete(Map.of("novel", novelName));
                 }
+
+                // 整书删除：按删除时捕获的集合名整删（版本行已同步删除，无法再枚举）
+                deleteCapturedVersionCollections(message);
 
                 // Delete raw file using DB filePath if available; fallback to name-based deletion.
                 deleteRawFileByNovelId(novelId, novelName);
@@ -197,6 +209,21 @@ public class CleanupWorker {
             }
         } catch (Exception e) {
             log.error("Failed to delete raw file for novel: " + novelName, e);
+        }
+    }
+
+    /**
+     * 整书删除时按消息中快照的集合名整删各版本专属向量集合。
+     * <p>版本行已在删除事务内同步删除，此处不能回查版本表，只能消费消息里的集合名。</p>
+     */
+    private void deleteCapturedVersionCollections(CleanupTaskMessage message) {
+        List<String> collectionNames = message.getCollectionNames();
+        if (collectionNames == null || collectionNames.isEmpty()) {
+            return;
+        }
+        for (String col : collectionNames) {
+            log.info("Deleting version collection '{}' (whole-novel cleanup)", col);
+            vectorStore.deleteByCollection(col);
         }
     }
 

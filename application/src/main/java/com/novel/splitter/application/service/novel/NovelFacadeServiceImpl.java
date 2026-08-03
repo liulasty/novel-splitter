@@ -7,16 +7,24 @@ import com.novel.splitter.application.model.dto.NovelUploadResponseDto;
 import com.novel.splitter.application.model.dto.NovelPipelineRequestDto;
 import com.novel.splitter.application.model.dto.TaskSubmitResponseDto;
 import com.novel.splitter.application.model.dto.NovelSummaryDto;
+import com.novel.splitter.application.model.dto.CreateVersionRequest;
+import com.novel.splitter.application.model.dto.NovelVersionDto;
 import com.novel.splitter.application.mapper.DtoMapper;
 import com.novel.splitter.application.service.download.DownloadService;
+import com.novel.splitter.application.service.knowledge.KnowledgeBaseService;
 import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.application.orchestration.EmbedPipelineOrchestrator;
 import com.novel.splitter.application.port.out.TaskQueuePort;
 import com.novel.splitter.domain.enums.NovelStatus;
+import com.novel.splitter.domain.enums.RecognitionStrategyType;
+import com.novel.splitter.domain.enums.SplitStrategy;
 import com.novel.splitter.domain.enums.TaskType;
+import com.novel.splitter.domain.enums.VersionStatus;
 import com.novel.splitter.application.model.dto.DownloadAndIngestRequest;
 import com.novel.splitter.application.model.dto.IngestRequest;
 import com.novel.splitter.domain.model.Novel;
+import com.novel.splitter.domain.model.NovelVersion;
+import com.novel.splitter.domain.repository.NovelVersionRepository;
 import com.novel.splitter.domain.model.SceneCountByProfile;
 import com.novel.splitter.domain.model.paging.PageQuery;
 import com.novel.splitter.domain.model.paging.PagedResult;
@@ -69,10 +77,19 @@ import java.util.stream.Collectors;
 public class NovelFacadeServiceImpl implements NovelFacadeService {
 
     private static final String DEFAULT_VERSION = "v1";
+    private static final SplitStrategy DEFAULT_SPLIT_STRATEGY = SplitStrategy.OVERLAP_CHUNK;
 
     /** 与 spring.servlet.multipart.max-file-size 保持一致，避免业务校验与容器限制不一致 */
     @Value("${spring.servlet.multipart.max-file-size:50MB}")
     private DataSize maxUploadFileSize;
+
+    /** 与 SplitNovelUseCase 的 splitter.ingestion.chunk-size 保持一致，作为版本默认滑窗大小 */
+    @Value("${splitter.ingestion.chunk-size:350}")
+    private int defaultChunkSize;
+
+    /** 与 SplitNovelUseCase 的 splitter.ingestion.chunk-overlap 保持一致，作为版本默认重叠 */
+    @Value("${splitter.ingestion.chunk-overlap:65}")
+    private int defaultChunkOverlap;
 
     private final NovelStorageService novelStorageService;
     private final NovelService novelService;
@@ -85,6 +102,9 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
     private final SceneRepository sceneRepository;
     private final ChapterRepository chapterRepository;
     private final DtoMapper dtoMapper;
+    private final NovelVersionRepository novelVersionRepository;
+    private final NovelVersionService novelVersionService;
+    private final KnowledgeBaseService knowledgeBaseService;
 
     @Override
     public List<NovelStatRecordDto> getNovelStats() {
@@ -320,6 +340,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         String version = normalizeVersion(request != null ? request.getVersion() : null);
         boolean force = request != null && request.isForce();
         ensureChapterTitleRegexValid(request != null ? request.getChapterTitleRegex() : null);
+        ensureRecognitionStrategyValid(request != null ? request.getStrategy() : null);
 
         String taskId = UUID.randomUUID().toString();
         taskService.createTaskWithNovelAdmission(taskId, TaskType.LOAD, id, 0, version);
@@ -330,7 +351,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         message.setTaskTypeForRecovery(TaskType.LOAD.name());
         taskQueuePort.sendLoad(message);
         log.info("Sent taskId {} to load queue (standalone LOAD, strategy={})", taskId,
-                request != null ? request.getStrategy() : "PLAIN");
+                request != null ? request.getStrategy() : "CN_CHAPTER");
 
         return TaskSubmitResponseDto.builder()
                 .message("Load 任务已提交到队列")
@@ -547,6 +568,172 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         novelService.softDeleteNovel(id);
         chapterRepository.deleteByNovelId(id);
         sceneRepository.deleteNovelById(id);
+        // 级联删除该小说全部版本行（含版本专属向量集合由异步清理回收）
+        novelVersionRepository.deleteByNovelId(id);
+    }
+
+    @Override
+    public List<NovelVersionDto> listVersions(String novelId) {
+        if (novelId == null || novelId.isBlank()) {
+            throw new IllegalArgumentException("novelId must not be blank");
+        }
+        String id = novelId.trim();
+        Novel novel = novelService.getNovelById(id);
+        String activeTag = novel != null ? novel.getActiveVersionTag() : null;
+        return novelVersionRepository.findByNovelId(id).stream()
+                .map(v -> toVersionDto(v, activeTag))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public NovelVersionDto createVersion(String novelId, CreateVersionRequest request) {
+        if (novelId == null || novelId.isBlank()) {
+            throw new IllegalArgumentException("novelId must not be blank");
+        }
+        String id = novelId.trim();
+        Novel novel = novelService.getNovelById(id);
+
+        String versionTag = trimToNull(request != null ? request.getVersionTag() : null);
+        if (versionTag == null) {
+            versionTag = nextVersionTag(id);
+        }
+
+        SplitStrategy strategy = parseSplitStrategy(request != null ? request.getSplitStrategy() : null);
+
+        int chunkSize = resolveDefaultChunkSize(request != null ? request.getChunkSize() : null);
+        int chunkOverlap = resolveDefaultChunkOverlap(request != null ? request.getChunkOverlap() : null);
+        if (chunkOverlap >= chunkSize) {
+            chunkOverlap = Math.max(0, chunkSize - 1);
+        }
+
+        long now = System.currentTimeMillis();
+        NovelVersion version = NovelVersion.builder()
+                .novelId(id)
+                .versionTag(versionTag)
+                .splitStrategy(strategy)
+                .chunkSize(chunkSize)
+                .chunkOverlap(chunkOverlap)
+                .status(VersionStatus.PENDING)
+                .createdAt(now)
+                .updatedAt(now)
+                .build();
+        novelVersionRepository.save(version);
+        log.info("Created version {}/{} strategy={} chunk={}/{}", id, versionTag, strategy, chunkSize, chunkOverlap);
+        return toVersionDto(version, novel != null ? novel.getActiveVersionTag() : null);
+    }
+
+    @Override
+    public TaskSubmitResponseDto startVersionSplit(String novelId, String versionTag) throws IOException {
+        if (novelId == null || novelId.isBlank() || versionTag == null || versionTag.isBlank()) {
+            throw new IllegalArgumentException("novelId and versionTag must not be blank");
+        }
+        String id = novelId.trim();
+        String tag = versionTag.trim();
+        NovelVersion version = novelVersionRepository.findById(id, tag)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "版本不存在: " + tag));
+        TaskSubmitResponseDto dto = startSceneSplitTask(
+                id, Integer.MAX_VALUE, tag, false,
+                version.getChunkSize(), version.getChunkOverlap());
+        log.info("版本切分任务已投递 Split 队列, novelId={}, version={}, taskId={}", id, tag, dto.getTaskId());
+        return dto;
+    }
+
+    @Override
+    public TaskSubmitResponseDto startVersionEmbed(String novelId, String versionTag) throws IOException {
+        if (novelId == null || novelId.isBlank() || versionTag == null || versionTag.isBlank()) {
+            throw new IllegalArgumentException("novelId and versionTag must not be blank");
+        }
+        String id = novelId.trim();
+        String tag = versionTag.trim();
+        NovelVersion version = novelVersionRepository.findById(id, tag)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "版本不存在: " + tag));
+        TaskSubmitResponseDto dto = embed(id, tag, version.getChunkSize(), version.getChunkOverlap());
+        log.info("版本向量化编排已启动, novelId={}, version={}, taskId={}", id, tag, dto.getTaskId());
+        return dto;
+    }
+
+    @Override
+    public void activateVersion(String novelId, String versionTag) {
+        if (novelId == null || novelId.isBlank() || versionTag == null || versionTag.isBlank()) {
+            throw new IllegalArgumentException("novelId and versionTag must not be blank");
+        }
+        novelVersionService.activate(novelId.trim(), versionTag.trim());
+    }
+
+    @Override
+    public void deleteVersion(String novelId, String versionTag) {
+        if (novelId == null || novelId.isBlank() || versionTag == null || versionTag.isBlank()) {
+            throw new IllegalArgumentException("novelId and versionTag must not be blank");
+        }
+        String id = novelId.trim();
+        String tag = versionTag.trim();
+        NovelVersion version = novelVersionRepository.findById(id, tag).orElse(null);
+        int chunkSize = version != null && version.getChunkSize() != null ? version.getChunkSize() : 0;
+        int chunkOverlap = version != null && version.getChunkOverlap() != null ? version.getChunkOverlap() : 0;
+        // 删除该版本切分数据集/向量（同步软删场景 + 异步清理向量与文件）
+        knowledgeBaseService.deleteSplitProfileByNovelId(id, tag, chunkSize, chunkOverlap, false);
+        // 兜底删除 novel_version 行（现有删除流程不覆盖该表）
+        novelVersionRepository.delete(id, tag);
+        log.info("Deleted version {}/{}", id, tag);
+    }
+
+    @Override
+    public TaskSubmitResponseDto baselineParse(String novelId, ReparseChaptersRequestDto request) throws IOException {
+        if (novelId == null || novelId.isBlank()) {
+            throw new IllegalArgumentException("novelId must not be blank");
+        }
+        return reparseChapters(novelId.trim(), request != null ? request : new ReparseChaptersRequestDto());
+    }
+
+    private String nextVersionTag(String novelId) {
+        int maxNum = 0;
+        for (NovelVersion v : novelVersionRepository.findByNovelId(novelId)) {
+            String tag = v.getVersionTag();
+            if (tag != null && tag.matches("v\\d+")) {
+                maxNum = Math.max(maxNum, Integer.parseInt(tag.substring(1)));
+            }
+        }
+        return "v" + (maxNum + 1);
+    }
+
+    private static SplitStrategy parseSplitStrategy(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return DEFAULT_SPLIT_STRATEGY;
+        }
+        String u = raw.trim().toUpperCase(Locale.ROOT);
+        try {
+            return SplitStrategy.valueOf(u);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "非法 splitStrategy: " + raw);
+        }
+    }
+
+    private int resolveDefaultChunkSize(Integer chunkSize) {
+        return chunkSize != null && chunkSize > 0 ? chunkSize : defaultChunkSize;
+    }
+
+    private int resolveDefaultChunkOverlap(Integer chunkOverlap) {
+        return chunkOverlap != null && chunkOverlap >= 0 ? chunkOverlap : defaultChunkOverlap;
+    }
+
+    private static NovelVersionDto toVersionDto(NovelVersion v, String activeTag) {
+        return NovelVersionDto.builder()
+                .novelId(v.getNovelId())
+                .versionTag(v.getVersionTag())
+                .splitStrategy(v.getSplitStrategy() != null ? v.getSplitStrategy().name() : null)
+                .chunkSize(v.getChunkSize())
+                .chunkOverlap(v.getChunkOverlap())
+                .status(v.getStatus() != null ? v.getStatus().name() : null)
+                .splitCursorChapterIndex(v.getSplitCursorChapterIndex())
+                .splitCursorSceneSeq(v.getSplitCursorSceneSeq())
+                .embedRunId(v.getEmbedRunId())
+                .embedCursorSceneSeq(v.getEmbedCursorSceneSeq())
+                .collectionName(v.getCollectionName())
+                .activatedAt(v.getActivatedAt())
+                .createdAt(v.getCreatedAt())
+                .updatedAt(v.getUpdatedAt())
+                .active(activeTag != null && activeTag.equals(v.getVersionTag()))
+                .build();
     }
 
     private void applyChunkingParams(SplitTaskMessage message, Integer chunkSize, Integer chunkOverlap) {
@@ -594,6 +781,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
             String chapterTitleRegex, String strategy)
             throws IOException {
         ensureChapterTitleRegexValid(chapterTitleRegex);
+        ensureRecognitionStrategyValid(strategy);
         String taskId = UUID.randomUUID().toString();
         taskService.createTaskWithNovelAdmission(taskId, TaskType.CHAPTER_PARSE, novelId, maxScenes, version);
         SplitTaskMessage message = new SplitTaskMessage(taskId, novelId, maxScenes, version, false);
@@ -667,6 +855,16 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         } catch (PatternSyntaxException e) {
             throw new IllegalArgumentException("chapterTitleRegex 非法: " + e.getMessage());
         }
+    }
+
+    /**
+     * 提交队列前校验策略字符串；null/空白跳过，未知值抛 {@link IllegalArgumentException}（转为 400）。
+     */
+    private static void ensureRecognitionStrategyValid(String strategy) {
+        if (strategy == null || strategy.isBlank()) {
+            return;
+        }
+        RecognitionStrategyType.fromString(strategy);
     }
 
     private static String trimToNull(String s) {

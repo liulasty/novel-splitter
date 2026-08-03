@@ -32,6 +32,15 @@ public class EmbedNovelUseCase {
      * @return 实际完成向量写入的场景 persistence id 列表（顺序与 validScenes 一致）
      */
     public List<Long> embedBatch(List<Long> scenePersistenceIds) {
+        return embedBatch(scenePersistenceIds, null);
+    }
+
+    /**
+     * 批量写入向量库到指定集合。
+     * @param scenePersistenceIds DB 主键列表
+     * @param collectionName      目标 Chroma 集合名；null 或空白时使用默认集合
+     */
+    public List<Long> embedBatch(List<Long> scenePersistenceIds, String collectionName) {
         if (scenePersistenceIds == null || scenePersistenceIds.isEmpty()) {
             return Collections.emptyList();
         }
@@ -56,7 +65,11 @@ public class EmbedNovelUseCase {
 
         try {
             List<float[]> embeddings = embeddingService.embedBatch(texts);
-            vectorStore.saveBatch(validScenes, embeddings);
+            if (collectionName != null && !collectionName.isBlank()) {
+                vectorStore.saveBatch(validScenes, embeddings, collectionName);
+            } else {
+                vectorStore.saveBatch(validScenes, embeddings);
+            }
             return validScenes.stream()
                     .map(Scene::getPersistenceId)
                     .collect(Collectors.toList());

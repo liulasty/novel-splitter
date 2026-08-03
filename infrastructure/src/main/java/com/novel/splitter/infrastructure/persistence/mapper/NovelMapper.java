@@ -19,6 +19,7 @@ public class NovelMapper {
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
                 .isDeleted(entity.isDeleted())
+                .activeVersionTag(entity.getActiveVersionTag())
                 .chapters(null)
                 .paragraphs(null)
                 .build();
@@ -36,6 +37,7 @@ public class NovelMapper {
         entity.setCreatedAt(domain.getCreatedAt());
         entity.setUpdatedAt(domain.getUpdatedAt());
         entity.setDeleted(domain.isDeleted());
+        entity.setActiveVersionTag(domain.getActiveVersionTag());
         return entity;
     }
 }

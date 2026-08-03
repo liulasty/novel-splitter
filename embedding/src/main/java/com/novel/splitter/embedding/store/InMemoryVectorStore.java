@@ -34,9 +34,13 @@ public class InMemoryVectorStore implements VectorStore {
     
     // 存储向量数据的并发哈希表 (Scene ID -> 向量数组)
     private final Map<String, float[]> vectorMap = new ConcurrentHashMap<>();
-    
+
     // 存储场景元数据的并发哈希表 (Scene ID -> 场景元数据)
     private final Map<String, com.novel.splitter.domain.model.SceneMetadata> metadataMap = new ConcurrentHashMap<>();
+
+    // 多集合：按集合名分区的向量与元数据
+    private final Map<String, Map<String, float[]>> collectionVectors = new ConcurrentHashMap<>();
+    private final Map<String, Map<String, com.novel.splitter.domain.model.SceneMetadata>> collectionMetadata = new ConcurrentHashMap<>();
     
     // 用于序列化和反序列化 JSON 的工具对象
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -318,5 +322,121 @@ public class InMemoryVectorStore implements VectorStore {
 
         // 返回点积除以两个向量模长的乘积
         return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+    }
+
+    // ──────────── 多集合支持 ────────────
+
+    private Map<String, float[]> vectorsForCollection(String name) {
+        return collectionVectors.computeIfAbsent(name, k -> new ConcurrentHashMap<>());
+    }
+
+    private Map<String, com.novel.splitter.domain.model.SceneMetadata> metadataForCollection(String name) {
+        return collectionMetadata.computeIfAbsent(name, k -> new ConcurrentHashMap<>());
+    }
+
+    @Override
+    public void saveBatch(List<Scene> scenes, List<float[]> embeddings, String collectionName) {
+        if (collectionName == null || collectionName.isBlank()) {
+            saveBatch(scenes, embeddings);
+            return;
+        }
+        if (scenes.size() != embeddings.size()) {
+            throw new IllegalArgumentException("Scenes and embeddings size mismatch");
+        }
+        Map<String, float[]> vecs = vectorsForCollection(collectionName);
+        Map<String, com.novel.splitter.domain.model.SceneMetadata> metas = metadataForCollection(collectionName);
+        for (int i = 0; i < scenes.size(); i++) {
+            Scene scene = scenes.get(i);
+            if (scene != null && scene.getId() != null) {
+                vecs.put(scene.getId(), embeddings.get(i));
+                if (scene.getMetadata() != null) {
+                    metas.put(scene.getId(), scene.getMetadata());
+                }
+            }
+        }
+    }
+
+    @Override
+    public List<VectorRecord> search(float[] queryEmbedding, int topK, Map<String, Object> filter,
+                                     String collectionName) {
+        if (collectionName == null || collectionName.isBlank()) {
+            return search(queryEmbedding, topK, filter);
+        }
+        Map<String, float[]> vecs = collectionVectors.get(collectionName);
+        Map<String, com.novel.splitter.domain.model.SceneMetadata> metas = collectionMetadata.get(collectionName);
+        if (vecs == null || vecs.isEmpty()) {
+            return Collections.emptyList();
+        }
+        if (topK <= 0) {
+            return Collections.emptyList();
+        }
+
+        PriorityQueue<VectorRecord> topKQueue = new PriorityQueue<>(Comparator.comparingDouble(VectorRecord::getScore));
+
+        for (Map.Entry<String, float[]> entry : vecs.entrySet()) {
+            String id = entry.getKey();
+            if (filter != null && !filter.isEmpty()) {
+                com.novel.splitter.domain.model.SceneMetadata meta = metas != null ? metas.get(id) : null;
+                if (meta == null) {
+                    continue;
+                }
+                boolean match = true;
+                for (Map.Entry<String, Object> f : filter.entrySet()) {
+                    String key = f.getKey();
+                    Object expected = f.getValue();
+                    Object actual = null;
+                    if ("novelId".equals(key) || "novel".equals(key)) actual = meta.getNovel();
+                    else if ("version".equals(key)) actual = meta.getVersion();
+                    else if ("chunkSize".equals(key)) actual = meta.getChunkSize();
+                    else if ("chunkOverlap".equals(key)) actual = meta.getChunkOverlap();
+                    if (!Objects.equals(actual, expected)) {
+                        match = false;
+                        break;
+                    }
+                }
+                if (!match) continue;
+            }
+            double similarity = cosineSimilarity(queryEmbedding, entry.getValue());
+            com.novel.splitter.domain.model.SceneMetadata meta = metas != null ? metas.get(id) : null;
+            Map<String, Object> metaMap = new HashMap<>();
+            if (meta != null) {
+                if (meta.getNovel() != null) metaMap.put("novelId", meta.getNovel());
+                if (meta.getVersion() != null) metaMap.put("version", meta.getVersion());
+                if (meta.getChunkSize() != null) metaMap.put("chunkSize", meta.getChunkSize());
+                if (meta.getChunkOverlap() != null) metaMap.put("chunkOverlap", meta.getChunkOverlap());
+            }
+            if (topKQueue.size() < topK) {
+                topKQueue.offer(new VectorRecord(id, similarity, metaMap));
+            } else if (similarity > topKQueue.peek().getScore()) {
+                topKQueue.poll();
+                topKQueue.offer(new VectorRecord(id, similarity, metaMap));
+            }
+        }
+        List<VectorRecord> results = new ArrayList<>(topKQueue);
+        results.sort(Comparator.comparingDouble(VectorRecord::getScore).reversed());
+        return results;
+    }
+
+    @Override
+    public void deleteByCollection(String collectionName) {
+        collectionVectors.remove(collectionName);
+        collectionMetadata.remove(collectionName);
+        log.info("Deleted collection '{}' from memory store", collectionName);
+    }
+
+    @Override
+    public void createCollection(String name) {
+        vectorsForCollection(name);
+        metadataForCollection(name);
+    }
+
+    @Override
+    public void deleteCollection(String name) {
+        deleteByCollection(name);
+    }
+
+    @Override
+    public boolean collectionExists(String name) {
+        return collectionVectors.containsKey(name) || collectionMetadata.containsKey(name);
     }
 }

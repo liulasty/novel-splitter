@@ -2,6 +2,7 @@ package com.novel.splitter.interfaces.infra;
 
 import com.novel.splitter.application.config.RabbitConfig;
 import com.novel.splitter.application.port.out.TaskQueuePort;
+import com.novel.splitter.domain.task.CleanupTaskMessage;
 import com.novel.splitter.domain.task.EmbedSceneTaskMessage;
 import com.novel.splitter.domain.task.EmbedTaskMessage;
 import com.novel.splitter.domain.task.EnrichTaskMessage;
@@ -46,6 +47,11 @@ public class RabbitTaskQueueAdapter implements TaskQueuePort {
     @Override
     public void sendEnrich(EnrichTaskMessage message) {
         rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "enrich", message);
+    }
+
+    @Override
+    public void sendCleanup(CleanupTaskMessage message) {
+        rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "cleanup", message);
     }
 }
 

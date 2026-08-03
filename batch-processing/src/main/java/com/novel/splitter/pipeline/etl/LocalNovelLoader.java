@@ -1,8 +1,11 @@
 package com.novel.splitter.pipeline.etl;
 
+import com.novel.splitter.core.ChapterRecognitionStrategy;
+import com.novel.splitter.core.ChapterRecognitionStrategyRegistry;
 import com.novel.splitter.core.ChapterRecognizer;
 import com.novel.splitter.core.NovelLineNoiseFilter;
 import com.novel.splitter.core.VolumeChapterRecognizer;
+import com.novel.splitter.domain.enums.RecognitionStrategyType;
 import com.novel.splitter.domain.model.Chapter;
 import com.novel.splitter.domain.model.Novel;
 import com.novel.splitter.domain.model.RawParagraph;
@@ -23,9 +26,12 @@ import java.util.regex.Pattern;
 public class LocalNovelLoader {
 
     private final NovelCacheRepository novelCacheRepository;
+    private final ChapterRecognitionStrategyRegistry strategyRegistry;
 
-    public LocalNovelLoader(NovelCacheRepository novelCacheRepository) {
+    public LocalNovelLoader(NovelCacheRepository novelCacheRepository,
+                            ChapterRecognitionStrategyRegistry strategyRegistry) {
         this.novelCacheRepository = novelCacheRepository;
+        this.strategyRegistry = strategyRegistry;
     }
 
     public Novel load(String novelId, Path path) throws IOException {
@@ -37,16 +43,19 @@ public class LocalNovelLoader {
     }
 
     /**
-     * @param chapterTitleRegex 可选；非空时作为<strong>整行匹配</strong>的 Java 正则覆盖默认章节标题规则
-     * @param strategyType      识别策略：PLAIN / VOLUME_CHAPTER / CUSTOM；null 或 PLAIN 使用原有逻辑
+     * 按 {@link RecognitionStrategyType} 枚举分发章节识别；strategyType 为 null/空白/旧值 PLAIN 时默认 CN_CHAPTER。
+     *
+     * @param chapterTitleRegex 可选；仅 {@link RecognitionStrategyType#CUSTOM} 策略下作为<strong>整行匹配</strong>的 Java 正则
+     * @param strategyType      识别策略字符串；未知值抛 {@link IllegalArgumentException}
      */
     public Novel load(String novelId, Path path, String chapterTitleRegex, String strategyType) throws IOException {
-        boolean isVolumeChapter = "VOLUME_CHAPTER".equalsIgnoreCase(strategyType);
+        RecognitionStrategyType strategyTypeEnum = RecognitionStrategyType.fromString(strategyType);
+        ChapterRecognitionStrategy strategy = strategyRegistry.require(strategyTypeEnum, chapterTitleRegex);
+        boolean isVolumeChapter = strategyTypeEnum == RecognitionStrategyType.VOLUME_CHAPTER;
         log.info("Loading novel from: {} (strategy: {}, custom regex: {})",
-                path, strategyType != null ? strategyType : "PLAIN",
-                chapterTitleRegex != null && !chapterTitleRegex.isBlank());
+                path, strategyTypeEnum, chapterTitleRegex != null && !chapterTitleRegex.isBlank());
 
-        Pattern pattern = ChapterRecognizer.compileUserPattern(chapterTitleRegex);
+        Pattern pattern = strategy.pattern();
         ChapterRecognizer chapterRecognizer = new ChapterRecognizer(pattern);
         VolumeChapterRecognizer volumeRecognizer = null;
         if (isVolumeChapter) {
@@ -112,7 +121,7 @@ public class LocalNovelLoader {
                             .build();
                     chapters.add(finishedChapter);
                     if (novelId != null) {
-                        novelCacheRepository.saveChapter(novelId, finishedChapter.getIndex(), new ChapterData(finishedChapter, new ArrayList<>(currentChapterParagraphs)));
+                        saveChapterCache(novelId, finishedChapter.getIndex(), new ChapterData(finishedChapter, new ArrayList<>(currentChapterParagraphs)));
                     }
                     currentChapterParagraphs.clear();
                     currentWordCount = 0;
@@ -149,7 +158,7 @@ public class LocalNovelLoader {
                     .build();
             chapters.add(synthetic);
             if (novelId != null) {
-                novelCacheRepository.saveChapter(novelId, 1, new ChapterData(synthetic, new ArrayList<>(currentChapterParagraphs)));
+                saveChapterCache(novelId, 1, new ChapterData(synthetic, new ArrayList<>(currentChapterParagraphs)));
             }
             log.info("No chapter headings matched; saved as single chapter \"全文\" ({} paragraphs)", currentChapterParagraphs.size());
         }
@@ -174,7 +183,7 @@ public class LocalNovelLoader {
                     .build();
             chapters.add(finishedChapter);
             if (novelId != null) {
-                novelCacheRepository.saveChapter(novelId, finishedChapter.getIndex(), new ChapterData(finishedChapter, new ArrayList<>(currentChapterParagraphs)));
+                saveChapterCache(novelId, finishedChapter.getIndex(), new ChapterData(finishedChapter, new ArrayList<>(currentChapterParagraphs)));
             }
         }
 
@@ -186,5 +195,18 @@ public class LocalNovelLoader {
                 .chapters(chapters)
                 .paragraphs(new ArrayList<>())
                 .build();
+    }
+
+    /**
+     * 尽力而为地写入章节缓存文件（chapter_N.json）。
+     * <p>缓存是可重建产物：写失败仅记日志，不中断基准解析——基准完整性由 DB chapters 的原子落库保证。</p>
+     */
+    private void saveChapterCache(String novelId, int chapterIndex, ChapterData chapterData) {
+        try {
+            novelCacheRepository.saveChapter(novelId, chapterIndex, chapterData);
+        } catch (Exception e) {
+            log.warn("章节缓存写入失败（可重建，不影响基准）：novelId={} chapter={} err={}",
+                    novelId, chapterIndex, e.toString());
+        }
     }
 }

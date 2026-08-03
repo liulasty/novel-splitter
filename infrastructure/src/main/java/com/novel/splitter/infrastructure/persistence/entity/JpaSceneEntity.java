@@ -14,7 +14,9 @@ import org.hibernate.annotations.SQLRestriction;
 import org.hibernate.type.SqlTypes;
 
 @Entity
-@Table(name = "scenes")
+@Table(name = "scenes",
+        uniqueConstraints = @UniqueConstraint(name = "uk_scene_version_seq",
+                columnNames = {"novel_id", "version", "seq"}))
 @Getter
 @Setter
 @ToString(exclude = {"novel", "chapter"})
@@ -49,6 +51,10 @@ public class JpaSceneEntity {
 
     @Column(name = "version", nullable = false)
     private String version;
+
+    /** 全局场景序号（novelId,version 内单调），幂等续传的落点。 */
+    @Column(name = "seq")
+    private Long seq;
 
     /** 场景切分滑窗块大小；新数据必写，旧数据可能为 null */
     @Column(name = "chunk_size")

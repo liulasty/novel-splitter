@@ -11,7 +11,9 @@ import org.hibernate.Hibernate;
 import org.hibernate.annotations.SQLRestriction;
 
 @Entity
-@Table(name = "chapters")
+@Table(name = "chapters",
+        uniqueConstraints = @UniqueConstraint(name = "uk_chapter_novel_index",
+                columnNames = {"novel_id", "chapter_index"}))
 @Getter
 @Setter
 @ToString(exclude = "novel")
@@ -32,7 +34,7 @@ public class JpaChapterEntity {
     @Column(name = "title", nullable = false)
     private String title;
 
-    @Column(name = "index_num", nullable = false)
+    @Column(name = "chapter_index", nullable = false)
     private int indexNum;
 
     @Column(name = "start_line")
