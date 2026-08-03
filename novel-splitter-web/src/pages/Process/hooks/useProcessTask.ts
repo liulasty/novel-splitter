@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { novelApi } from "@/api/novelApi";
+import { novelApi, type CreateVersionRequest } from "@/api/novelApi";
 import { taskApi } from "@/api/taskApi";
 import { useTaskPoller } from '@/pages/Ingest/hooks/useTaskPoller';
 import { getApiErrorMessage, handleConflict409, isHttpConflict409 } from '@/lib/apiError';
@@ -19,7 +19,7 @@ export function useProcessTask() {
     const [currentNovelId, setCurrentNovelId] = useState<string>("");
     const [chapterReviewAck, setChapterReviewAck] = useState(false);
     const [chapterTitleRegex, setChapterTitleRegex] = useState('');
-    const [recognitionStrategy, setRecognitionStrategy] = useState('PLAIN');
+    const [recognitionStrategy, setRecognitionStrategy] = useState('CN_CHAPTER');
     const initRef = useRef(false);
 
     const { version, setVersion, profiles, currentProfile, refresh: refreshSplitProfiles } =
@@ -92,6 +92,28 @@ export function useProcessTask() {
         queryKey: ['tasks'],
         queryFn: taskApi.getAllTasks,
     });
+
+    // 版本数据源（/process 主数据）：按 (novelId) 列出全部实验版本
+    const { data: versions = [], isLoading: versionsLoading } = useQuery({
+        queryKey: ['versions', currentNovelId],
+        queryFn: () => novelApi.listVersions(currentNovelId),
+        enabled: !!currentNovelId,
+    });
+
+    // 基准就绪门控：与旧 structurallyReady 对齐（小说 PARSED / SPLIT_COMPLETED / COMPLETED，或有章节解析成功任务）
+    const { data: novelOptions = [] } = useQuery({
+        queryKey: ['novelSummaries', 'all'],
+        queryFn: () => novelApi.getNovelSummaries('all'),
+    });
+    const currentMeta = novelOptions.find((n) => n.novelId === currentNovelId);
+    const chapterParseSucceeded = tasks.some(
+        (t) =>
+            t.novelId === currentNovelId &&
+            (t.taskType === 'CHAPTER_PARSE' || t.taskType === 'LOAD') &&
+            t.status === 'SUCCESS'
+    );
+    const isBaselineReady =
+        ['PARSED', 'SPLIT_COMPLETED', 'COMPLETED'].includes(currentMeta?.status ?? '') || chapterParseSucceeded;
 
     const { addActiveTask, polledTasks, poller, manualRefresh } = useTaskPoller(tasks, currentNovelId);
 
@@ -193,16 +215,92 @@ export function useProcessTask() {
     useEffect(() => {
         for (const t of tasks) {
             if (t.novelId !== currentNovelId) continue;
-            if (t.taskType !== 'SCENE_SPLIT' && t.taskType !== 'EMBED') continue;
-            // 仅 SUCCESS 会生成新的版本 profile；挂载时对既有终态任务的刷新有意保留（进入页面即发现最新版本）。
-            if (t.status !== 'SUCCESS') continue;
             const key = `${t.taskId}:${t.status}`;
-            if (!completedTaskKeysRef.current.has(key)) {
-                completedTaskKeysRef.current.add(key);
+            if (completedTaskKeysRef.current.has(key)) continue;
+            completedTaskKeysRef.current.add(key);
+            // 旧版切分/入库 SUCCESS 会生成新版本 profile；挂载时对既有终态任务的刷新有意保留。
+            if (t.status === 'SUCCESS' && (t.taskType === 'SCENE_SPLIT' || t.taskType === 'EMBED')) {
                 refreshSplitProfiles();
             }
+            // 版本实验流水线：任务进入终态（成功/失败）即刷新 versions，更新状态徽标与游标进度。
+            if ((t.status === 'SUCCESS' || t.status === 'FAILED') && currentNovelId) {
+                queryClient.invalidateQueries({ queryKey: ['versions', currentNovelId] });
+            }
         }
-    }, [tasks, currentNovelId, refreshSplitProfiles]);
+    }, [tasks, currentNovelId, refreshSplitProfiles, queryClient]);
+
+    // ==== 版本实验 mutations ====
+    const createVersionMutation = useMutation({
+        mutationFn: (body: CreateVersionRequest) => novelApi.createVersion(currentNovelId, body),
+        onSuccess: (data) => {
+            toast.success(`版本 ${data.versionTag} 已创建`);
+            if (currentNovelId) {
+                queryClient.invalidateQueries({ queryKey: ['versions', currentNovelId] });
+            }
+        },
+        onError: (error: unknown) => {
+            if (handleConflict409(error, '版本冲突，请更换版本标识后重试')) return;
+            toast.error(getApiErrorMessage(error, '创建版本失败'));
+        },
+    });
+
+    const startSplitMutation = useMutation({
+        mutationFn: (versionTag: string) => novelApi.startVersionSplit(currentNovelId, versionTag),
+        onSuccess: (data) => {
+            toast.success(`切分任务已提交：${data.message}`);
+            if (data.taskId) addActiveTask(data.taskId);
+            if (currentNovelId) {
+                queryClient.invalidateQueries({ queryKey: ['versions', currentNovelId] });
+            }
+        },
+        onError: (error: unknown) => {
+            if (handleConflict409(error, '该版本正在切分/向量化，请等待任务结束后重试')) return;
+            toast.error(getApiErrorMessage(error, '发起切分失败'));
+        },
+    });
+
+    const startEmbedMutation = useMutation({
+        mutationFn: (versionTag: string) => novelApi.startVersionEmbed(currentNovelId, versionTag),
+        onSuccess: (data) => {
+            toast.success(`向量化任务已提交：${data.message}`);
+            if (data.taskId) addActiveTask(data.taskId);
+            if (currentNovelId) {
+                queryClient.invalidateQueries({ queryKey: ['versions', currentNovelId] });
+            }
+        },
+        onError: (error: unknown) => {
+            if (handleConflict409(error, '该版本正在切分/向量化，请等待任务结束后重试')) return;
+            toast.error(getApiErrorMessage(error, '发起向量化失败'));
+        },
+    });
+
+    const activateVersionMutation = useMutation({
+        mutationFn: (versionTag: string) => novelApi.activateVersion(currentNovelId, versionTag),
+        onSuccess: (_data, versionTag) => {
+            toast.success(`版本 ${versionTag} 已激活，当前检索使用该版本`);
+            if (currentNovelId) {
+                queryClient.invalidateQueries({ queryKey: ['versions', currentNovelId] });
+            }
+        },
+        onError: (error: unknown) => {
+            if (handleConflict409(error, '当前有检索中版本，请先停用后再激活其它版本')) return;
+            toast.error(getApiErrorMessage(error, '激活失败'));
+        },
+    });
+
+    const deleteVersionMutation = useMutation({
+        mutationFn: (versionTag: string) => novelApi.deleteVersion(currentNovelId, versionTag),
+        onSuccess: (_data, versionTag) => {
+            toast.success(`版本 ${versionTag} 已删除`);
+            if (currentNovelId) {
+                queryClient.invalidateQueries({ queryKey: ['versions', currentNovelId] });
+            }
+        },
+        onError: (error: unknown) => {
+            if (handleConflict409(error, '任务运行中，暂不可删除，请等待任务结束后重试')) return;
+            toast.error(getApiErrorMessage(error, '删除版本失败'));
+        },
+    });
 
     const handleChapterParse = () => {
         if (!currentNovelId) {
@@ -250,6 +348,14 @@ export function useProcessTask() {
         embedMutation.mutate(currentNovelId);
     };
 
+    const guardNovelSelected = () => {
+        if (!currentNovelId) {
+            toast.error('请先选择小说');
+            return false;
+        }
+        return true;
+    };
+
     return {
         state: {
             currentNovelId,
@@ -267,6 +373,14 @@ export function useProcessTask() {
             isChapterParsing: chapterParseMutation.isPending,
             isSceneSplitting: sceneSplitMutation.isPending,
             isEmbedding: embedMutation.isPending,
+            versions,
+            versionsLoading,
+            isBaselineReady,
+            isCreatingVersion: createVersionMutation.isPending,
+            isStartingSplit: startSplitMutation.isPending,
+            isStartingEmbed: startEmbedMutation.isPending,
+            isActivating: activateVersionMutation.isPending,
+            isDeletingVersion: deleteVersionMutation.isPending,
         },
         actions: {
             setVersion,
@@ -284,6 +398,26 @@ export function useProcessTask() {
             selectNovelById: persistCurrentNovelId,
             clearSelectedNovel: clearCurrentNovelId,
             addActiveTask,
+            createVersion: (body: CreateVersionRequest) => {
+                if (!guardNovelSelected()) return;
+                createVersionMutation.mutate(body);
+            },
+            startSplit: (versionTag: string) => {
+                if (!guardNovelSelected()) return;
+                startSplitMutation.mutate(versionTag);
+            },
+            startEmbed: (versionTag: string) => {
+                if (!guardNovelSelected()) return;
+                startEmbedMutation.mutate(versionTag);
+            },
+            activate: (versionTag: string) => {
+                if (!guardNovelSelected()) return;
+                activateVersionMutation.mutate(versionTag);
+            },
+            deleteVersion: (versionTag: string) => {
+                if (!guardNovelSelected()) return;
+                deleteVersionMutation.mutate(versionTag);
+            },
         },
     };
 }

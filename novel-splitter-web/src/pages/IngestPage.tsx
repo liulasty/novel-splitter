@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { useIngestTask } from "./Ingest/hooks/useIngestTask";
 import { UploadPanel } from "./Ingest/components/UploadPanel";
+import { BaselineParsePanel } from "./Ingest/components/BaselineParsePanel";
 
 export default function IngestPage() {
     const { state, actions } = useIngestTask();
@@ -20,6 +21,9 @@ export default function IngestPage() {
 
             {/* Upload Panel */}
             <UploadPanel state={state} actions={actions} />
+
+            {/* Stage 1: baseline chapter parse */}
+            <BaselineParsePanel novelId={state.currentNovelId} />
         </div>
     );
 }

@@ -129,6 +129,32 @@ export interface ReparseChaptersRequest {
   maxScenes?: number;
 }
 
+/** 与后端 NovelVersionDto JSON 对齐（版本化流水线） */
+export interface NovelVersionDto {
+  novelId: string;
+  versionTag: string;
+  splitStrategy?: string | null;
+  chunkSize?: number | null;
+  chunkOverlap?: number | null;
+  status: string;
+  splitCursorChapterIndex?: number | null;
+  splitCursorSceneSeq?: number | null;
+  embedRunId?: string | null;
+  embedCursorSceneSeq?: number | null;
+  collectionName?: string | null;
+  activatedAt?: number | null;
+  createdAt?: number | null;
+  updatedAt?: number | null;
+  active: boolean;
+}
+
+export interface CreateVersionRequest {
+  versionTag?: string;
+  splitStrategy?: string;
+  chunkSize?: number;
+  chunkOverlap?: number;
+}
+
 /** 与 GET /api/novels/summaries?scope= 对齐 */
 export type NovelSummaryScope = 'all' | 'embed_ready';
 
@@ -284,6 +310,55 @@ export const novelApi = {
 
   softDeleteNovel: async (novelId: string): Promise<void> => {
     await apiClient.delete<ApiEnvelope<void>, void>(`/novels/${encodeURIComponent(novelId)}`);
+  },
+
+  listVersions: async (novelId: string): Promise<NovelVersionDto[]> => {
+    const response = await apiClient.get<ApiEnvelope<NovelVersionDto[]>, NovelVersionDto[]>(
+      `/novels/${encodeURIComponent(novelId)}/versions`
+    );
+    return response;
+  },
+
+  createVersion: async (novelId: string, body: CreateVersionRequest): Promise<NovelVersionDto> => {
+    const response = await apiClient.post<ApiEnvelope<NovelVersionDto>, NovelVersionDto>(
+      `/novels/${encodeURIComponent(novelId)}/versions`,
+      body
+    );
+    return response;
+  },
+
+  baselineParse: async (novelId: string, body?: ReparseChaptersRequest): Promise<TaskSubmitResponse> => {
+    const response = await apiClient.post<ApiEnvelope<TaskSubmitResponse>, TaskSubmitResponse>(
+      `/novels/${encodeURIComponent(novelId)}/baseline`,
+      body ?? {}
+    );
+    return response;
+  },
+
+  startVersionSplit: async (novelId: string, versionTag: string): Promise<TaskSubmitResponse> => {
+    const response = await apiClient.post<ApiEnvelope<TaskSubmitResponse>, TaskSubmitResponse>(
+      `/novels/${encodeURIComponent(novelId)}/versions/${encodeURIComponent(versionTag)}/split`
+    );
+    return response;
+  },
+
+  startVersionEmbed: async (novelId: string, versionTag: string): Promise<TaskSubmitResponse> => {
+    const response = await apiClient.post<ApiEnvelope<TaskSubmitResponse>, TaskSubmitResponse>(
+      `/novels/${encodeURIComponent(novelId)}/versions/${encodeURIComponent(versionTag)}/embed`
+    );
+    return response;
+  },
+
+  activateVersion: async (novelId: string, versionTag: string): Promise<void> => {
+    await apiClient.post<ApiEnvelope<void>, void>(
+      `/novels/${encodeURIComponent(novelId)}/versions/${encodeURIComponent(versionTag)}/activate`
+    );
+  },
+
+  deleteVersion: async (novelId: string, versionTag: string): Promise<void> => {
+    await apiClient.delete<ApiEnvelope<void>, void>(
+      `/novels/${encodeURIComponent(novelId)}/versions/${encodeURIComponent(versionTag)}`
+    );
   },
 
   // Deprecated, keep for backwards compatibility if needed, or replace.

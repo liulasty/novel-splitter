@@ -1,64 +1,23 @@
-import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { novelApi } from '@/api/novelApi';
 import { ListChecks, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TaskPollerStatus } from '@/pages/Ingest/components/TaskPollerStatus';
-import type { ProcessState, ProcessActions, ProcessGates } from './ProcessTypes';
-import { ParseTab } from './ParseTab';
-import { SplitTab } from './SplitTab';
-import { EmbedTab } from './EmbedTab';
+import type { ProcessState, ProcessActions } from './ProcessTypes';
+import { VersionExperimentPanel } from './VersionExperimentPanel';
 
 interface ProcessingPanelProps {
   state: ProcessState;
   actions: ProcessActions;
 }
 
-const TABS = [
-  { id: 'parse', label: '章节解析' },
-  { id: 'split', label: '场景切分' },
-  { id: 'embed', label: '向量化入库' },
-] as const;
-type TabId = (typeof TABS)[number]['id'];
-
 export function ProcessingPanel({ state, actions }: ProcessingPanelProps) {
-  const { currentNovelId, tasks, activeTasks, poller } = state;
-  const [searchParams, setSearchParams] = useSearchParams();
+  const { currentNovelId, activeTasks, poller } = state;
 
   const { data: novelOptions = [] } = useQuery({
     queryKey: ['novelSummaries', 'all'],
     queryFn: () => novelApi.getNovelSummaries('all'),
   });
-
-  const currentMeta = novelOptions.find((n) => n.novelId === currentNovelId);
-  const chapterParseBusy = tasks.some(
-    (t) =>
-      t.novelId === currentNovelId &&
-      (t.taskType === 'CHAPTER_PARSE' || t.taskType === 'LOAD') &&
-      (t.status === 'PENDING' || t.status === 'PROCESSING')
-  );
-  const chapterParseSucceeded = tasks.some(
-    (t) =>
-      t.novelId === currentNovelId &&
-      (t.taskType === 'CHAPTER_PARSE' || t.taskType === 'LOAD') &&
-      t.status === 'SUCCESS'
-  );
-  const structurallyReady =
-    ['PARSED', 'SPLIT_COMPLETED', 'COMPLETED'].includes(currentMeta?.status ?? '') || chapterParseSucceeded;
-  const canSceneSplit =
-    !!currentNovelId && structurallyReady && state.chapterReviewAck && !chapterParseBusy;
-
-  const gates: ProcessGates = { chapterParseBusy, chapterParseSucceeded, structurallyReady, canSceneSplit };
-
-  const tabParam = searchParams.get('tab');
-  const activeTab: TabId = TABS.some((t) => t.id === tabParam) ? (tabParam as TabId) : 'parse';
-  const setActiveTab = (tab: TabId) => {
-    setSearchParams((prev) => {
-      const p = new URLSearchParams(prev);
-      p.set('tab', tab);
-      return p;
-    }, { replace: true });
-  };
 
   return (
     <div className="rounded-2xl border-2 border-dashed border-indigo-200 bg-gradient-to-br from-indigo-50/60 via-white to-violet-50/40 p-6 relative">
@@ -137,35 +96,12 @@ export function ProcessingPanel({ state, actions }: ProcessingPanelProps) {
         ) : null}
       </div>
 
-      {/* Tab 栏 */}
-      <div role="tablist" aria-label="处理阶段" className="mb-5 flex gap-1 rounded-xl border border-slate-200 bg-white/80 p-1">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            role="tab"
-            id={`tab-${t.id}`}
-            aria-selected={activeTab === t.id}
-            aria-controls={`panel-${t.id}`}
-            onClick={() => setActiveTab(t.id)}
-            className={cn(
-              'flex-1 h-9 rounded-lg text-sm font-medium transition-colors',
-              activeTab === t.id ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
-            )}
-          >
-            {t.label}
-          </button>
-        ))}
+      {/* 版本实验视图（创建版本 → 切分 → 向量化 → 激活） */}
+      <div className="mb-5">
+        <VersionExperimentPanel state={state} actions={actions} />
       </div>
 
-      {/* 活动 tab 内容 */}
-      <div role="tabpanel" id={`panel-${activeTab}`} aria-labelledby={`tab-${activeTab}`} className="mb-5">
-        {activeTab === 'parse' && <ParseTab state={state} actions={actions} gates={gates} currentNovelStatus={currentMeta?.status ?? undefined} />}
-        {activeTab === 'split' && <SplitTab state={state} actions={actions} gates={gates} currentNovelStatus={currentMeta?.status ?? undefined} />}
-        {activeTab === 'embed' && <EmbedTab state={state} actions={actions} />}
-      </div>
-
-      {/* 全局任务状态（所有 tab 可见） */}
+      {/* 全局任务状态 */}
       <TaskPollerStatus tasks={activeTasks} poller={poller} onManualRefresh={actions.manualRefresh} />
     </div>
   );
