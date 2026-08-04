@@ -107,7 +107,9 @@ public class NovelController {
             @Parameter(description = "上传的文件对象", required = true) @RequestParam("file") MultipartFile file,
             @Parameter(description = "小说标题") @RequestParam(value = "title", required = false) String title,
             @Parameter(description = "小说作者") @RequestParam(value = "author", required = false) String author,
-            @Parameter(description = "小说描述") @RequestParam(value = "description", required = false) String description) throws IOException {
+            @Parameter(description = "小说描述") @RequestParam(value = "description", required = false) String description,
+            @Parameter(description = "章节识别策略") @RequestParam(value = "strategy", required = false) String strategy,
+            @Parameter(description = "章节标题正则（CUSTOM 策略）") @RequestParam(value = "chapterTitleRegex", required = false) String chapterTitleRegex) throws IOException {
         if (file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "文件为空");
         }
@@ -116,7 +118,7 @@ public class NovelController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "文件为空");
         }
         try (java.io.InputStream in = file.getInputStream()) {
-            return novelFacadeService.uploadNovel(new UploadNovelCommand(in, file.getOriginalFilename(), title, author, description, size));
+            return novelFacadeService.uploadNovel(new UploadNovelCommand(in, file.getOriginalFilename(), title, author, description, size, strategy, chapterTitleRegex));
         }
     }
 

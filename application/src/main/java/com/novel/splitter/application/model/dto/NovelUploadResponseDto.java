@@ -15,4 +15,5 @@ import lombok.NoArgsConstructor;
 public class NovelUploadResponseDto {
     private String message;
     private String novelId;
+    private String taskId;
 }

@@ -259,9 +259,13 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "文件过大，最大允许 " + maxUploadFileSize);
         }
         String novelId = novelService.createNovel(command.content(), command.originalFilename(), command.title(), command.author(), command.description());
+        TaskSubmitResponseDto parseTask = startChapterParseTask(
+                novelId, "v1", 0, false,
+                command.chapterTitleRegex(), command.strategy(), true);
         return NovelUploadResponseDto.builder()
-                .message("文件上传成功")
+                .message("文件上传成功，章节解析任务已提交")
                 .novelId(novelId)
+                .taskId(parseTask.getTaskId())
                 .build();
     }
 
@@ -278,7 +282,8 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         TaskSubmitResponseDto dto = startChapterParseTask(
                 id, version, maxScenes, false,
                 request != null ? request.getChapterTitleRegex() : null,
-                request != null ? request.getStrategy() : null);
+                request != null ? request.getStrategy() : null,
+                false);
         log.info("章节解析任务已投递 Load 队列, taskId={}", dto.getTaskId());
         return dto;
     }
@@ -435,7 +440,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
                 case "CHAPTER_RELOAD": {
                     TaskSubmitResponseDto chapterTask = startChapterParseTask(
                             id, version, maxScenes, true, request.getChapterTitleRegex(),
-                                    request.getStrategy());
+                                    request.getStrategy(), false);
                     if (hasEmbed) {
                         chapterTask.setMessage(chapterTask.getMessage()
                                 + "。向量化请在场景切分完成后触发 EMBED，或使用 POST /scene-split 且 triggerEmbed=true。");
@@ -445,7 +450,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
                 default: {
                     TaskSubmitResponseDto chapterTask = startChapterParseTask(
                             id, version, maxScenes, false, request.getChapterTitleRegex(),
-                                    request.getStrategy());
+                                    request.getStrategy(), false);
                     if (hasEmbed) {
                         chapterTask.setMessage(chapterTask.getMessage()
                                 + "。完整流水线：解析完成后请调用 POST /scene-split（可 triggerEmbed 串联向量化）。");
@@ -500,7 +505,8 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         return startChapterParseTask(
                 id, version, maxScenes, true,
                 request != null ? request.getChapterTitleRegex() : null,
-                request != null ? request.getStrategy() : null);
+                request != null ? request.getStrategy() : null,
+                false);
     }
 
     @Override
@@ -778,7 +784,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
      */
     private TaskSubmitResponseDto startChapterParseTask(
             String novelId, String version, int maxScenes, boolean forceReload,
-            String chapterTitleRegex, String strategy)
+            String chapterTitleRegex, String strategy, boolean rollbackOnFailure)
             throws IOException {
         ensureChapterTitleRegexValid(chapterTitleRegex);
         ensureRecognitionStrategyValid(strategy);
@@ -789,6 +795,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         message.setForceReload(forceReload);
         message.setChapterTitleRegex(trimToNull(chapterTitleRegex));
         message.setRecognitionStrategy(strategy);
+        message.setRollbackOnFailure(rollbackOnFailure);
         taskQueuePort.sendLoad(message);
         return TaskSubmitResponseDto.builder()
                 .taskId(taskId)

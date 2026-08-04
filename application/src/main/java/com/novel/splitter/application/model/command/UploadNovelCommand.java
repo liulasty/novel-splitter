@@ -9,7 +9,9 @@ public record UploadNovelCommand(
         String author,
         String description,
         /** multipart 大小，未知时 -1 */
-        long sizeBytes
+        long sizeBytes,
+        String strategy,
+        String chapterTitleRegex
 ) {
 }
 
