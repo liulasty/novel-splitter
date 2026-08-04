@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { format } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
 import { AlertCircle, Book, Database, Loader2, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -11,16 +12,19 @@ interface NovelListTabProps {
   highlightNovelId?: string;
 }
 
+const STATUS_BADGE_MAP: Record<string, { label: string; cls: string }> = {
+    RUNNING: { label: '处理中', cls: 'bg-blue-50 text-blue-700 border-blue-200' },
+    PENDING: { label: '待处理', cls: 'bg-slate-50 text-slate-600 border-slate-200' },
+    PARSED: { label: '已解析', cls: 'bg-teal-50 text-teal-700 border-teal-200' },
+    SPLITTING: { label: '切分中', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
+    SPLIT_COMPLETED: { label: '待向量化', cls: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
+    EMBEDDING: { label: '向量化中', cls: 'bg-violet-50 text-violet-700 border-violet-200' },
+    COMPLETED: { label: '已完成', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+    FAILED: { label: '失败', cls: 'bg-red-50 text-red-700 border-red-200' },
+};
+
 function StatusBadge({ status }: { status: string | null | undefined }) {
-    const map: Record<string, { label: string; cls: string }> = {
-        RUNNING: { label: '解析中', cls: 'bg-blue-50 text-blue-700 border-blue-200' },
-        PARSED: { label: '已解析', cls: 'bg-teal-50 text-teal-700 border-teal-200' },
-        COMPLETED: { label: '已完成', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-        FAILED: { label: '失败', cls: 'bg-red-50 text-red-700 border-red-200' },
-        EMBEDDING: { label: '向量化中', cls: 'bg-violet-50 text-violet-700 border-violet-200' },
-        SPLITTING: { label: '切分中', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
-    };
-    const cfg = map[status ?? ''] ?? { label: status ?? '未知', cls: 'bg-gray-50 text-gray-600 border-gray-200' };
+    const cfg = STATUS_BADGE_MAP[status ?? ''] ?? { label: status ?? '未知', cls: 'bg-gray-50 text-gray-600 border-gray-200' };
     return (
         <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border shrink-0', cfg.cls)}>
             {cfg.label}
@@ -30,8 +34,7 @@ function StatusBadge({ status }: { status: string | null | undefined }) {
 
 function formatTime(ts?: number): string {
     if (!ts) return '—';
-    const d = new Date(ts);
-    return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+    return format(ts, 'yyyy-MM-dd HH:mm');
 }
 
 export function NovelListTab({ highlightNovelId }: NovelListTabProps) {
@@ -60,7 +63,6 @@ export function NovelListTab({ highlightNovelId }: NovelListTabProps) {
             tasks
                 .filter((t) => t.status === 'PENDING' || t.status === 'PROCESSING')
                 .map((t) => t.novelId)
-                .filter(Boolean)
         ),
         [tasks]
     );
@@ -71,7 +73,21 @@ export function NovelListTab({ highlightNovelId }: NovelListTabProps) {
         [novelList]
     );
 
+    // 章节不可读（解析中）的小说：PENDING / SPLITTING 状态，后端 checkCanReadChapters 只在这两个状态下拒绝读章节
+    const chapterUnavailableIds = useMemo(
+        () => new Set(
+            novelList
+                .filter((n) => n.status === 'PENDING' || n.status === 'SPLITTING')
+                .map((n) => n.novelId)
+        ),
+        [novelList]
+    );
+
     const [selectedNovelId, setSelectedNovelId] = useState<string | null>(highlightNovelId ?? null);
+
+    useEffect(() => {
+        if (highlightNovelId) setSelectedNovelId(highlightNovelId);
+    }, [highlightNovelId]);
 
     return (
         <div className="space-y-5">
@@ -138,7 +154,7 @@ export function NovelListTab({ highlightNovelId }: NovelListTabProps) {
             )}
 
             {selectedNovelId && (
-                <BaselineParsePanel novelId={selectedNovelId} isPolling={runningNovelIds.has(selectedNovelId)} />
+                <BaselineParsePanel novelId={selectedNovelId} isPolling={chapterUnavailableIds.has(selectedNovelId)} />
             )}
         </div>
     );
