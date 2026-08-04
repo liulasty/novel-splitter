@@ -7,16 +7,18 @@ const PREVIEW_COUNT = 5;
 
 interface BaselineParsePanelProps {
   novelId?: string;
+  /** 上传后的章节解析任务是否仍在进行中；解析完成前不应请求章节列表（后端 PENDING/SPLITTING 会拒绝）。 */
+  isPolling?: boolean;
 }
 
 /**
  * 章节解析结果面板：仅展示已自动解析的章节目录，切分策略在 /process 配置。
  */
-export function BaselineParsePanel({ novelId }: BaselineParsePanelProps) {
-    const { data: chapters = [], isLoading: chaptersLoading } = useQuery<NovelChapterDto[]>({
+export function BaselineParsePanel({ novelId, isPolling = false }: BaselineParsePanelProps) {
+    const { data: chapters = [], isLoading: chaptersLoading, isError: chaptersError } = useQuery<NovelChapterDto[]>({
         queryKey: ['chapters', novelId],
         queryFn: () => novelApi.getChapters(novelId!),
-        enabled: !!novelId,
+        enabled: !!novelId && !isPolling,
     });
 
     const previewChapters = chapters.slice(0, PREVIEW_COUNT);
@@ -43,6 +45,11 @@ export function BaselineParsePanel({ novelId }: BaselineParsePanelProps) {
                     <AlertCircle className="w-4 h-4 flex-shrink-0" />
                     请先上传小说。
                 </div>
+            ) : isPolling ? (
+                <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-blue-50 border border-blue-200 text-sm text-blue-700">
+                    <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" />
+                    章节解析中，完成后自动展示章节目录…
+                </div>
             ) : (
                 <div className="space-y-4">
                     {/* 章节结果 */}
@@ -63,6 +70,10 @@ export function BaselineParsePanel({ novelId }: BaselineParsePanelProps) {
                                 <div className="flex justify-center py-10">
                                     <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
                                 </div>
+                            ) : chaptersError ? (
+                                <p className="px-3 py-8 text-center text-sm text-red-400">
+                                    章节列表加载失败，请确认章节解析已完成。
+                                </p>
                             ) : chapters.length === 0 ? (
                                 <p className="px-3 py-8 text-center text-sm text-gray-400">
                                     暂无章节。

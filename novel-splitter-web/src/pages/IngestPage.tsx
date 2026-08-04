@@ -23,7 +23,7 @@ export default function IngestPage() {
             <UploadPanel state={state} actions={actions} />
 
             {/* Stage 1: baseline chapter parse */}
-            <BaselineParsePanel novelId={state.currentNovelId} />
+            <BaselineParsePanel novelId={state.currentNovelId} isPolling={state.isPolling} />
         </div>
     );
 }
