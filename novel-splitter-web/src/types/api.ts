@@ -41,18 +41,6 @@ export interface IngestRequest {
   maxScenes: number; // 0 for all
 }
 
-export interface DownloadAndIngestRequest {
-  url: string;
-  name: string;
-  version: string;
-  maxScenes: number; // 0 for all
-  stages?: Array<'SPLIT' | 'EMBED'>;
-  splitEntry?: 'FULL' | 'CHAPTER_RELOAD' | 'SCENE_ONLY';
-  chunkSize?: number;
-  chunkOverlap?: number;
-  chapterTitleRegex?: string;
-}
-
 export interface NovelUploadResponse {
   message: string;
   novelId: string;
