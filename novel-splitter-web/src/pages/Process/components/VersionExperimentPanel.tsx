@@ -49,7 +49,7 @@ export function VersionExperimentPanel({ state, actions }: VersionExperimentPane
             当前小说尚未完成章节解析，请先在 <span className="font-medium">/ingest</span> 完成基准解析后再创建版本。
           </div>
           <Link
-            to={`/ingest?novelId=${encodeURIComponent(currentNovelId)}`}
+            to="/ingest"
             className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full text-xs font-medium text-amber-900 bg-amber-100 hover:bg-amber-200 transition-colors"
           >
             前往 /ingest
