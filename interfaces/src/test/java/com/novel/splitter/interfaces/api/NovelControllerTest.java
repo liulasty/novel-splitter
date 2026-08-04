@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -82,6 +83,28 @@ class NovelControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.novelId").value("demo_1"));
+
+        verify(novelFacadeService).uploadNovel(any(UploadNovelCommand.class));
+    }
+
+    @Test
+    void uploadNovel_forwardsStrategyAndReturnsTaskId() throws Exception {
+        MockMultipartFile file = new MockMultipartFile("file", "demo.txt", MediaType.TEXT_PLAIN_VALUE, "content".getBytes());
+        when(novelFacadeService.uploadNovel(argThat(cmd ->
+                "CN_CHAPTER".equals(cmd.strategy()) && cmd.chapterTitleRegex() == null)))
+                .thenReturn(NovelUploadResponseDto.builder()
+                        .message("文件上传成功，章节解析任务已提交")
+                        .novelId("demo_1")
+                        .taskId("task-1")
+                        .build());
+
+        mockMvc.perform(multipart("/api/novels/upload")
+                        .file(file)
+                        .param("strategy", "CN_CHAPTER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.novelId").value("demo_1"))
+                .andExpect(jsonPath("$.data.taskId").value("task-1"));
 
         verify(novelFacadeService).uploadNovel(any(UploadNovelCommand.class));
     }
