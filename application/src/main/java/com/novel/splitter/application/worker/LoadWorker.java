@@ -3,6 +3,7 @@ package com.novel.splitter.application.worker;
 import com.novel.splitter.application.config.RabbitConfig;
 import com.novel.splitter.application.port.out.FileStoragePort;
 import com.novel.splitter.application.service.novel.ChapterService;
+import com.novel.splitter.application.service.ingest.IngestRollbackService;
 import com.novel.splitter.application.service.novel.NovelService;
 import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.application.support.TaskFailureFormatter;
@@ -37,6 +38,7 @@ public class LoadWorker {
     private final FileStoragePort fileStoragePort;
     private final NovelService novelService;
     private final ChapterService chapterService;
+    private final IngestRollbackService ingestRollbackService;
 
     @RabbitListener(queues = RabbitConfig.LOAD_TASK_QUEUE)
     public void processLoadTask(SplitTaskMessage message) {
@@ -105,7 +107,16 @@ public class LoadWorker {
             log.error("处理任务 {} 时发生异常", taskId, e);
             String failMsg = TaskFailureFormatter.format("LOAD",
                     TaskFailureFormatter.params("novelId", novelId, "taskId", taskId), e);
-            // 任务行记录 FAILED 用于人工排查；novel 状态由 parseBaseline 在失败时回滚到解析前快照
+            // 入库原子任务失败 → 整体回滚（删 Novel + 文件 + 产物），无残留
+            if (message.isRollbackOnFailure() && novelId != null && !novelId.isBlank()) {
+                try {
+                    ingestRollbackService.rollback(novelId);
+                    log.warn("任务 {} 入库解析失败，已整体回滚（novelId={}）", taskId, novelId);
+                } catch (Exception rbEx) {
+                    log.error("任务 {} 入库回滚失败", taskId, rbEx);
+                }
+            }
+            // 任务行记录 FAILED 用于人工排查；非回滚场景 novel 状态由 parseBaseline 在失败时回滚到解析前快照
             // （通常为 PENDING），不再置 FAILED —— 基准未产生，novel 应留在 PENDING 以便重新投递。
             taskService.updateTaskStatus(taskId, SplitTask.TaskStatus.FAILED, 0, failMsg);
         }

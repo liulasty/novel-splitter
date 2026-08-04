@@ -4,6 +4,7 @@ import com.novel.splitter.application.port.out.FileStoragePort;
 import com.novel.splitter.application.service.novel.ChapterService;
 import com.novel.splitter.application.service.novel.ChapterServiceImpl;
 import com.novel.splitter.application.service.novel.NovelService;
+import com.novel.splitter.application.service.ingest.IngestRollbackService;
 import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.domain.enums.NovelStatus;
 import com.novel.splitter.domain.enums.TaskType;
@@ -67,6 +68,8 @@ class LoadWorkerAtomicTest {
     private NovelService novelService;
     @Mock
     private ChapterService chapterService;
+    @Mock
+    private IngestRollbackService ingestRollbackService;
 
     @InjectMocks
     private LoadWorker loadWorker;
@@ -121,6 +124,31 @@ class LoadWorkerAtomicTest {
         verify(chapterService, never()).replaceAll(anyString(), anyList());
         verify(chapterService, never()).saveChapters(anyList());
         // 任务行仍记录 FAILED（人工排查）
+        verify(taskService).updateTaskStatus(eq("t1"), eq(SplitTask.TaskStatus.FAILED), eq(0), anyString());
+        // 未带回滚标记（重解析等场景）：不触发整体回滚
+        verify(ingestRollbackService, never()).rollback(anyString());
+    }
+
+    /**
+     * 契约：入库任务（rollbackOnFailure=true）解析失败 → 调用 IngestRollbackService 整体回滚，
+     * 任务行记录 FAILED 用于人工排查。
+     */
+    @Test
+    void ingestTaskFailure_rollsBackNovelWhenFlagSet() throws Exception {
+        when(taskService.getTask("t1")).thenReturn(chapterParseTask());
+        when(chapterService.hasChapters("n1")).thenReturn(false);
+        when(novelCacheRepository.parsedDirPath("n1")).thenReturn(tmp.resolve("n1-parsed-missing"));
+        stubRawCopyInputs();
+        when(novelService.getNovelById("n1"))
+                .thenReturn(Novel.builder().id("n1").status(NovelStatus.PENDING).build());
+        when(loadNovelUseCase.load(eq("n1"), any(Path.class), any(), isNull(), isNull()))
+                .thenThrow(new RuntimeException("章节识别失败"));
+
+        SplitTaskMessage msg = new SplitTaskMessage("t1", "n1", 0, "v1");
+        msg.setRollbackOnFailure(true);
+        loadWorker.processLoadTask(msg);
+
+        verify(ingestRollbackService).rollback("n1");
         verify(taskService).updateTaskStatus(eq("t1"), eq(SplitTask.TaskStatus.FAILED), eq(0), anyString());
     }
 
