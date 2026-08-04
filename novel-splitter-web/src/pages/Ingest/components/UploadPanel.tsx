@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import { Link } from "react-router-dom";
 import { useQuery } from '@tanstack/react-query';
 import { novelApi, type ChapterStrategy } from "@/api/novelApi";
+import type { SplitTask } from "@/api/taskApi";
 
 interface UploadPanelProps {
     state: {
@@ -14,7 +15,7 @@ interface UploadPanelProps {
         strategy: string;
         chapterTitleRegex: string;
         isPolling: boolean;
-        polledTask?: { status?: string; progress?: number | null; message?: string } | null;
+        polledTask?: SplitTask | null;
     };
     actions: {
         handleFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -96,7 +97,7 @@ export function UploadPanel({ state, actions }: UploadPanelProps) {
                 <button
                     type="button"
                     onClick={actions.handleUpload}
-                    disabled={!selectedFile || isUploading}
+                    disabled={!selectedFile || isUploading || isPolling}
                     className="inline-flex items-center gap-2 px-5 py-2 rounded-full text-sm font-medium border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:shadow transition-all disabled:opacity-40 disabled:pointer-events-none"
                 >
                     {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UploadCloud className="w-4 h-4" />}

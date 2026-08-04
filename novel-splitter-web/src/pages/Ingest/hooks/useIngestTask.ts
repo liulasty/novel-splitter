@@ -103,12 +103,21 @@ export function useIngestTask() {
         },
     });
 
-    const { data: polledTask } = useQuery<SplitTask>({
+    const { data: polledTask, isError: pollError } = useQuery<SplitTask>({
         queryKey: ['ingestTask', pollingTaskId],
         queryFn: () => taskApi.getTask(pollingTaskId!),
         enabled: !!pollingTaskId,
+        retry: false,
         refetchInterval: 2000,
     });
+
+    // 轮询查询失败（任务被清理/服务异常）→ 不能无限卡在解析中，转为失败态。
+    useEffect(() => {
+        if (!pollError) return;
+        setPollingTaskId('');
+        setIngestStatus('入库任务状态查询失败，请刷新页面查看实际进度');
+        setIsError(true);
+    }, [pollError]);
 
     useEffect(() => {
         const status = polledTask?.status;
