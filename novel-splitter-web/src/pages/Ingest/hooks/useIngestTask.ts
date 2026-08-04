@@ -37,8 +37,9 @@ export function useIngestTask({ onUploadSuccess }: UseIngestTaskOptions = {}) {
             queryClient.invalidateQueries({ queryKey: ['novelSummaries'] });
             onUploadSuccess?.(data.novelId);
         },
-        onError: (error: any) => {
-            const msg = `上传失败：${error.response?.data?.error || error.message}`;
+        onError: (error: unknown) => {
+            const e = error as { response?: { data?: { error?: string } }; message?: string };
+            const msg = `上传失败：${e.response?.data?.error || e.message || '未知错误'}`;
             setIngestStatus(msg);
             setIsError(true);
             toast.error(msg);
@@ -56,6 +57,7 @@ export function useIngestTask({ onUploadSuccess }: UseIngestTaskOptions = {}) {
     // 轮询查询失败（任务被清理/服务异常）→ 不能无限卡在解析中，转为失败态。
     useEffect(() => {
         if (!pollError) return;
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- 响应轮询查询失败，刻意同步清理轮询状态
         setPollingTaskId('');
         setIngestStatus('入库任务状态查询失败，请刷新页面查看实际进度');
         setIsError(true);
@@ -64,6 +66,7 @@ export function useIngestTask({ onUploadSuccess }: UseIngestTaskOptions = {}) {
     useEffect(() => {
         const status = polledTask?.status;
         if (!status || (status !== 'SUCCESS' && status !== 'FAILED')) return;
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- 响应轮询查询终态，刻意同步清理轮询状态
         setPollingTaskId('');
         if (status === 'SUCCESS') {
             setIngestStatus(polledTask.message || '章节解析完成');
@@ -76,7 +79,7 @@ export function useIngestTask({ onUploadSuccess }: UseIngestTaskOptions = {}) {
             setIsError(true);
             toast.error('入库失败，已整体回滚，无残留');
         }
-    }, [polledTask?.status, currentNovelId, queryClient]);
+    }, [polledTask, currentNovelId, queryClient]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files?.[0]) {

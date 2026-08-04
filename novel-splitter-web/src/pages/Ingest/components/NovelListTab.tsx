@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
 import { AlertCircle, Book, Database, Loader2, RefreshCw } from 'lucide-react';
@@ -52,7 +52,7 @@ export function NovelListTab({ highlightNovelId }: NovelListTabProps) {
         refetchInterval: 5000,
     });
 
-    const novelList = Array.isArray(novels) ? novels : [];
+    const novelList = useMemo(() => (Array.isArray(novels) ? novels : []), [novels]);
     const statsMap = useMemo(() => {
         const map = new Map<string, NovelStatRecordDto>();
         for (const s of stats) if (s.novelId) map.set(s.novelId, s);
@@ -84,10 +84,6 @@ export function NovelListTab({ highlightNovelId }: NovelListTabProps) {
     );
 
     const [selectedNovelId, setSelectedNovelId] = useState<string | null>(highlightNovelId ?? null);
-
-    useEffect(() => {
-        if (highlightNovelId) setSelectedNovelId(highlightNovelId);
-    }, [highlightNovelId]);
 
     return (
         <div className="space-y-5">
