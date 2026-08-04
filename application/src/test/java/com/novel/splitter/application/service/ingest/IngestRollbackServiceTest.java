@@ -57,4 +57,11 @@ class IngestRollbackServiceTest {
                 .doesNotThrowAnyException();
         verify(novelRepository, never()).findById(anyString());
     }
+
+    @Test
+    void rollback_nullNovelId_isNoOp() {
+        assertThatCode(() -> ingestRollbackService.rollback(null))
+                .doesNotThrowAnyException();
+        verify(novelRepository, never()).findById(anyString());
+    }
 }

@@ -25,17 +25,18 @@ public class IngestRollbackService {
         if (novelId == null || novelId.isBlank()) {
             return;
         }
-        Novel novel = novelRepository.findById(novelId).orElse(null);
+        String id = novelId.trim();
+        Novel novel = novelRepository.findById(id).orElse(null);
         if (novel == null) {
-            log.info("入库回滚跳过：novel {} 不存在", novelId);
+            log.info("入库回滚跳过：novel {} 不存在", id);
             return;
         }
         // 文件产物（raw + parsed）整体清理；removeNovelArtifacts 内部已吞异常，尽力而为
-        novelCacheRepository.removeNovelArtifacts(novelId);
+        novelCacheRepository.removeNovelArtifacts(id);
         // 章节兜底（理论无半成品：replaceAll 单事务，未提交则不落库）
-        chapterRepository.deleteByNovelId(novelId);
+        chapterRepository.deleteByNovelId(id);
         // 硬删 DB 行
-        novelRepository.hardDelete(novelId);
-        log.info("入库回滚完成：已删除 novel {}", novelId);
+        novelRepository.hardDelete(id);
+        log.info("入库回滚完成：已删除 novel {}", id);
     }
 }
