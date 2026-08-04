@@ -32,6 +32,9 @@ public class SplitTaskMessage {
      */
     private String recognitionStrategy;
 
+    /** true：入库来源任务（上传）解析失败时整体回滚——删除 Novel + 文件 + parsed 产物，无残留。 */
+    private boolean rollbackOnFailure;
+
     public SplitTaskMessage() {}
 
     public SplitTaskMessage(String taskId, String novelId, int maxScenes, String version) {
@@ -107,5 +110,13 @@ public class SplitTaskMessage {
 
     public void setRecognitionStrategy(String recognitionStrategy) {
         this.recognitionStrategy = recognitionStrategy;
+    }
+
+    public boolean isRollbackOnFailure() {
+        return rollbackOnFailure;
+    }
+
+    public void setRollbackOnFailure(boolean rollbackOnFailure) {
+        this.rollbackOnFailure = rollbackOnFailure;
     }
 }
