@@ -146,7 +146,7 @@ export function useIngestTask() {
 
     const handleUpload = () => {
         if (selectedFile) {
-            uploadMutation.mutate(selectedFile);
+            uploadMutation.mutate();
         }
     };
 
