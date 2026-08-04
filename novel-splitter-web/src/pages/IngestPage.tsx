@@ -1,10 +1,27 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
+import { FileInput, List } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useIngestTask } from "./Ingest/hooks/useIngestTask";
 import { UploadPanel } from "./Ingest/components/UploadPanel";
-import { BaselineParsePanel } from "./Ingest/components/BaselineParsePanel";
+import { NovelListTab } from "./Ingest/components/NovelListTab";
+
+type TabKey = 'upload' | 'novels';
 
 export default function IngestPage() {
-    const { state, actions } = useIngestTask();
+    const [activeTab, setActiveTab] = useState<TabKey>('upload');
+    const [highlightNovelId, setHighlightNovelId] = useState<string | undefined>(undefined);
+    const { state, actions } = useIngestTask({
+        onUploadSuccess: (novelId) => {
+            setHighlightNovelId(novelId);
+            setActiveTab('novels');
+        },
+    });
+
+    const tabs: { key: TabKey; label: string; icon: typeof FileInput }[] = [
+        { key: 'upload', label: '上传', icon: FileInput },
+        { key: 'novels', label: '我的小说', icon: List },
+    ];
 
     return (
         <div className="flex flex-col gap-5 max-w-4xl mx-auto">
@@ -19,11 +36,35 @@ export default function IngestPage() {
                 </p>
             </div>
 
-            {/* Upload Panel */}
-            <UploadPanel state={state} actions={actions} />
+            {/* Tab bar */}
+            <div className="flex gap-1 p-1 rounded-full bg-gray-100 w-fit">
+                {tabs.map((t) => {
+                    const Icon = t.icon;
+                    const isActive = activeTab === t.key;
+                    return (
+                        <button
+                            key={t.key}
+                            type="button"
+                            onClick={() => setActiveTab(t.key)}
+                            className={cn(
+                                "inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-all",
+                                isActive
+                                    ? "bg-white text-indigo-600 shadow-sm ring-1 ring-gray-200"
+                                    : "text-gray-500 hover:text-gray-700"
+                            )}
+                        >
+                            <Icon className="w-4 h-4" />
+                            {t.label}
+                        </button>
+                    );
+                })}
+            </div>
 
-            {/* Stage 1: baseline chapter parse */}
-            <BaselineParsePanel novelId={state.currentNovelId} isPolling={state.isPolling} />
+            {activeTab === 'upload' ? (
+                <UploadPanel state={state} actions={actions} />
+            ) : (
+                <NovelListTab highlightNovelId={highlightNovelId} />
+            )}
         </div>
     );
 }
