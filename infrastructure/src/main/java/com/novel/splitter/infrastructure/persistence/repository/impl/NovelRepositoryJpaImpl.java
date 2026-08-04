@@ -35,6 +35,12 @@ public class NovelRepositoryJpaImpl implements NovelRepository {
     }
 
     @Override
+    public void hardDelete(String id) {
+        String novelId = Objects.requireNonNull(id, "id must not be null");
+        jpaNovelRepository.deleteById(novelId);
+    }
+
+    @Override
     public Optional<Novel> findById(String id) {
         String novelId = Objects.requireNonNull(id, "id must not be null");
         return jpaNovelRepository.findById(novelId).map(novelMapper::toDomain);

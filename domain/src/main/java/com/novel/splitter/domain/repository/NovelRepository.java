@@ -11,6 +11,11 @@ import java.util.Optional;
  */
 public interface NovelRepository {
     /**
+     * 硬删除小说记录（物理删除行；用于入库原子回滚等"无残留"场景，区别于软删）。
+     */
+    void hardDelete(String id);
+
+    /**
      * 保存小说实体
      */
     void save(Novel novel);
