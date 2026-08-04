@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { novelApi } from "@/api/novelApi";
+import { taskApi, type SplitTask } from "@/api/taskApi";
 
 const SESSION_KEY = 'kb:currentNovelId';
 
@@ -14,6 +15,9 @@ export function useIngestTask() {
     const [currentNovelId, setCurrentNovelId] = useState<string>("");
     const [ingestStatus, setIngestStatus] = useState<string>("");
     const [isError, setIsError] = useState(false);
+    const [strategy, setStrategy] = useState('CN_CHAPTER');
+    const [chapterTitleRegex, setChapterTitleRegex] = useState('');
+    const [pollingTaskId, setPollingTaskId] = useState('');
     const initRef = useRef(false);
 
     const persistCurrentNovelId = useCallback(
@@ -76,13 +80,18 @@ export function useIngestTask() {
     }, [searchParams, setSearchParams]);
 
     const uploadMutation = useMutation({
-        mutationFn: novelApi.uploadNovel,
+        mutationFn: () =>
+            novelApi.uploadNovel(selectedFile!, {
+                strategy,
+                ...(chapterTitleRegex.trim() !== '' ? { chapterTitleRegex: chapterTitleRegex.trim() } : {}),
+            }),
         onSuccess: (data) => {
-            const msg = `上传成功！Novel ID: ${data.novelId}`;
+            const msg = `上传成功！章节解析任务已提交`;
             setIngestStatus(msg);
             setIsError(false);
             toast.success(msg);
             persistCurrentNovelId(data.novelId);
+            setPollingTaskId(data.taskId);
             queryClient.invalidateQueries({ queryKey: ['novels'] });
             queryClient.invalidateQueries({ queryKey: ['novelSummaries'] });
         },
@@ -93,6 +102,30 @@ export function useIngestTask() {
             toast.error(msg);
         },
     });
+
+    const { data: polledTask } = useQuery<SplitTask>({
+        queryKey: ['ingestTask', pollingTaskId],
+        queryFn: () => taskApi.getTask(pollingTaskId!),
+        enabled: !!pollingTaskId,
+        refetchInterval: 2000,
+    });
+
+    useEffect(() => {
+        const status = polledTask?.status;
+        if (!status || (status !== 'SUCCESS' && status !== 'FAILED')) return;
+        setPollingTaskId('');
+        if (status === 'SUCCESS') {
+            setIngestStatus(polledTask.message || '章节解析完成');
+            setIsError(false);
+            toast.success('章节解析完成');
+            queryClient.invalidateQueries({ queryKey: ['chapters', currentNovelId] });
+            queryClient.invalidateQueries({ queryKey: ['novelSummaries'] });
+        } else {
+            setIngestStatus('入库失败，已整体回滚，无残留');
+            setIsError(true);
+            toast.error('入库失败，已整体回滚，无残留');
+        }
+    }, [polledTask?.status, currentNovelId, queryClient]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files?.[0]) {
@@ -115,11 +148,17 @@ export function useIngestTask() {
             ingestStatus,
             isError,
             isUploading: uploadMutation.isPending,
+            strategy,
+            chapterTitleRegex,
+            isPolling: !!pollingTaskId,
+            polledTask,
         },
         actions: {
             handleFileChange,
             handleUpload,
             clearSelectedNovel: clearCurrentNovelId,
+            setStrategy,
+            setChapterTitleRegex,
         },
     };
 }

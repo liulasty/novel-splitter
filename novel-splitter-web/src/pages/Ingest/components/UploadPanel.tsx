@@ -1,6 +1,8 @@
 import { UploadCloud, Loader2, CheckCircle, AlertCircle, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link } from "react-router-dom";
+import { useQuery } from '@tanstack/react-query';
+import { novelApi, type ChapterStrategy } from "@/api/novelApi";
 
 interface UploadPanelProps {
     state: {
@@ -9,18 +11,31 @@ interface UploadPanelProps {
         ingestStatus: string;
         isError: boolean;
         isUploading: boolean;
+        strategy: string;
+        chapterTitleRegex: string;
+        isPolling: boolean;
+        polledTask?: { status?: string; progress?: number | null; message?: string } | null;
     };
     actions: {
         handleFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
         handleUpload: () => void;
         clearSelectedNovel: () => void;
+        setStrategy: (v: string) => void;
+        setChapterTitleRegex: (v: string) => void;
     };
 }
 
 export function UploadPanel({ state, actions }: UploadPanelProps) {
     const {
         selectedFile, currentNovelId, ingestStatus, isError, isUploading,
+        strategy, chapterTitleRegex, isPolling, polledTask,
     } = state;
+
+    const { data: strategies = [] } = useQuery<ChapterStrategy[]>({
+        queryKey: ['chapter-strategies'],
+        queryFn: novelApi.listChapterStrategies,
+        staleTime: Infinity,
+    });
 
     return (
         <div className="rounded-2xl border-2 border-dashed border-amber-200 bg-gradient-to-br from-amber-50/60 via-white to-violet-50/40 p-6 relative">
@@ -50,6 +65,32 @@ export function UploadPanel({ state, actions }: UploadPanelProps) {
                 />
             </label>
 
+            {/* 章节识别策略 */}
+            <div className="space-y-1.5 mb-5">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">章节识别策略</p>
+                <select
+                    value={strategy}
+                    onChange={(e) => actions.setStrategy(e.target.value)}
+                    className="w-full h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                >
+                    {strategies.map((s) => (
+                        <option key={s.key} value={s.key}>{s.label}</option>
+                    ))}
+                </select>
+                {strategies.length > 0 && (
+                    <p className="text-xs text-gray-400">{strategies.find((s) => s.key === strategy)?.description}</p>
+                )}
+                {strategy === 'CUSTOM' && (
+                    <input
+                        type="text"
+                        value={chapterTitleRegex}
+                        onChange={(e) => actions.setChapterTitleRegex(e.target.value)}
+                        placeholder="例如：^第\\d+章.*（整行匹配）"
+                        className="w-full h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm font-mono text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    />
+                )}
+            </div>
+
             {/* Actions */}
             <div className="flex gap-3 justify-center items-center flex-wrap">
                 <button
@@ -71,6 +112,14 @@ export function UploadPanel({ state, actions }: UploadPanelProps) {
                 )}>
                     {isError ? <AlertCircle className="w-4 h-4 flex-shrink-0" /> : <CheckCircle className="w-4 h-4 flex-shrink-0" />}
                     {ingestStatus}
+                </div>
+            )}
+
+            {isPolling && (
+                <div className="mt-4 flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-blue-50 text-blue-700">
+                    <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" />
+                    章节解析中…{polledTask?.progress != null ? ` ${polledTask.progress}%` : ''}
+                    {polledTask?.message ? `（${polledTask.message}）` : ''}
                 </div>
             )}
 

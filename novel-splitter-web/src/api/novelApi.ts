@@ -4,6 +4,7 @@ import type { IngestRequest } from '@/types/api';
 export interface NovelUploadResponse {
   novelId: string;
   message: string;
+  taskId: string;
 }
 
 export interface NovelSummaryDto {
@@ -193,10 +194,15 @@ export const novelApi = {
     return response;
   },
 
-  uploadNovel: async (file: File): Promise<NovelUploadResponse> => {
+  uploadNovel: async (
+    file: File,
+    extra?: { strategy?: string; chapterTitleRegex?: string }
+  ): Promise<NovelUploadResponse> => {
     const formData = new FormData();
     formData.append('file', file);
-    
+    if (extra?.strategy) formData.append('strategy', extra.strategy);
+    if (extra?.chapterTitleRegex) formData.append('chapterTitleRegex', extra.chapterTitleRegex);
+
     const response = await apiClient.post<ApiEnvelope<NovelUploadResponse>, NovelUploadResponse>('/novels/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
