@@ -8,19 +8,17 @@ import { useTaskPoller } from '@/pages/Ingest/hooks/useTaskPoller';
 import { getApiErrorMessage, handleConflict409, isHttpConflict409 } from '@/lib/apiError';
 import { useSplitVersion } from '@/hooks/useSplitVersion';
 
-const SESSION_KEY = 'kb:currentNovelId';
-
 export function useProcessTask() {
     const queryClient = useQueryClient();
     const [searchParams, setSearchParams] = useSearchParams();
 
     const [maxTokens, setMaxTokens] = useState(512);
     const [overlapTokens, setOverlapTokens] = useState(64);
-    const [currentNovelId, setCurrentNovelId] = useState<string>("");
+    // URL ?novelId= 是唯一事实源（不再从 sessionStorage 恢复，也无需 state 同步）。
+    const currentNovelId = searchParams.get('novelId')?.trim() ?? '';
     const [chapterReviewAck, setChapterReviewAck] = useState(false);
     const [chapterTitleRegex, setChapterTitleRegex] = useState('');
     const [recognitionStrategy, setRecognitionStrategy] = useState('CN_CHAPTER');
-    const initRef = useRef(false);
 
     const { version, setVersion, profiles, currentProfile, refresh: refreshSplitProfiles } =
         useSplitVersion(currentNovelId);
@@ -28,9 +26,7 @@ export function useProcessTask() {
     const persistCurrentNovelId = useCallback(
         (novelId: string) => {
             const id = novelId.trim();
-            setCurrentNovelId(id);
             if (id) {
-                try { sessionStorage.setItem(SESSION_KEY, id); } catch { /* ignore */ }
                 setSearchParams(
                     (prev) => {
                         const p = new URLSearchParams(prev);
@@ -45,8 +41,6 @@ export function useProcessTask() {
     );
 
     const clearCurrentNovelId = useCallback(() => {
-        setCurrentNovelId('');
-        try { sessionStorage.removeItem(SESSION_KEY); } catch { /* ignore */ }
         setSearchParams(
             (prev) => {
                 const p = new URLSearchParams(prev);
@@ -58,33 +52,7 @@ export function useProcessTask() {
     }, [setSearchParams]);
 
     useEffect(() => {
-        const fromUrl = searchParams.get('novelId')?.trim();
-        if (fromUrl) {
-            setCurrentNovelId(fromUrl);
-            try { sessionStorage.setItem(SESSION_KEY, fromUrl); } catch { /* ignore */ }
-            initRef.current = true;
-            return;
-        }
-        if (!initRef.current) {
-            initRef.current = true;
-            try {
-                const fromSession = sessionStorage.getItem(SESSION_KEY)?.trim();
-                if (fromSession) {
-                    setCurrentNovelId(fromSession);
-                    setSearchParams(
-                        (prev) => {
-                            const p = new URLSearchParams(prev);
-                            p.set('novelId', fromSession);
-                            return p;
-                        },
-                        { replace: true }
-                    );
-                }
-            } catch { /* ignore */ }
-        }
-    }, [searchParams, setSearchParams]);
-
-    useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- 切换小说时刻意重置章节确认标记
         setChapterReviewAck(false);
     }, [currentNovelId]);
 
@@ -93,19 +61,23 @@ export function useProcessTask() {
         queryFn: taskApi.getAllTasks,
     });
 
-    // 版本数据源（/process 主数据）：按 (novelId) 列出全部实验版本
-    const { data: versions = [], isLoading: versionsLoading } = useQuery({
-        queryKey: ['versions', currentNovelId],
-        queryFn: () => novelApi.listVersions(currentNovelId),
-        enabled: !!currentNovelId,
-    });
-
-    // 基准就绪门控：与旧 structurallyReady 对齐（小说 PARSED / SPLIT_COMPLETED / COMPLETED，或有章节解析成功任务）
-    const { data: novelOptions = [] } = useQuery({
+    // 小说列表：作为所有 novelId 维度查询的有效性总开关（URL ?novelId= 可能指向已删/不存在的小说）
+    const { data: novelOptions = [], isLoading: novelOptionsLoading } = useQuery({
         queryKey: ['novelSummaries', 'all'],
         queryFn: () => novelApi.getNovelSummaries('all'),
     });
     const currentMeta = novelOptions.find((n) => n.novelId === currentNovelId);
+    const novelIsValid = Boolean(currentNovelId && !novelOptionsLoading && currentMeta);
+    const novelMissing = Boolean(currentNovelId && !novelOptionsLoading && !currentMeta);
+
+    // 版本数据源（/process 主数据）：按 (novelId) 列出全部实验版本。无效 ID 直接不发请求，避免 400。
+    const { data: versions = [], isLoading: versionsLoading } = useQuery({
+        queryKey: ['versions', currentNovelId],
+        queryFn: () => novelApi.listVersions(currentNovelId),
+        enabled: novelIsValid,
+    });
+
+    // 基准就绪门控：与旧 structurallyReady 对齐（小说 PARSED / SPLIT_COMPLETED / COMPLETED，或有章节解析成功任务）
     const chapterParseSucceeded = tasks.some(
         (t) =>
             t.novelId === currentNovelId &&
@@ -132,6 +104,7 @@ export function useProcessTask() {
         const wasRunning = chapterParseWasRunningRef.current;
         chapterParseWasRunningRef.current = running;
         if (wasRunning && !running) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- 解析任务退出运行态时刻意重置确认标记
             setChapterReviewAck(false);
         }
     }, [tasks, currentNovelId]);
@@ -359,6 +332,7 @@ export function useProcessTask() {
     return {
         state: {
             currentNovelId,
+            novelMissing,
             version,
             profiles,
             currentProfile,

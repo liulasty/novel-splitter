@@ -4,6 +4,8 @@ import type { CreateVersionRequest, NovelVersionDto } from '@/api/novelApi';
 
 export interface ProcessState {
   currentNovelId: string;
+  /** currentNovelId 指向已删/不存在的小说（novelOptions 已加载且不含该书） */
+  novelMissing: boolean;
   version: string;
   profiles: SceneSplitProfileDto[];
   currentProfile?: SceneSplitProfileDto;

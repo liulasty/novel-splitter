@@ -141,7 +141,7 @@ public class ChromaVectorStore implements VectorStore {
         request.put("metadatas", metadatas);
         request.put("documents", documents);
 
-        log.debug("Saving {} scenes to ChromaDB", scenes.size());
+        log.debug("写入 {} 个场景到 ChromaDB", scenes.size());
 
         try {
             postAddPayload(request);
@@ -159,7 +159,7 @@ public class ChromaVectorStore implements VectorStore {
             }
         }
 
-        log.info("Saved {} vectors to ChromaDB collection '{}'", scenes.size(), collectionName);
+        log.info("已写入 {} 条向量到 ChromaDB 集合 '{}'", scenes.size(), collectionName);
     }
 
     /**
@@ -800,7 +800,7 @@ public class ChromaVectorStore implements VectorStore {
         request.put("metadatas", metadatas);
         request.put("documents", documents);
 
-        log.debug("Saving {} scenes to ChromaDB collection '{}'", scenes.size(), colName);
+        log.debug("写入 {} 个场景到 ChromaDB 集合 '{}'", scenes.size(), colName);
 
         try {
             restClient.post()
@@ -813,7 +813,7 @@ public class ChromaVectorStore implements VectorStore {
             throw chromaUserVisibleFailure("写入向量(/add) collection=" + colName, e);
         }
 
-        log.info("Saved {} vectors to ChromaDB collection '{}'", scenes.size(), colName);
+        log.info("已写入 {} 条向量到 ChromaDB 集合 '{}'", scenes.size(), colName);
     }
 
     @Override

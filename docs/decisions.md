@@ -12,6 +12,6 @@
 | ChromaDB + 本地文件双存储 | 向量存 ChromaDB 做快速相似搜索，完整场景元数据存磁盘供检索水合 | `implementation_roadmap.md` Phase 3 |
 | MapStruct 做 domain↔DTO 映射 | 编译期安全，无反射 | module README |
 | 优先本地文件导入 | Phase 2 用 `LocalNovelLoader` 做可靠 TXT 输入，web scraper 作为辅助 | `implementation_roadmap.md` Phase 2 |
-| Dockerfile 使用预构建 jar | 不在 Docker 内运行 Maven，利用本地缓存仓库 `D:/CODE/mvn_repository`，构建从 5+ 分钟降至 16 秒 | 2026-05-23 会话 |
+| Dockerfile 使用预构建 jar | 不在 Docker 内运行 Maven，利用本地 Maven 缓存加速构建，从 5+ 分钟降至 16 秒 | 2026-05-23 会话 |
 | 脚本统一 `docker compose` v2 | 全部 .bat/.ps1/.sh 统一为无连字符版本 + `--env-file` 参数 | 2026-05-23 会话 |
 | env 配置集中在 `config/` | 根目录 `.env` 已弃用，`config/.env.dev` 和 `config/.env.prod` 为唯一配置来源 | `.env` 文件内容 |

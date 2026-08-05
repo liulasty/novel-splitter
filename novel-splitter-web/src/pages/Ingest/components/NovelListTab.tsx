@@ -73,11 +73,11 @@ export function NovelListTab({ highlightNovelId }: NovelListTabProps) {
         [novelList]
     );
 
-    // 章节不可读（解析中）的小说：PENDING / SPLITTING 状态，后端 checkCanReadChapters 只在这两个状态下拒绝读章节
+    // 章节不可读（未解析）的小说：仅 PENDING 状态。PARSED 后章节已落定并稳定，SPLITTING 只写场景，期间读取章节安全。
     const chapterUnavailableIds = useMemo(
         () => new Set(
             novelList
-                .filter((n) => n.status === 'PENDING' || n.status === 'SPLITTING')
+                .filter((n) => n.status === 'PENDING')
                 .map((n) => n.novelId)
         ),
         [novelList]

@@ -52,6 +52,8 @@ services:
         condition: service_started
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      # 日志/日期使用北京时间（当前 UTC）
+      TZ: Asia/Shanghai
       DB_HOST: postgres
       DB_PORT: ${DB_PORT}
       DB_NAME: ${DB_NAME}

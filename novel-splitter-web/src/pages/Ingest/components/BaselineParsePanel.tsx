@@ -7,7 +7,7 @@ const PREVIEW_COUNT = 5;
 
 interface BaselineParsePanelProps {
   novelId?: string;
-  /** 上传后的章节解析任务是否仍在进行中；解析完成前不应请求章节列表（后端 PENDING/SPLITTING 会拒绝）。 */
+  /** 上传后的章节解析任务是否仍在进行中；解析完成前不应请求章节列表（后端仅在 PENDING 时拒绝读章节）。 */
   isPolling?: boolean;
 }
 

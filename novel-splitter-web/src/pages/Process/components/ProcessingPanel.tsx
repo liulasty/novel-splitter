@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { novelApi } from '@/api/novelApi';
-import { ListChecks, XCircle } from "lucide-react";
+import { Database, ListChecks, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TaskPollerStatus } from '@/pages/Ingest/components/TaskPollerStatus';
 import type { ProcessState, ProcessActions } from './ProcessTypes';
@@ -12,7 +13,7 @@ interface ProcessingPanelProps {
 }
 
 export function ProcessingPanel({ state, actions }: ProcessingPanelProps) {
-  const { currentNovelId, activeTasks, poller } = state;
+  const { currentNovelId, novelMissing, activeTasks, poller } = state;
 
   const { data: novelOptions = [] } = useQuery({
     queryKey: ['novelSummaries', 'all'],
@@ -47,20 +48,7 @@ export function ProcessingPanel({ state, actions }: ProcessingPanelProps) {
             同一本书可用不同场景版本号生成多套切片。
           </p>
           <div className="max-h-48 overflow-y-auto rounded-lg border border-slate-200 bg-white divide-y divide-slate-100">
-            {currentNovelId && !novelOptions.some((n) => n.novelId === currentNovelId) ? (
-              <button
-                type="button"
-                onClick={() => actions.selectNovelById(currentNovelId)}
-                className={cn(
-                  'w-full text-left px-3 py-2.5 text-sm transition-colors',
-                  'bg-amber-50/80 text-amber-900 hover:bg-amber-50'
-                )}
-              >
-                <span className="font-medium">当前会话（未在书库列表中）</span>
-                <span className="block text-xs font-mono text-amber-800/80 mt-0.5 break-all">{currentNovelId}</span>
-              </button>
-            ) : null}
-            {novelOptions.length === 0 && !(currentNovelId && !novelOptions.some((n) => n.novelId === currentNovelId)) ? (
+            {novelOptions.length === 0 ? (
               <div className="px-3 py-6 text-center text-sm text-slate-400">
                 暂无已登记小说，请前往「上传入库」页面上传文件。
               </div>
@@ -96,10 +84,34 @@ export function ProcessingPanel({ state, actions }: ProcessingPanelProps) {
         ) : null}
       </div>
 
-      {/* 版本实验视图（创建版本 → 切分 → 向量化 → 激活） */}
-      <div className="mb-5">
-        <VersionExperimentPanel state={state} actions={actions} />
-      </div>
+      {/* 无效 novelId（已删/不存在）→ 隐藏业务内容，只展示兜底空态 */}
+      {novelMissing ? (
+        <div className="mb-5 rounded-xl border-2 border-dashed border-amber-300 bg-amber-50/60 px-6 py-8 text-center">
+          <p className="text-sm font-semibold text-amber-800">当前小说不存在或已被删除</p>
+          <p className="mt-1 text-xs text-amber-600">请重新选择一部小说，或返回书库查看可用的内容。</p>
+          <div className="mt-4 flex justify-center gap-3">
+            <Link
+              to="/knowledge"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition-colors"
+            >
+              <Database className="w-4 h-4" />
+              返回小说列表
+            </Link>
+            <button
+              type="button"
+              onClick={() => actions.clearSelectedNovel()}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white text-slate-600 text-sm font-medium border border-slate-200 hover:bg-slate-50 transition-colors"
+            >
+              <XCircle className="w-4 h-4" />
+              清除选择
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="mb-5">
+          <VersionExperimentPanel state={state} actions={actions} />
+        </div>
+      )}
 
       {/* 全局任务状态 */}
       <TaskPollerStatus tasks={activeTasks} poller={poller} onManualRefresh={actions.manualRefresh} />

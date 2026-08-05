@@ -1,6 +1,7 @@
 package com.novel.splitter.application.service.novel;
 
 import com.novel.splitter.application.mapper.DtoMapper;
+import com.novel.splitter.application.model.dto.ChapterDto;
 import com.novel.splitter.application.orchestration.EmbedPipelineOrchestrator;
 import com.novel.splitter.application.port.out.TaskQueuePort;
 import com.novel.splitter.application.service.download.DownloadService;
@@ -24,6 +25,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -70,5 +72,31 @@ class NovelFacadeServiceSceneReadTest {
 
         verify(sceneRepository).findByNovelIdAndChapterId(eq("n1"), eq(1L), any(PageQuery.class));
         verify(sceneRepository, never()).findByNovelIdAndChapterIdAndVersion(any(), any(), any(), any());
+    }
+
+    @Test
+    void getChapters_allowed_duringSplitting() {
+        when(novelService.getNovelById("n1"))
+                .thenReturn(Novel.builder().id("n1").status(NovelStatus.SPLITTING).build());
+        when(chapterService.getChaptersByNovelId("n1")).thenReturn(List.of());
+        when(dtoMapper.toChapterDtos(List.of())).thenReturn(List.of());
+
+        List<ChapterDto> result = novelFacadeService.getChapters("n1");
+
+        assertTrue(result.isEmpty());
+        verify(chapterService).getChaptersByNovelId("n1");
+    }
+
+    @Test
+    void getChapters_returnsEmpty_whenPending() {
+        when(novelService.getNovelById("n1"))
+                .thenReturn(Novel.builder().id("n1").status(NovelStatus.PENDING).build());
+        when(chapterService.getChaptersByNovelId("n1")).thenReturn(List.of());
+        when(dtoMapper.toChapterDtos(List.of())).thenReturn(List.of());
+
+        List<ChapterDto> result = novelFacadeService.getChapters("n1");
+
+        assertTrue(result.isEmpty());
+        verify(chapterService).getChaptersByNovelId("n1");
     }
 }

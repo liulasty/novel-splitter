@@ -262,6 +262,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         TaskSubmitResponseDto parseTask = startChapterParseTask(
                 novelId, "v1", 0, false,
                 command.chapterTitleRegex(), command.strategy(), true);
+
         return NovelUploadResponseDto.builder()
                 .message("文件上传成功，章节解析任务已提交")
                 .novelId(novelId)
@@ -540,7 +541,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         if (novel == null) {
             throw new IllegalArgumentException("Novel not found: " + novelId);
         }
-        novel.checkCanReadChapters();
+        // 章节目录在 PENDING 等处理期本就不存在，返回空列表即可，不应因状态抛错导致 500。
         return dtoMapper.toChapterDtos(chapterService.getChaptersByNovelId(novelId));
     }
 
@@ -550,7 +551,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         if (novel == null) {
             throw new IllegalArgumentException("Novel not found: " + novelId);
         }
-        novel.checkCanReadChapters();
+        novel.checkCanReadScenes();
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 500);
         if (version == null || version.isBlank()) {

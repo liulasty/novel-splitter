@@ -2,15 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { knowledgeApi } from '@/api/knowledgeApi';
-
-const SESSION_PREFIX = 'kb:version:';
+import { novelApi } from '@/api/novelApi';
 
 /**
- * 共享版本状态：URL `?version=` 为事实源。
- * 解析优先级：URL（存在且有效）> 显式选择 > sessionStorage（按 novelId 隔离、校验有效）> 最新 profile > "v1"。
+ * 共享版本状态：URL `?version=` 为事实源（版本选择不再持久化到 sessionStorage）。
+ * 解析优先级：URL（存在且有效）> 显式选择 > 最新 profile > "v1"。
  * - URL 中有效的 version 始终被采纳（含浏览器前进/后退、手动改地址），即使当前是显式选择。
- * - 显式选择（setVersion）写 URL + sessionStorage，且优先于 session/最新，直到换小说或 URL 变化。
- * - 自动发现（latest / v1）不写 URL/session，发现器刷新出现更新版本时自动升级。
+ * - 显式选择（setVersion）写 URL，优先于最新，直到换小说或 URL 变化。
+ * - 自动发现（latest / v1）不写 URL，发现器刷新出现更新版本时自动升级。
  * - URL 携带不存在的 version（如 v99）→ 若用户已显式选择则保留，否则降级到最新有效版本。
  * - 已知限制：显式选择的版本被删除后无法与"待生成的新版本"区分，暂不自动重解析。
  */
@@ -23,10 +22,17 @@ export function useSplitVersion(novelId: string | undefined) {
   const novelRef = useRef<string | undefined>(undefined);
   const switchPendingRef = useRef(false);
 
+  // 有效性门控：novelId 指向已删/不存在的小说不发 split-profiles 请求（避免 400）。查询 key 复用全局缓存。
+  const { data: novelOptions = [] } = useQuery({
+    queryKey: ['novelSummaries', 'all'],
+    queryFn: () => novelApi.getNovelSummaries('all'),
+  });
+  const novelValid = Boolean(novelId && novelOptions.some((n) => n.novelId === novelId));
+
   const { data: profiles = [], isPending: isDiscovering, isError } = useQuery({
     queryKey: ['splitProfiles', novelId],
     queryFn: () => knowledgeApi.listSplitProfilesByNovelId(novelId as string),
-    enabled: !!novelId,
+    enabled: novelValid,
   });
 
   const writeUrl = useCallback((v: string) => {
@@ -52,17 +58,21 @@ export function useSplitVersion(novelId: string | undefined) {
     const prevNovel = novelRef.current;
     novelRef.current = novelId;
     originRef.current = 'auto';
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 切换小说时刻意重置版本状态
     setVersionState('');
     if (prevNovel && prevNovel !== novelId) {
       switchPendingRef.current = true;
       clearUrlVersion();
-      try { sessionStorage.removeItem(SESSION_PREFIX + prevNovel); } catch { /* ignore */ }
     }
   }, [novelId, clearUrlVersion]);
 
   // 解析版本：URL 有效则始终采纳；否则保留显式选择（含待生成的新版本）；再否则降级到 v1 / session / 最新。
   useEffect(() => {
-    if (!novelId) { setVersionState(''); return; }
+    if (!novelId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- novelId 清空时刻意重置版本状态
+      setVersionState('');
+      return;
+    }
     if (isDiscovering) return;
 
     const exists = (v: string) => profiles.some((p) => p.version === v);
@@ -73,13 +83,10 @@ export function useSplitVersion(novelId: string | undefined) {
       if (urlVersion !== version) {
         setVersionState(urlVersion);
         originRef.current = 'explicit';
-        if (!isError) {
-          try { sessionStorage.setItem(SESSION_PREFIX + novelId, urlVersion); } catch { /* ignore */ }
-        }
       }
       return;
     }
-    // 切换小说后的首个解析窗口：忽略上个小说残留的 URL 版本，改走 session/最新。
+    // 切换小说后的首个解析窗口：忽略上个小说残留的 URL 版本，改走最新/兜底。
     switchPendingRef.current = false;
 
     if (originRef.current === 'explicit') return;
@@ -90,14 +97,6 @@ export function useSplitVersion(novelId: string | undefined) {
       return;
     }
 
-    let sessionVersion: string | null = null;
-    try { sessionVersion = sessionStorage.getItem(SESSION_PREFIX + novelId)?.trim() ?? null; } catch { /* ignore */ }
-    if (sessionVersion && exists(sessionVersion)) {
-      setVersionState(sessionVersion);
-      originRef.current = 'explicit';
-      writeUrl(sessionVersion);
-      return;
-    }
     // 后端 /split-profiles 按 MAX(id) 排序（旧→新），末位 = 最新。
     const latest = profiles[profiles.length - 1]?.version;
     if (latest) {
@@ -107,7 +106,7 @@ export function useSplitVersion(novelId: string | undefined) {
     }
     if (version !== 'v1') setVersionState('v1');
     originRef.current = 'auto';
-  }, [novelId, profiles, isDiscovering, isError, searchParams, writeUrl, version]);
+  }, [novelId, profiles, isDiscovering, isError, searchParams, version]);
 
   const setVersion = useCallback((v: string) => {
     const t = (v ?? '').trim();
@@ -115,18 +114,12 @@ export function useSplitVersion(novelId: string | undefined) {
       setVersionState('');
       originRef.current = 'auto';
       clearUrlVersion();
-      if (novelId) {
-        try { sessionStorage.removeItem(SESSION_PREFIX + novelId); } catch { /* ignore */ }
-      }
       return;
     }
     setVersionState(t);
     originRef.current = 'explicit';
     writeUrl(t);
-    if (novelId) {
-      try { sessionStorage.setItem(SESSION_PREFIX + novelId, t); } catch { /* ignore */ }
-    }
-  }, [novelId, writeUrl, clearUrlVersion]);
+  }, [writeUrl, clearUrlVersion]);
 
   const currentProfile = profiles.find((p) => p.version === version);
   const latestVersion = profiles.length > 0 ? profiles[profiles.length - 1].version : undefined;

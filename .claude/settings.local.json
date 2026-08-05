@@ -70,7 +70,17 @@
       "Bash(Get-Process -Name \"java\" -ErrorAction SilentlyContinue)",
       "Bash(Select-Object Id, ProcessName, StartTime)",
       "Bash(Format-Table -AutoSize)",
-      "PowerShell(Get-Process *)"
+      "PowerShell(Get-Process *)",
+      "Bash(bash *)",
+      "PowerShell(& 'D:\\\\soft\\\\novel-splitter\\\\scripts\\\\svc.ps1' ps 2>&1)",
+      "PowerShell(.\\\\scripts\\\\start-all.ps1 -Build)",
+      "PowerShell(docker compose *)",
+      "PowerShell(netstat *)",
+      "PowerShell(taskkill *)",
+      "PowerShell(curl.exe -s -o NUL -w \"%{http_code}\" http://localhost:3000)",
+      "PowerShell(curl.exe -s -H \"Authorization: Bearer your_secret_token_dev\" -H \"Content-Type: application/json\" -X POST \"http://localhost:8080/api/novels/85266173-74bf-4b2b-9d66-defe40318c53/re-parse-chapters\" -d '{\"strategy\":\"VOLUME_CHAPTER\",\"maxScenes\":0}' | python -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(f'code={d[\\\\\"code\\\\\"]}, msg={d[\\\\\"message\\\\\"]}, taskId={d[\\\\\"data\\\\\"][\\\\\"taskId\\\\\"][:8]}...'\\)\" 2>&1)",
+      "PowerShell($body = @{strategy=\"VOLUME_CHAPTER\"; maxScenes=0} | ConvertTo-Json; $response = Invoke-RestMethod -Uri \"http://localhost:8080/api/novels/85266173-74bf-4b2b-9d66-defe40318c53/re-parse-chapters\" -Method Post -Headers @{\"Authorization\"=\"Bearer your_secret_token_dev\"} -ContentType \"application/json\" -Body $body; Write-Host \"code=$\\($response.code\\) taskId=$\\($response.data.taskId\\) msg=$\\($response.message\\)\")",
+      "PowerShell($response = Invoke-RestMethod -Uri \"http://localhost:8080/api/novels/85266173-74bf-4b2b-9d66-defe40318c53/chapters\" -Method Get -Headers @{\"Authorization\"=\"Bearer your_secret_token_dev\"}; $c = $response.data; Write-Host \"Total: $\\($c.Count\\) chapters`n\"; $c | Select-Object -First 10 | ForEach-Object { \"$\\($_.index.ToString\\(\\).PadLeft\\(3\\)\\). $\\($_.title\\) \\($\\($_.wordCount\\)字\\)\" }; Write-Host \"...`n\"; $c | Select-Object -Last 3 | ForEach-Object { \"$\\($_.index.ToString\\(\\).PadLeft\\(3\\)\\). $\\($_.title\\) \\($\\($_.wordCount\\)字\\)\" })"
     ]
   },
   "enableAllProjectMcpServers": true,

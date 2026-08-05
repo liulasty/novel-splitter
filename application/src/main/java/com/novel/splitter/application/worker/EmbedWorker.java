@@ -177,14 +177,14 @@ public class EmbedWorker {
                 markNoWriteOutcomes(subIds, sceneByPid, embedRunId);
             } else {
                 sceneRepository.batchUpdateEmbedOutcome(written, embedRunId, EmbedStatus.SUCCESS, null);
-                log.debug("embed sub-batch ok taskId={} embedRunId={} subBatchSize={} written={}",
-                        taskId, embedRunId, subIds.size(), written.size());
+                log.debug("子批次向量化完成：本批写入 {}/{} 个场景 taskId={} embedRunId={}",
+                        written.size(), subIds.size(), taskId, embedRunId);
                 // 推进版本向量化游标，并判定该 run 是否全量完成 → EMBED_DONE
                 advanceEmbedCursorAndCheckCompletion(
                         novelId, version, chunkSize, chunkOverlap, embedRunId, maxSeqOf(sceneByPid, written));
             }
         } catch (Exception e) {
-            log.error("embed sub-batch failed taskId={} embedRunId={} subBatchSize={} scenePids={}",
+            log.error("子批次向量化失败 taskId={} embedRunId={} subBatchSize={} scenePids={}",
                     taskId, embedRunId, subIds.size(), subIds, e);
             String err = TaskFailureFormatter.format("EMBED_SCENE",
                     TaskFailureFormatter.params(
@@ -235,10 +235,14 @@ public class EmbedWorker {
             long success = sceneRepository.countEmbedByRunAndStatus(
                     novelId, version, chunkSize, chunkOverlap, embedRunId, EmbedStatus.SUCCESS);
             long total = sceneRepository.countByProfile(novelId, version, chunkSize, chunkOverlap);
+            if (total > 0) {
+                int pct = (int) Math.min(100, success * 100L / total);
+                log.info("向量化进度：{}/{}（{}%）novelId={} version={}", success, total, pct, novelId, version);
+            }
             if (total > 0 && success >= total) {
                 if (v.getStatus() == VersionStatus.EMBEDDING) {
                     v.completeEmbed();
-                    log.info("版本 {}/{} 向量化全部完成 -> EMBED_DONE", novelId, version);
+                    log.info("版本 {}/{} 向量化全部完成（{} 个场景）-> EMBED_DONE", novelId, version, success);
                 } else if (v.getStatus() == VersionStatus.FAILED) {
                     // 失败后有批次补跑成功且全量达成：直接升级 EMBED_DONE（保留游标）
                     v.setStatus(VersionStatus.EMBED_DONE);
