@@ -17,7 +17,7 @@ export default function TaskSplitPage() {
     mutationFn: () => novelApi.splitNovel(novelId.trim(), { version: version.trim() || 'v1', maxScenes }),
     onSuccess: (r) => {
       setTaskId(r.taskId);
-      toast.success('Split 任务已提交（含 Load）');
+      toast.success('切分任务已提交（含章节解析）');
     },
     onError: (e: unknown) => toast.error(getApiErrorMessage(e, '提交失败')),
   });

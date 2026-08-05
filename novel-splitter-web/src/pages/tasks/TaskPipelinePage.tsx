@@ -26,7 +26,7 @@ export default function TaskPipelinePage() {
     },
     onSuccess: (r) => {
       setTaskId(r.taskId);
-      toast.success('Pipeline 已提交');
+      toast.success('流水线任务已提交');
     },
     onError: (e: unknown) => toast.error(getApiErrorMessage(e, '提交失败')),
   });

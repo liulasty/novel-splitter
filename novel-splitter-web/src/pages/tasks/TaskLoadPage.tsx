@@ -17,7 +17,7 @@ export default function TaskLoadPage() {
     mutationFn: () => novelApi.loadNovel(novelId.trim(), { version: version.trim() || 'v1', force }),
     onSuccess: (r) => {
       setTaskId(r.taskId);
-      toast.success('Load 任务已提交');
+      toast.success('章节解析任务已提交');
     },
     onError: (e: unknown) => toast.error(getApiErrorMessage(e, '提交失败')),
   });
