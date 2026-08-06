@@ -33,12 +33,14 @@ public class SceneSemanticExtractor {
             - role: 场景功能，取值必须是 dialogue（对话）/ narration（叙事）/ action（动作）/ transition（过渡）之一
             严格按每个块的 Chunk ID 对应输出。
 
-            输出 Answer JSON（外层固定为 answer/citations/confidence 三个字段）：
+            输出 Answer JSON（外层固定为 answer/citations/confidence 三个字段），其中 answer 必须是「字符串」，其内容为转义后的 JSON 数组：
             {
-              "answer": "<JSON 数组字符串，每个元素形如 {\"id\":\"<Chunk ID>\",\"characters\":[\"角色1\"],\"location\":\"地点或null\",\"time\":\"时间或null\",\"role\":\"场景功能\"}，数组内双引号需转义>",
+              "answer": "[{\"id\":\"s1\",\"characters\":[\"萧炎\",\"药老\"],\"location\":\"乌坦城\",\"time\":null,\"role\":\"narration\"}]",
               "citations": [],
               "confidence": 1.0
             }
+            数组元素形如 {"id":"<Chunk ID>","characters":[...],"location":"...或null","time":"...或null","role":"..."}；
+            answer 的值是字符串（含转义的双引号），不是 JSON 数组本身。
             """;
 
     private final RobustLlmClient llmClient;
@@ -65,7 +67,7 @@ public class SceneSemanticExtractor {
         try {
             answer = llmClient.chat(prompt);
         } catch (Exception e) {
-            log.warn("抽取 LLM 调用失败（{} 个场景），降级为空: {}", scenes.size(), e.toString());
+            log.warn("抽取 LLM 调用失败或返回格式不符合 Answer 契约（{} 个场景），降级为空: {}", scenes.size(), e.toString());
             return List.of();
         }
         String payload = answer != null ? answer.getAnswer() : null;
