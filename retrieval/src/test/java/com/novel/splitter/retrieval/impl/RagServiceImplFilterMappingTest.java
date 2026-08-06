@@ -1,8 +1,6 @@
 package com.novel.splitter.retrieval.impl;
 
-import com.novel.splitter.domain.model.Scene;
 import com.novel.splitter.retrieval.api.AnswerPolicyClassifier;
-import com.novel.splitter.retrieval.api.RagRetrievalService;
 import com.novel.splitter.retrieval.api.RetrievalService;
 import com.novel.splitter.retrieval.config.RagProperties;
 import com.novel.splitter.retrieval.dto.RagRequest;
@@ -11,8 +9,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
-
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.anyInt;

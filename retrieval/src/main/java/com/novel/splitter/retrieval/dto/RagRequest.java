@@ -52,9 +52,9 @@ public class RagRequest {
     /** 按出场人物过滤（需 retrieval.structured-filter.enabled 打开） */
     private String characterFilter;
 
-    /** 按故事地点过滤 */
+    /** 按故事地点过滤（需 retrieval.structured-filter.enabled 打开） */
     private String locationFilter;
 
-    /** 按故事时间过滤 */
+    /** 按故事时间过滤（需 retrieval.structured-filter.enabled 打开） */
     private String timeFilter;
 }
