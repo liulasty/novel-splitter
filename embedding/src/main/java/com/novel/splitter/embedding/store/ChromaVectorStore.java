@@ -164,8 +164,9 @@ public class ChromaVectorStore implements VectorStore {
 
     /**
      * 与写入、{@code where} 删除、检索过滤对齐的必填 metadata；缺失则拒绝写入以免产生「查不到也不报错」的脏数据。
+     * <p>包可见（非 private）：供测试直接构造校验结构化键的写入逻辑。</p>
      */
-    private Map<String, Object> buildChromaMetadata(Scene s) {
+    Map<String, Object> buildChromaMetadata(Scene s) {
         Map<String, Object> map = new HashMap<>();
         if (s.getMetadata() != null) {
             if (s.getMetadata().getNovel() != null) {
@@ -182,6 +183,19 @@ public class ChromaVectorStore implements VectorStore {
             }
             if (s.getMetadata().getSequenceNum() != null) {
                 map.put("sequenceNum", s.getMetadata().getSequenceNum());
+            }
+            // 可选语义分析键：字段为 null（或 characters 为空列表）则不写入，不参与必填校验
+            if (s.getMetadata().getRole() != null) {
+                map.put("role", s.getMetadata().getRole());
+            }
+            if (s.getMetadata().getLocation() != null) {
+                map.put("location", s.getMetadata().getLocation());
+            }
+            if (s.getMetadata().getTime() != null) {
+                map.put("time", s.getMetadata().getTime());
+            }
+            if (s.getMetadata().getCharacters() != null && !s.getMetadata().getCharacters().isEmpty()) {
+                map.put("characters", s.getMetadata().getCharacters());
             }
         }
         map.put("chapterIndex", s.getChapterIndex());
