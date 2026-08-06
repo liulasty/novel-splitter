@@ -110,4 +110,21 @@ class VectorRetrievalServiceFilterTest {
         verify(vectorStore).search(any(float[].class), eq(5), captor.capture(), anyString());
         assertFalse(captor.getValue().containsKey("role"));
     }
+
+    @Test
+    void retrieve_skipsBlankStructuredFilters() {
+        ReflectionTestUtils.setField(service, "structuredFilterEnabled", true);
+        RetrievalQuery query = query();
+        query.setCharacterFilter("  ");
+        query.setLocationFilter("");
+        stubSearch();
+
+        service.retrieve(query);
+
+        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
+        verify(vectorStore).search(any(float[].class), eq(5), captor.capture(), anyString());
+        Map<String, Object> filter = captor.getValue();
+        assertFalse(filter.containsKey("characters"));
+        assertFalse(filter.containsKey("location"));
+    }
 }
