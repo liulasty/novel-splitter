@@ -58,7 +58,7 @@ public class VectorRetrievalService implements RetrievalService {
             throw new IllegalArgumentException("TopK must be greater than or equal to 1");
         }
 
-        log.info("Processing retrieval query: '{}' (topK={})", query.getQuestion(), query.getTopK());
+        log.info("处理检索查询: '{}' (topK={})", query.getQuestion(), query.getTopK());
 
         final String novelId = query.getNovelId();
         final String version = resolveVersion(novelId, query.getVersion());
@@ -68,7 +68,7 @@ public class VectorRetrievalService implements RetrievalService {
         if (novelId != null && !novelId.isBlank() && version != null && !version.isBlank()) {
             collectionName = VectorStore.collectionNameFor(novelId, version);
             if (!vectorStore.collectionExists(collectionName)) {
-                log.warn("Vector collection {} not found for novelId={} version={}, returning empty results",
+                log.warn("向量集合 {} 不存在（novelId={} version={}），返回空结果",
                         collectionName, novelId, version);
                 return Collections.emptyList();
             }
@@ -111,7 +111,7 @@ public class VectorRetrievalService implements RetrievalService {
             filter.put(META_CHUNK_OVERLAP, chunkOverlap);
         }
 
-        log.info("Executing vector search with filter: {} collection={}", filter,
+        log.info("执行向量搜索，过滤条件: {} 集合: {}", filter,
                 collectionName != null ? collectionName : "(default)");
 
         // 执行向量搜索（降级：异常时返回空）
@@ -123,10 +123,10 @@ public class VectorRetrievalService implements RetrievalService {
                 records = vectorStore.search(queryVector, query.getTopK(), filter);
             }
         } catch (Exception e) {
-            log.warn("Vector search failed for collection {}: {}", collectionName, e.toString());
+            log.warn("向量搜索失败，集合 {}: {}", collectionName, e.toString());
             return Collections.emptyList();
         }
-        log.debug("Found {} vector matches", records.size());
+        log.debug("找到 {} 条向量匹配结果", records.size());
 
         // 3. Hydrate (Vector -> Scene)：将向量搜索结果还原为包含完整文本的 Scene 实体
         // 按小说和版本对记录进行分组，以尽量减少磁盘或数据库 IO 操作
@@ -138,7 +138,7 @@ public class VectorRetrievalService implements RetrievalService {
             Map<String, Object> meta = record.getMetadata();
             // 校验元数据完整性，缺少必要信息则跳过该记录
             if (meta == null || !meta.containsKey(META_NOVEL_ID) || !meta.containsKey(META_VERSION)) {
-                log.warn("Vector record {} missing metadata (novelId/version), skipping hydration", record.getChunkId());
+                log.warn("向量记录 {} 缺少元数据（novelId/version），跳过 Hydrate", record.getChunkId());
                 continue;
             }
             String key = meta.get(META_NOVEL_ID) + KEY_SEPARATOR + meta.get(META_VERSION);
@@ -160,7 +160,7 @@ public class VectorRetrievalService implements RetrievalService {
                     .collect(Collectors.toMap(Scene::getId, s -> s, (v1, v2) -> v1));
         }
 
-        // Hydrate scenes and track failures：装配 Scene 并记录可能失败的分组
+        // 装配 Scene 并跟踪失败：记录可能失败的分组
         Map<String, Scene> hydratedScenes = new HashMap<>();
         List<String> failedGroups = new ArrayList<>();
 
@@ -186,17 +186,17 @@ public class VectorRetrievalService implements RetrievalService {
                             hydratedScenes.put(targetId, s);
                         }
                     } else {
-                        log.warn("Scene {} not found for novelId={} version={}", targetId, groupNovelId, groupVersion);
+                        log.warn("未找到 Scene {}（novelId={} version={}）", targetId, groupNovelId, groupVersion);
                     }
                 }
             } catch (Exception e) {
-                log.error("Failed to load scenes for novelId={} version={}", groupNovelId, groupVersion, e);
+                log.error("加载 Scene 失败（novelId={} version={}）", groupNovelId, groupVersion, e);
                 failedGroups.add(groupNovelId + "/" + groupVersion);
             }
         }
 
         if (!failedGroups.isEmpty()) {
-            log.warn("Hydration failed for the following novel/version groups: {}", String.join(", ", failedGroups));
+            log.warn("以下 novel/version 分组 Hydrate 失败: {}", String.join(", ", failedGroups));
         }
 
         // 根据向量搜索得到的原始分数排序，重建返回结果列表，并剔除重复的 Scene
@@ -229,11 +229,11 @@ public class VectorRetrievalService implements RetrievalService {
         try {
             Novel novel = novelRepository.findById(novelId).orElse(null);
             if (novel != null && novel.getActiveVersionTag() != null && !novel.getActiveVersionTag().isBlank()) {
-                log.debug("Resolved active version {} for novel {}", novel.getActiveVersionTag(), novelId);
+                log.debug("已解析活动版本 {}，小说: {}", novel.getActiveVersionTag(), novelId);
                 return novel.getActiveVersionTag();
             }
         } catch (Exception e) {
-            log.warn("Failed to resolve active version for novel {}: {}", novelId, e.toString());
+            log.warn("解析小说 {} 的活动版本失败: {}", novelId, e.toString());
         }
         return null;
     }

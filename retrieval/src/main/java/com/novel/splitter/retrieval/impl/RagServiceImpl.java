@@ -36,7 +36,7 @@ public class RagServiceImpl implements RagRetrievalService {
         String novelId = request.getNovelId();
         String version = request.getVersion();
 
-        log.info("Retrieval request: question='{}', topK={}, novelId={}, version={}, chunk={}/{}",
+        log.info("检索请求: question='{}', topK={}, novelId={}, version={}, chunk={}/{}",
                 question, topK, novelId, version, request.getChunkSize(), request.getChunkOverlap());
 
         int currentChapter = -1;
