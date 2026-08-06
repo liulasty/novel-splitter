@@ -46,9 +46,9 @@
 `SceneReScorer` 两条打分路径各加 quality 混合项：
 
 - ONNX 重排路径（`:71-73`）：`final = rerankScore × (1-w) + qualityScore × w`
-- 启发式路径（`:88`）：`final = 0.5×向量 + 0.2×关键词 + 0.2×实体 + 0.1×质量 - 长度惩罚`
+- 启发式路径（`:88`）：`final = 0.6×向量 + 0.2×关键词 + 0.1×实体 + 0.1×质量 - 长度惩罚`（质量顶替实体权重的一半：0.2 → 0.1+0.1，向量与关键词权重不动）
 
-配置：`AssemblerConfig` 新增 `qualityScoreWeight`（默认 0.15），请求可覆盖。
+配置：`AssemblerConfig` 新增 `qualityScoreWeight`（默认 0.15），请求可覆盖。**注意：启发式路径的质量权重固定 0.1，不受 `qualityScoreWeight` 影响；该配置只作用于 ONNX 路径**（ONNX 路径无固定权重预算，由配置直接混合）。
 
 防护：
 - `qualityScore == SCORE_NOT_COMPUTED`（`SceneQualityScoreWriter.java:39` 空白文本哨兵值）时跳过混合，保持原分数。
@@ -77,6 +77,8 @@ chunk 分区参数从命中场景的 `metadata.chunkSize/chunkOverlap` 取（不
 - `assembler.expand-across-chapters`（默认 false）
 
 总量由下游 `TokenBudgetAllocator` 兜底，不会爆 token。
+
+**与合并阶段的交互**：扩展邻居与锚点 seq 连续，后续 `SceneMerger` 大概率因段落 gap 满足条件（`SceneMerger.java:74-84`）而自动合并，属预期行为，合并时沿用已衰减的分数，无需特殊处理。
 
 ### 1.3 prefixContext 组装补缝
 
@@ -128,7 +130,7 @@ chunk 分区参数从命中场景的 `metadata.chunkSize/chunkOverlap` 取（不
 - **幂等性已核实**：embed 流程按 sceneId upsert 覆盖 + 断点续传，重跑不产生重复数据、不残留浮空向量。
 - **唯一风险——短暂向量一致性窗口**：逐批覆盖期间集合内新旧向量并存，排序有轻微波动。缓解：仅管理员触发、可低峰期执行、秒级到分钟级窗口对内部工具可接受。
 - **审计**：重嵌入前日志记录本次 `embedRunId` 与操作人，异常可基于 runId 排查，不额外开发回滚能力。
-- 触发：复用现有 `POST /api/novels/{novelId}/embed`（`NovelController.java:204`）。顺序上先 2A 再 2B，确定性达成。
+- 触发：复用现有版本级端点 `POST /api/novels/{novelId}/versions/{versionTag}/embed`（`NovelController.java:263`），对指定版本触发重嵌入，避免波及同小说其他版本（尤其不同切分参数的版本）。顺序上先 2A 再 2B，确定性达成。
 
 ---
 
