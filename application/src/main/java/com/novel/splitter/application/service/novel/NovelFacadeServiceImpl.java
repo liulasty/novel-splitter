@@ -110,7 +110,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
     public List<NovelStatRecordDto> getNovelStats() {
         List<SceneCountByProfile> sceneCounts = sceneRepository.countScenesByNovelVersionAndChunk();
 
-        // novelId -> (profile label -> scene count)
+        // novelId -> (profile 标签 -> 场景数)
         Map<String, Map<String, Long>> novelProfileCounts = new HashMap<>();
         for (SceneCountByProfile row : sceneCounts) {
             String novelId = row.novelId();
@@ -128,7 +128,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         }
 
         List<SplitTask> allTasks = taskService.getAllTasks();
-        // Group tasks by novelId
+        // 按 novelId 分组任务
         Map<String, List<SplitTask>> tasksByNovel = allTasks.stream()
                 .filter(t -> t.getNovelId() != null)
                 .collect(Collectors.groupingBy(SplitTask::getNovelId));
@@ -146,7 +146,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
 
         List<NovelStatRecordDto> stats = new ArrayList<>();
 
-        // Merge data
+        // 合并数据
         for (Map.Entry<String, Map<String, Long>> entry : novelProfileCounts.entrySet()) {
             String novelId = entry.getKey();
             Map<String, Long> profileMap = entry.getValue();
@@ -155,7 +155,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
             Collections.sort(versions);
             long totalScenes = profileMap.values().stream().mapToLong(Long::longValue).sum();
 
-            // Get latest task for this novel
+            // 获取该小说最近一次任务
             List<SplitTask> novelTasks = tasksByNovel.getOrDefault(novelId, Collections.emptyList());
             SplitTask latestTask = novelTasks.stream()
                     .max(Comparator.comparing(SplitTask::getCreatedAt))
@@ -177,14 +177,14 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
                     .novelName(titleForDisplay)
                     .versions(versions)
                     .sceneCount(totalScenes)
-                    .vectorCount(totalScenes) // Assume 1 scene = 1 vector
+                    .vectorCount(totalScenes) // 假设 1 个场景 = 1 个向量
                     .ingestTime(ingestTime)
                     .status(status)
                     .build();
             stats.add(dto);
         }
 
-        // Add novels that have tasks but no scenes yet
+        // 补充有任务但还没有场景数据的小说
         for (Map.Entry<String, List<SplitTask>> entry : tasksByNovel.entrySet()) {
             String novelId = entry.getKey();
             if (!novelTitles.containsKey(novelId)) {
@@ -333,7 +333,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
                 request != null ? request.getChunkSize() : null,
                 request != null ? request.getChunkOverlap() : null);
         dto.setMessage("场景切分重试已提交到队列（跳过章节解析）");
-        log.info("Sent taskId {} to split queue for retrySplit", dto.getTaskId());
+        log.info("重试切分任务已投递 Split 队列, taskId={}", dto.getTaskId());
         return dto;
     }
 
@@ -356,7 +356,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         message.setRecognitionStrategy(request != null ? request.getStrategy() : null);
         message.setTaskTypeForRecovery(TaskType.LOAD.name());
         taskQueuePort.sendLoad(message);
-        log.info("Sent taskId {} to load queue (standalone LOAD, strategy={})", taskId,
+        log.info("独立 LOAD 任务已投递 Load 队列, taskId={}, strategy={}", taskId,
                 request != null ? request.getStrategy() : "CN_CHAPTER");
 
         return TaskSubmitResponseDto.builder()
@@ -391,7 +391,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         taskService.createEmbedTaskWithNovelAdmission(taskId, nid, v, chunkSize, chunkOverlap);
 
         embedPipelineOrchestrator.startNewEmbedRun(taskId, nid, v, chunkSize, chunkOverlap);
-        log.info("Embed orchestration started taskId {}", taskId);
+        log.info("向量化编排已启动, taskId={}", taskId);
 
         return TaskSubmitResponseDto.builder()
                 .message("向量化任务已提交（编排已启动）")
@@ -485,7 +485,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         message.setTaskTypeForRecovery(TaskType.CHAPTER_PARSE.name());
         message.setChapterTitleRegex(trimToNull(request.getChapterTitleRegex()));
         taskQueuePort.sendLoad(message);
-        log.info("Sent taskId {} to load queue", taskId);
+        log.info("任务已投递 Load 队列, taskId={}", taskId);
 
         log.info("入库任务已发送到队列, taskId: {}", taskId);
         return TaskSubmitResponseDto.builder()
@@ -571,7 +571,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         }
         String id = novelId.trim();
         taskService.ensureNoActiveTasksForNovelLocked(id, "Novel has running tasks; cannot delete right now.");
-        // Soft delete novel row first; also soft delete chapters/scenes for visibility.
+        // 先软删除小说行；同时软删章节/场景以保证可见性。
         novelService.softDeleteNovel(id);
         chapterRepository.deleteByNovelId(id);
         sceneRepository.deleteNovelById(id);
@@ -625,7 +625,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
                 .updatedAt(now)
                 .build();
         novelVersionRepository.save(version);
-        log.info("Created version {}/{} strategy={} chunk={}/{}", id, versionTag, strategy, chunkSize, chunkOverlap);
+        log.info("已创建版本 {}/{} strategy={} chunk={}/{}", id, versionTag, strategy, chunkSize, chunkOverlap);
         return toVersionDto(version, novel != null ? novel.getActiveVersionTag() : null);
     }
 
@@ -681,7 +681,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         knowledgeBaseService.deleteSplitProfileByNovelId(id, tag, chunkSize, chunkOverlap, false);
         // 兜底删除 novel_version 行（现有删除流程不覆盖该表）
         novelVersionRepository.delete(id, tag);
-        log.info("Deleted version {}/{}", id, tag);
+        log.info("已删除版本 {}/{}", id, tag);
     }
 
     @Override

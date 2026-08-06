@@ -59,7 +59,7 @@ public class DownloadService {
                         .build();
                 
                 downloaderFactory.registerGeneralRule(rule);
-                log.info("Registered downloader for domain: {}", rule.getDomain());
+                log.info("已注册域名 {} 的下载器", rule.getDomain());
             }
         }
         
@@ -77,7 +77,7 @@ public class DownloadService {
     public String downloadNovel(String url, String saveName) {
         // 1. 获取下载器
         NovelDownloader downloader = downloaderFactory.getDownloader(url);
-        log.info("Using downloader: {}", downloader.getClass().getSimpleName());
+        log.info("使用下载器：{}", downloader.getClass().getSimpleName());
 
         // 2. 执行下载
         List<DownloadChapter> chapters = downloader.download(url);
@@ -99,12 +99,12 @@ public class DownloadService {
 
         try {
             String safeName = name.replaceAll("[\\\\/:*?\"<>|]", "_");
-            // Keep downloads under configured raw-dir-name to avoid scattering raw storage conventions.
+            // 将下载内容放在配置的 raw-dir-name 下，避免破坏原始存储目录约定。
             String relativePath = appConfig.getStorage().getRawDirName() + "/_downloads/" + safeName + ".txt";
             try (InputStream in = new java.io.ByteArrayInputStream(sb.toString().getBytes(StandardCharsets.UTF_8))) {
                 fileStoragePort.write(relativePath, in, true);
             }
-            log.info("Saved downloaded novel to: {}", relativePath);
+            log.info("已保存下载的小说至：{}", relativePath);
             return relativePath;
         } catch (IOException e) {
             throw new RuntimeException("Failed to save downloaded novel", e);

@@ -285,7 +285,7 @@ public class TaskService {
             taskRepository.save(task);
             appendTaskEvent(task);
 
-            // Put task progress to cache for polling
+            // 将任务进度写入缓存供轮询读取
             if (status == SplitTask.TaskStatus.SUCCESS || status == SplitTask.TaskStatus.FAILED) {
                 taskCachePort.evict(taskId);
             } else {
@@ -301,9 +301,9 @@ public class TaskService {
     }
 
     /**
-     * Deletes {@link SplitTask.TaskStatus#SUCCESS} and {@link SplitTask.TaskStatus#FAILED} rows for the novel,
-     * plus matching {@code task_events}. Never touches {@code PENDING} / {@code PROCESSING}.
-     * Call only after confirming no active tasks if the surrounding operation requires that invariant.
+     * 删除该小说的 {@link SplitTask.TaskStatus#SUCCESS} 与 {@link SplitTask.TaskStatus#FAILED} 行，
+     * 以及对应的 {@code task_events}。绝不触碰 {@code PENDING} / {@code PROCESSING}。
+     * 仅在外围操作要求「无进行中任务」不变式且已确认无活动任务时调用。
      */
     @Transactional
     public int purgeTerminalSplitTasksForNovel(String novelId) {
@@ -315,8 +315,8 @@ public class TaskService {
     }
 
     /**
-     * Like {@link #purgeTerminalSplitTasksForNovel(String)} but only tasks whose stored {@code version} matches.
-     * Chunk size/overlap are not on {@link SplitTask}; any terminal task with the same version string is removed.
+     * 类似 {@link #purgeTerminalSplitTasksForNovel(String)}，但只清理存储 {@code version} 匹配的任务。
+     * {@link SplitTask} 上没有 chunk size/overlap 字段；凡 version 字符串相同的终态任务都会被删除。
      */
     @Transactional
     public int purgeTerminalSplitTasksForNovelAndVersion(String novelId, String version) {
@@ -394,19 +394,19 @@ public class TaskService {
     }
 
     public void submitLoadTask(String novelId) {
-        // Implementation provided by LoadWorker or RabbitMQ sending, kept interface compatible
+        // 由 LoadWorker 或 RabbitMQ 发送实现，此处保留接口兼容
     }
 
     public void submitSplitTask(String novelId) {
-        // Implementation provided by LoadWorker or RabbitMQ sending, kept interface compatible
+        // 由 LoadWorker 或 RabbitMQ 发送实现，此处保留接口兼容
     }
 
     public void submitEmbedTask(String novelId) {
-        // Implementation provided by LoadWorker or RabbitMQ sending, kept interface compatible
+        // 由 LoadWorker 或 RabbitMQ 发送实现，此处保留接口兼容
     }
 
     public void submitCleanupTask(String novelId) {
-        // Implementation provided by LoadWorker or RabbitMQ sending, kept interface compatible
+        // 由 LoadWorker 或 RabbitMQ 发送实现，此处保留接口兼容
     }
 
     private PollResponse toPollResponse(SplitTask task) {

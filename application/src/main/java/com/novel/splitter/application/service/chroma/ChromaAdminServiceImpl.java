@@ -41,7 +41,7 @@ public class ChromaAdminServiceImpl implements ChromaAdminService {
         return outputStream -> {
             try (JsonGenerator jsonGenerator = objectMapper.getFactory().createGenerator(outputStream)) {
                 jsonGenerator.writeStartArray();
-                // Simple implementation fetching lists, could be optimized via streaming in Repository
+                // 简单实现：直接拉取列表，后续可改为在 Repository 中流式查询以优化
                 if (novelName == null || novelName.isBlank()) {
                     throw new IllegalArgumentException("novelName must not be blank");
                 }
@@ -98,7 +98,7 @@ public class ChromaAdminServiceImpl implements ChromaAdminService {
             String result = chromaApiClient.getString("/api/v2/healthcheck");
             return Map.of("status", "ok", "result", result != null ? result : "ok");
         } catch (Exception e) {
-            log.error("Healthcheck failed", e);
+            log.error("健康检查失败", e);
             return Map.of("status", "error", "error", e.getMessage());
         }
     }
@@ -120,9 +120,9 @@ public class ChromaAdminServiceImpl implements ChromaAdminService {
 
         try {
             chromaApiClient.delete(pathPrefix + "/" + collectionName);
-            log.info("Deleted ChromaDB collection: {}", collectionName);
+            log.info("已删除 ChromaDB 集合：{}", collectionName);
         } catch (Exception e) {
-            log.warn("Failed to delete collection (might not exist): {}", e.getMessage());
+            log.warn("删除集合失败（可能不存在）：{}", e.getMessage());
         }
 
         String space = chromaHnswSpace != null && !chromaHnswSpace.isBlank()
@@ -135,14 +135,14 @@ public class ChromaAdminServiceImpl implements ChromaAdminService {
         
         try {
             chromaApiClient.post(pathPrefix, body);
-            log.info("Created ChromaDB collection: {} with hnsw:space={}", collectionName, space);
+            log.info("已创建 ChromaDB 集合：{}，hnsw:space={}", collectionName, space);
         } catch (Exception e) {
-            log.error("Failed to create collection: {}", e.getMessage());
+            log.error("创建集合失败：{}", e.getMessage());
             throw new RuntimeException("Failed to recreate collection", e);
         }
 
         sceneRepository.deleteAll();
-        log.info("Cleared local DB scenes via collection rebuild logic");
+        log.info("集合重建逻辑已清空本地 DB 场景");
 
         return Map.of("message", "Collection rebuilt successfully");
     }
@@ -157,7 +157,7 @@ public class ChromaAdminServiceImpl implements ChromaAdminService {
         List<String> metadataKeys = new ArrayList<>();
 
         try {
-            // Find collection id (proxy returns raw JSON string, parse into proper objects)
+            // 查找集合 id（代理返回原始 JSON 字符串，需解析为对象）
             Object collectionsObj = parseJsonResponse(proxyGet("/api/v2/tenants/default_tenant/databases/default_database/collections"));
             String collectionId = null;
             if (collectionsObj instanceof List<?> list) {
@@ -181,7 +181,7 @@ public class ChromaAdminServiceImpl implements ChromaAdminService {
                 }
                 Map<String, Object> where = Map.of("$and", andClauses);
 
-                // Get count
+                // 获取数量
                 Map<String, Object> countBody = Map.of(
                         "where", where,
                         "include", List.of()
@@ -191,7 +191,7 @@ public class ChromaAdminServiceImpl implements ChromaAdminService {
                     chromaCount = ids.size();
                 }
 
-                // Get 1 record metadata
+                // 获取 1 条记录的元数据
                 Map<String, Object> metaBody = Map.of(
                         "where", where,
                         "limit", 1,
@@ -210,8 +210,8 @@ public class ChromaAdminServiceImpl implements ChromaAdminService {
                 }
             }
         } catch (Exception e) {
-            log.error("Failed to get chroma diagnostics for novel={}, version={}", novel, version, e);
-            // Optionally, we could set chromaCount = -1 to indicate error
+            log.error("获取 novel={} version={} 的 chroma 诊断信息失败", novel, version, e);
+            // 可选：可置 chromaCount = -1 以标识出错
         }
 
         ChromaVersionDiagnosticDto dto = new ChromaVersionDiagnosticDto();
@@ -260,13 +260,13 @@ public class ChromaAdminServiceImpl implements ChromaAdminService {
         return parseJsonResponse(extractBody(chromaApiClient.delete(path)));
     }
 
-    /** Parse a JSON string proxy response into a proper Java object (Map/List/etc.) */
+    /** 将 JSON 字符串形式的代理响应解析为合适的 Java 对象（Map/List 等） */
     private Object parseJsonResponse(Object proxyResult) {
         if (proxyResult instanceof String json) {
             try {
                 return objectMapper.readValue(json, Object.class);
             } catch (Exception e) {
-                log.warn("Failed to parse proxy response as JSON, returning raw string", e);
+                log.warn("将代理响应解析为 JSON 失败，返回原始字符串", e);
                 return proxyResult;
             }
         }

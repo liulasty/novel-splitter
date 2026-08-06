@@ -70,7 +70,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
             }
             @Override
             public String getType() {
-                return scene.getChapterTitle(); // Using chapterTitle as type hack from JpaImpl
+                return scene.getChapterTitle(); // 复用 chapterTitle 作为 type 的 hack，与 JpaImpl 保持一致
             }
             @Override
             public Integer getTokenCount() {
@@ -119,7 +119,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Novel has running tasks; cannot delete version right now.");
         }
 
-        log.info("Logical deleting split profile: novelId={} version={} chunk={}/{}", novelId, version, chunkSize, chunkOverlap);
+        log.info("逻辑删除切分数据集: novelId={} version={} chunk={}/{}", novelId, version, chunkSize, chunkOverlap);
         sceneRepository.deleteByProfile(novelId, version, chunkSize, chunkOverlap);
         if (version != null && !version.isBlank()) {
             novelVersionRepository.delete(novelId, version.trim());
@@ -145,7 +145,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                 .build();
         
         applicationEventPublisher.publishEvent(new CleanupTaskCreatedEvent(message));
-        log.info("Published cleanup event for cleanup task {}", savedTask.getId());
+        log.info("已发布清理事件, cleanup task={}", savedTask.getId());
         maybePurgeTerminalSplitTasks(novelId, version != null ? version.trim() : null, purgeTerminalSplitTasks);
         return savedTask.getId();
     }
@@ -160,7 +160,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         if (taskService.hasActiveTasksForNovelId(novelId)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Novel has running tasks; cannot delete knowledge base right now.");
         }
-        log.info("Logical deleting knowledge base for novelId={} title={}", novelId, normalizedNovelName);
+        log.info("逻辑删除知识库: novelId={} title={}", novelId, normalizedNovelName);
         List<String> versionCollections = collectVersionCollections(novelId);
         sceneRepository.deleteNovelById(novelId);
         novelVersionRepository.deleteByNovelId(novelId);
@@ -182,7 +182,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                 .build();
         
         applicationEventPublisher.publishEvent(new CleanupTaskCreatedEvent(message));
-        log.info("Published cleanup event for cleanup task {}", savedTask.getId());
+        log.info("已发布清理事件, cleanup task={}", savedTask.getId());
         maybePurgeTerminalSplitTasks(novelId, null, purgeTerminalSplitTasks);
         return savedTask.getId();
     }
@@ -202,7 +202,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                 .map(n -> n.getTitle() != null && !n.getTitle().isBlank() ? n.getTitle() : n.getId())
                 .orElse(normalizedNovelId);
 
-        log.info("Logical deleting knowledge base by novelId: {} (name='{}')", normalizedNovelId, novelName);
+        log.info("按 novelId 逻辑删除知识库: {} (name='{}')", normalizedNovelId, novelName);
         List<String> versionCollections = collectVersionCollections(normalizedNovelId);
         sceneRepository.deleteNovelById(normalizedNovelId);
         novelVersionRepository.deleteByNovelId(normalizedNovelId);
@@ -224,7 +224,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                 .build();
 
         applicationEventPublisher.publishEvent(new CleanupTaskCreatedEvent(message));
-        log.info("Published cleanup event for cleanup task {} for novelId {}", savedTask.getId(), normalizedNovelId);
+        log.info("已发布清理事件, cleanup task={}, novelId={}", savedTask.getId(), normalizedNovelId);
         maybePurgeTerminalSplitTasks(normalizedNovelId, null, purgeTerminalSplitTasks);
         return savedTask.getId();
     }
@@ -279,7 +279,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         }
 
         String trimmedVersion = version.trim();
-        log.info("Logical deleting split profile by novelId: {} version={} chunk={}/{}", normalizedNovelId, trimmedVersion, chunkSize, chunkOverlap);
+        log.info("按 novelId 逻辑删除切分数据集: {} version={} chunk={}/{}", normalizedNovelId, trimmedVersion, chunkSize, chunkOverlap);
         String novelNameForVectors = novelRepository.findById(normalizedNovelId)
                 .map(n -> n.getTitle() != null && !n.getTitle().isBlank() ? n.getTitle() : n.getId())
                 .orElse(normalizedNovelId);
@@ -306,7 +306,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
                 .build();
 
         applicationEventPublisher.publishEvent(new CleanupTaskCreatedEvent(message));
-        log.info("Published cleanup event for cleanup task {} for novelId {} profile {}", savedTask.getId(), normalizedNovelId, trimmedVersion);
+        log.info("已发布清理事件, cleanup task={}, novelId={}, profile={}", savedTask.getId(), normalizedNovelId, trimmedVersion);
         maybePurgeTerminalSplitTasks(normalizedNovelId, trimmedVersion, purgeTerminalSplitTasks);
         return savedTask.getId();
     }
@@ -317,7 +317,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         try {
             rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE_NAME, "cleanup", message);
         } catch (Exception e) {
-            log.error("Failed to send cleanup task {} to MQ after commit", message.getCleanupTaskId(), e);
+            log.error("事务提交后发送清理任务 {} 到 MQ 失败", message.getCleanupTaskId(), e);
             cleanupTaskRepository.findById(message.getCleanupTaskId()).ifPresent(task -> {
                 task.setStatus("FAILED");
                 task.setErrorMessage("MQ send failed: " + e.getMessage());
@@ -333,7 +333,7 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         int removed = versionOrNull == null || versionOrNull.isEmpty()
                 ? taskService.purgeTerminalSplitTasksForNovel(novelId)
                 : taskService.purgeTerminalSplitTasksForNovelAndVersion(novelId, versionOrNull);
-        log.info("purgeTerminalSplitTasks removed {} rows for novelId={} versionFilter={}", removed, novelId, versionOrNull);
+        log.info("purgeTerminalSplitTasks 清理了 {} 行, novelId={}, versionFilter={}", removed, novelId, versionOrNull);
     }
 
     private static SceneSplitProfileDto toProfileDto(SceneSplitProfile p) {

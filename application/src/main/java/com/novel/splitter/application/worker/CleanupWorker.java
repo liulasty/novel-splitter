@@ -39,7 +39,7 @@ public class CleanupWorker {
     @RabbitListener(queues = RabbitConfig.CLEANUP_TASK_QUEUE, concurrency = "1")
     public void handleCleanupTask(CleanupTaskMessage message) {
         log.info(
-                "Received cleanup task for: type={}, targetId={}, novelId={}, novelName={}, version={}",
+                "收到清理任务：type={}, targetId={}, novelId={}, novelName={}, version={}",
                 message.getTargetType(),
                 message.getTargetId(),
                 message.getNovelId(),
@@ -49,13 +49,13 @@ public class CleanupWorker {
         
         Optional<CleanupTask> taskOpt = cleanupTaskRepository.findById(message.getCleanupTaskId());
         if (taskOpt.isEmpty()) {
-            log.warn("Cleanup task {} not found in database, skipping", message.getCleanupTaskId());
+            log.warn("清理任务 {} 在数据库中不存在，跳过", message.getCleanupTaskId());
             return;
         }
         
         CleanupTask task = taskOpt.get();
         if (!"PENDING".equals(task.getStatus()) && !"FAILED".equals(task.getStatus())) {
-            log.info("Cleanup task {} is already in status {}, skipping", task.getId(), task.getStatus());
+            log.info("清理任务 {} 已处于状态 {}，跳过", task.getId(), task.getStatus());
             return;
         }
 
@@ -77,7 +77,7 @@ public class CleanupWorker {
                     filterByNovelId.put("chunkOverlap", message.getChunkOverlap());
                 }
                 if (novelId != null && version != null) {
-                    log.info("Physically deleting ChromaDB vectors for novelId={} version={} filter={}", novelId, version, filterByNovelId);
+                    log.info("物理删除 novelId={} version={} filter={} 的 ChromaDB 向量", novelId, version, filterByNovelId);
                     vectorStore.delete(filterByNovelId);
                 }
                 if (novelName != null && version != null) {
@@ -88,13 +88,13 @@ public class CleanupWorker {
                         filterByName.put("chunkSize", message.getChunkSize());
                         filterByName.put("chunkOverlap", message.getChunkOverlap());
                     }
-                    log.info("Physically deleting ChromaDB vectors for novel='{}' version={}", novelName, version);
+                    log.info("物理删除 novel='{}' version={} 的 ChromaDB 向量", novelName, version);
                     vectorStore.delete(filterByName);
                 }
                 // 按专属集合整删（多集合版本化后的主路径）
                 if (novelId != null && version != null) {
                     String collectionName = VectorStore.collectionNameFor(novelId, version);
-                    log.info("Deleting version collection '{}' (novelId={} version={})", collectionName, novelId, version);
+                    log.info("删除版本专属集合 '{}'（novelId={} version={}）", collectionName, novelId, version);
                     vectorStore.deleteByCollection(collectionName);
                 }
             } else if ("NOVEL".equals(message.getTargetType())) {
@@ -102,7 +102,7 @@ public class CleanupWorker {
                 if (novelName == null) {
                     throw new IllegalArgumentException("novelName must not be blank for NOVEL cleanup");
                 }
-                log.info("Physically deleting ChromaDB vectors for novel='{}'", novelName);
+                log.info("物理删除 novel='{}' 的 ChromaDB 向量", novelName);
                 vectorStore.delete(Map.of("novel", novelName));
 
                 deleteCapturedVersionCollections(message);
@@ -114,101 +114,101 @@ public class CleanupWorker {
                     throw new IllegalArgumentException("novelId must not be blank for NOVEL_ID cleanup");
                 }
 
-                // Delete vectors by novelId (preferred)
-                log.info("Physically deleting ChromaDB vectors for novelId={}", novelId);
+                // 按 novelId 删除向量（优先）
+                log.info("物理删除 novelId={} 的 ChromaDB 向量", novelId);
                 vectorStore.delete(Map.of("novelId", novelId));
 
-                // Backward compatibility: if we know a legacy novelName, also delete by novel
+                // 向后兼容：若已知旧版 novelName，也按 novel 删除
                 String novelName = firstNonBlank(message.getNovelName(), null);
                 if (novelName != null) {
-                    log.info("Physically deleting ChromaDB vectors (compat) for novel='{}'", novelName);
+                    log.info("物理删除 novel='{}' 的 ChromaDB 向量（兼容模式）", novelName);
                     vectorStore.delete(Map.of("novel", novelName));
                 }
 
                 // 整书删除：按删除时捕获的集合名整删（版本行已同步删除，无法再枚举）
                 deleteCapturedVersionCollections(message);
 
-                // Delete raw file using DB filePath if available; fallback to name-based deletion.
+                // 优先用 DB 中的 filePath 删除原始文件；否则回退为按名称删除。
                 deleteRawFileByNovelId(novelId, novelName);
             } else {
-                log.warn("Unknown targetType {} for cleanup task {}", message.getTargetType(), task.getId());
+                log.warn("未知 targetType {}，清理任务 {}", message.getTargetType(), task.getId());
             }
 
             task.setStatus("SUCCESS");
             cleanupTaskRepository.save(task);
-            log.info("Successfully completed cleanup task {}", task.getId());
+            log.info("清理任务 {} 已完成", task.getId());
 
         } catch (Exception e) {
-            log.error("Failed to process cleanup task " + task.getId(), e);
+            log.error("处理清理任务 " + task.getId() + " 失败", e);
             task.setStatus("FAILED");
             task.setErrorMessage(e.getMessage());
             cleanupTaskRepository.save(task);
             
-            // Re-throw to allow MQ to retry (based on retry policy)
+            // 重新抛出以让 MQ 重试（依据重试策略）
             throw new RuntimeException("Failed to process cleanup task", e);
         }
     }
 
     private void deleteRawFileByNovelId(String novelId, String fallbackNovelName) {
-        // Preferred: novelId-bound directory cleanup (raw + parsed)
+        // 优先：按 novelId 绑定的目录清理（raw + parsed）
         try {
             fileStoragePort.deleteTreeIfExists(rawDirName + "/" + novelId);
             fileStoragePort.deleteTreeIfExists(parsedDirName + "/" + novelId);
         } catch (Exception e) {
-            log.warn("Failed to delete novelId-bound directories for novelId={}, err={}", novelId, e.getMessage());
+            log.warn("删除 novelId={} 绑定的目录失败，err={}", novelId, e.getMessage());
         }
 
         try {
             Optional<Novel> novelOpt = novelRepository.findById(novelId);
             if (novelOpt.isPresent() && novelOpt.get().getFilePath() != null && !novelOpt.get().getFilePath().isBlank()) {
                 String relativeOrAbsolute = novelOpt.get().getFilePath();
-                // Prefer relative-path deletion; if absolute-path was stored historically, fall back to name-based deletion.
+                // 优先按相对路径删除；若历史存储的是绝对路径，则回退为按名称删除。
                 try {
                     String rel = fileStoragePort.toRelativePath(relativeOrAbsolute);
                     fileStoragePort.deleteIfExists(rel);
-                    log.info("Deleted raw file by filePath: {}", rel);
+                    log.info("已按 filePath 删除原始文件：{}", rel);
                     return;
                 } catch (Exception ignored) {
-                    // ignored, fallback below
+                    // 忽略，走下面的回退逻辑
                 }
             }
         } catch (Exception e) {
-            log.warn("Failed to delete raw file by novelId={}, falling back to name-based deletion. err={}", novelId, e.getMessage());
+            log.warn("按 novelId={} 删除原始文件失败，回退为按名称删除。err={}", novelId, e.getMessage());
         }
 
         if (fallbackNovelName != null) {
             deleteRawFileByName(fallbackNovelName);
         } else {
-            log.warn("No fallback novelName available for novelId={}", novelId);
+            log.warn("novelId={} 没有可用的回退 novelName", novelId);
         }
     }
 
     private void deleteRawFileByName(String novelName) {
         try {
-            // Legacy name-based deletion: raw/xxx.txt or storageRoot/xxx.txt
+            // 旧版按名称删除：raw/xxx.txt 或 storageRoot/xxx.txt
             boolean deleted = false;
             try {
                 fileStoragePort.deleteIfExists("raw/" + novelName + ".txt");
                 deleted = true;
             } catch (Exception ignored) {
-                // ignore
+                // 忽略
             }
             if (!deleted) {
                 try {
                     fileStoragePort.deleteIfExists(novelName + ".txt");
                     deleted = true;
                 } catch (Exception ignored) {
-                    // ignore
+                    // 忽略
                 }
             }
             
             if (deleted) {
-                log.info("Successfully deleted raw file for novel: {}", novelName);
+                log.info("已删除 novel: {} 的原始文件", novelName);
             } else {
-                log.warn("Raw file not found for deletion: {}", novelName);
+                log.warn("未找到待删除的原始文件：{}", novelName);
             }
         } catch (Exception e) {
-            log.error("Failed to delete raw file for novel: " + novelName, e);
+            log.error("删除 novel: " + novelName + " 的原始文件失败", e);
         }
     }
 
@@ -222,7 +222,7 @@ public class CleanupWorker {
             return;
         }
         for (String col : collectionNames) {
-            log.info("Deleting version collection '{}' (whole-novel cleanup)", col);
+            log.info("删除版本专属集合 '{}'（整书清理）", col);
             vectorStore.deleteByCollection(col);
         }
     }

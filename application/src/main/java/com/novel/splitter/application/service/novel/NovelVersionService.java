@@ -66,7 +66,7 @@ public class NovelVersionService {
                 .forEach(old -> {
                     old.setStatus(VersionStatus.EMBED_DONE);
                     novelVersionRepository.save(old);
-                    log.info("Downgraded old ACTIVE version {}/{} -> EMBED_DONE", novelId, old.getVersionTag());
+                    log.info("旧 ACTIVE 版本 {}/{} 已降级为 EMBED_DONE", novelId, old.getVersionTag());
                 });
 
         target.activate();
@@ -77,6 +77,6 @@ public class NovelVersionService {
         novel.setActiveVersionTag(versionTag);
         novelRepository.save(novel);
 
-        log.info("Activated version {}/{} -> ACTIVE (collection={})", novelId, versionTag, collectionName);
+        log.info("版本 {}/{} 已激活为 ACTIVE (collection={})", novelId, versionTag, collectionName);
     }
 }

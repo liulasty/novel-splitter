@@ -25,7 +25,7 @@ public class NovelStorageService {
     private final FileStoragePort fileStoragePort;
 
     public List<String> listNovels() throws IOException {
-        // Prefer configured rawDirName/{novelId}/{rawFilename}. Keep legacy root listing for compatibility.
+        // 优先使用配置的 rawDirName/{novelId}/{rawFilename}；为兼容保留旧的根目录列表。
         List<String> legacyRootTxt = fileStoragePort.listFiles("")
                 .stream()
                 .filter(name -> name.endsWith(".txt"))
@@ -34,7 +34,7 @@ public class NovelStorageService {
         List<String> rawNovelIds = fileStoragePort.listDirectories(appConfig.getStorage().getRawDirName());
         List<String> configuredRawPaths = rawNovelIds.stream().map(this::rawRelativePath).toList();
 
-        // Return configured paths first to nudge callers off legacy root fileName usage.
+        // 先返回配置路径，引导调用方摆脱旧的根目录 fileName 用法。
         return Stream.concat(configuredRawPaths.stream(), legacyRootTxt.stream()).distinct().toList();
     }
 
@@ -48,8 +48,8 @@ public class NovelStorageService {
     }
 
     /**
-     * Raw original relative path under storage root.
-     * Format: {rawDirName}/{novelId}/{rawFilename}
+     * 存储根目录下的原始原文相对路径。
+     * 格式：{rawDirName}/{novelId}/{rawFilename}
      */
     public String rawRelativePath(String novelId) {
         if (novelId == null || novelId.isBlank()) {
@@ -61,9 +61,9 @@ public class NovelStorageService {
     }
 
     /**
-     * Save novel raw text as {rawDirName}/{novelId}/{rawFilename} under storage root.
+     * 将小说原文保存为存储根目录下的 {rawDirName}/{novelId}/{rawFilename}。
      *
-     * @return stored relative path (e.g. novel-raw/{novelId}/original.txt)
+     * @return 存储后的相对路径（例如 novel-raw/{novelId}/original.txt）
      */
     public String saveNovelAsRawByNovelId(String novelId, InputStream content) throws IOException {
         if (content == null) {
@@ -96,7 +96,7 @@ public class NovelStorageService {
         try {
             fileStoragePort.deleteIfExists(fileName);
         } catch (IOException ignored) {
-            // Best-effort compensation only.
+            // 仅尽力补偿，不保证成功。
         }
     }
 

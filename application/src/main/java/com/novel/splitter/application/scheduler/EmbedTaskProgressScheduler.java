@@ -36,7 +36,7 @@ public class EmbedTaskProgressScheduler {
             try {
                 processOne(task);
             } catch (RuntimeException ex) {
-                log.warn("embed progress aggregate failed taskId={} : {}", task.getTaskId(), ex.toString());
+                log.warn("embed 进度聚合失败 taskId={} : {}", task.getTaskId(), ex.toString());
             }
         }
     }

@@ -21,7 +21,7 @@ public class ChapterServiceImpl implements ChapterService {
     public void saveChapters(List<Chapter> chapters) {
         if (chapters != null && !chapters.isEmpty()) {
             chapterRepository.saveAll(chapters);
-            log.info("Saved {} chapters in batch.", chapters.size());
+            log.info("已批量保存 {} 个章节。", chapters.size());
         }
     }
 
@@ -32,7 +32,7 @@ public class ChapterServiceImpl implements ChapterService {
         if (chapters != null && !chapters.isEmpty()) {
             chapterRepository.saveAll(chapters);
         }
-        log.info("Replaced chapters baseline for novel {} ({} chapters)", novelId,
+        log.info("已替换小说 {} 的章节基准 (共 {} 章)", novelId,
                 chapters != null ? chapters.size() : 0);
     }
 

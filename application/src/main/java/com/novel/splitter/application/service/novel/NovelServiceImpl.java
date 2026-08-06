@@ -31,7 +31,7 @@ public class NovelServiceImpl implements NovelService {
     public String createNovel(InputStream content, String originalFilename, String title, String author, String description) throws IOException {
         String novelId = UUID.randomUUID().toString();
 
-        // 1) DB-first: create record first with stable novelId + planned stored relative path
+        // 1) DB 优先：先用稳定的 novelId + 计划好的存储相对路径创建记录
         String storedRelativePath = novelStorageService.rawRelativePath(novelId);
         try {
             transactionTemplate.execute(status -> {
@@ -42,11 +42,11 @@ public class NovelServiceImpl implements NovelService {
             throw ex;
         }
 
-        // 2) Save file to local storage using novelId-based path
+        // 2) 基于 novelId 路径将文件保存到本地存储
         try {
             String actualStored = novelStorageService.saveNovelAsRawByNovelId(novelId, content);
             if (!storedRelativePath.equals(actualStored)) {
-                // Keep DB consistent with actual stored path
+                // 保持 DB 与实际存储路径一致
                 transactionTemplate.execute(status -> {
                     Novel n = novelRepository.findById(novelId).orElseThrow();
                     n.setFilePath(actualStored);
@@ -56,7 +56,7 @@ public class NovelServiceImpl implements NovelService {
                 });
             }
         } catch (RuntimeException | IOException ex) {
-            // Best-effort: mark the novel as deleted to keep DB-first list clean.
+            // 尽力而为：将小说标记为已删除，保持 DB 优先列表干净。
             transactionTemplate.execute(status -> {
                 novelRepository.findById(novelId).ifPresent(n -> {
                     n.setDeleted(true);
@@ -65,7 +65,7 @@ public class NovelServiceImpl implements NovelService {
                 });
                 return null;
             });
-            // Cleanup local file if partially written
+            // 若文件部分写入则清理本地文件
             novelStorageService.deleteNovelIfExists(storedRelativePath);
             throw ex;
         }
@@ -109,7 +109,7 @@ public class NovelServiceImpl implements NovelService {
                 .build();
 
         novelRepository.save(novel);
-        log.info("Saved novel entity to database, novelId: {}, title: {}", novelId, resolvedTitle);
+        log.info("小说实体已保存到数据库, novelId: {}, title: {}", novelId, resolvedTitle);
     }
 
     /**
@@ -196,7 +196,7 @@ public class NovelServiceImpl implements NovelService {
                 
         novel.updateStatus(status);
         novelRepository.save(novel);
-        log.info("Updated novel {} status to {}", novelId, status);
+        log.info("小说 {} 状态已更新为 {}", novelId, status);
     }
 
     @Override
@@ -225,6 +225,6 @@ public class NovelServiceImpl implements NovelService {
         novel.setDeleted(true);
         novel.setUpdatedAt(System.currentTimeMillis());
         novelRepository.save(novel);
-        log.info("Soft deleted novel {}", novelId);
+        log.info("已软删除小说 {}", novelId);
     }
 }

@@ -45,18 +45,18 @@ public class EmbedPipelineOrchestrator {
     public void startNewEmbedRun(String taskId, String novelId, String version, Integer chunkSize, Integer chunkOverlap) {
         SplitTask task = taskService.getTask(taskId);
         if (task == null) {
-            log.warn("Skip embed orchestration: task row gone (stale MQ after purge/delete?). taskId={}", taskId);
+            log.warn("跳过 embed 编排：任务行已不存在（可能是 purge/删除后遗留的过期 MQ 消息）。taskId={}", taskId);
             return;
         }
         if (task.getStatus() == SplitTask.TaskStatus.SUCCESS || task.getStatus() == SplitTask.TaskStatus.FAILED) {
-            log.warn("Skip embed orchestration for terminal task {} status {}", taskId, task.getStatus());
+            log.warn("任务 {} 已处于终态 {}，跳过 embed 编排", taskId, task.getStatus());
             return;
         }
         if (task.getStatus() == SplitTask.TaskStatus.PROCESSING
                 && task.getCurrentEmbedRunId() != null
                 && !task.getCurrentEmbedRunId().isBlank()
                 && task.getTotalScenes() > 0) {
-            log.info("Embed task {} already has an active run {}, ignoring duplicate trigger", taskId, task.getCurrentEmbedRunId());
+            log.info("embed 任务 {} 已有进行中的 run {}，忽略重复触发", taskId, task.getCurrentEmbedRunId());
             return;
         }
 
@@ -77,7 +77,7 @@ public class EmbedPipelineOrchestrator {
         int totalScenes = embedRunDbCoordinator.beginRunAfterVectorsCleaned(taskId, novelId, version, cs, co, embedRunId);
 
         fanOutSceneMessages(taskId, novelId, version, cs, co, embedRunId);
-        log.info("Embed run started taskId={} embedRunId={} totalScenes={}", taskId, embedRunId, totalScenes);
+        log.info("embed run 已启动 taskId={} embedRunId={} totalScenes={}", taskId, embedRunId, totalScenes);
     }
 
     /**
@@ -98,7 +98,7 @@ public class EmbedPipelineOrchestrator {
     public void resumeEmbedRun(String taskId) {
         SplitTask task = taskService.getTask(taskId);
         if (task == null) {
-            log.warn("Skip embed resume: task row gone (stale MQ?). taskId={}", taskId);
+            log.warn("跳过 embed 续跑：任务行已不存在（过期 MQ 消息？）。taskId={}", taskId);
             return;
         }
         String runId = task.getCurrentEmbedRunId();
@@ -121,11 +121,11 @@ public class EmbedPipelineOrchestrator {
                     .toList();
         }
         if (ids.isEmpty()) {
-            log.info("No pending/failed scenes to resume for task {}", taskId);
+            log.info("任务 {} 没有待续跑的 PENDING/FAILED 场景", taskId);
             return;
         }
         fanOutBatch(taskId, novelId, version, profile[0], profile[1], runId, ids);
-        log.info("Resume embed queued {} scene messages for taskId={}", ids.size(), taskId);
+        log.info("续跑已投递 {} 条场景消息 taskId={}", ids.size(), taskId);
     }
 
     private void fanOutSceneMessages(

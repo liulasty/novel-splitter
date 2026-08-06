@@ -156,8 +156,8 @@ public class EmbedWorker {
                 processEmbedSubBatch(subIds, sceneByPid, taskId, novelId, version, chunkSize, chunkOverlap, embedRunId);
             }
         } catch (Exception e) {
-            log.error("embed scene group failed taskId={}", taskId, e);
-            // Do not rethrow: batched listener must not nack the whole batch for one group failure.
+            log.error("embed 场景分组处理失败 taskId={}", taskId, e);
+            // 不重新抛出：批量监听器不应因单个分组失败而 nack 整个批次。
         }
     }
 
@@ -196,7 +196,7 @@ public class EmbedWorker {
             try {
                 sceneRepository.batchUpdateEmbedOutcome(subIds, embedRunId, EmbedStatus.FAILED, err);
             } catch (RuntimeException ex) {
-                log.warn("Failed to persist embed failure batch scenePids={}: {}", subIds, ex.toString());
+                log.warn("持久化向量化失败批次出错 scenePids={}: {}", subIds, ex.toString());
             }
             failVersion(novelId, version);
         }
@@ -250,7 +250,7 @@ public class EmbedWorker {
             }
             novelVersionRepository.save(v);
         } catch (Exception e) {
-            log.warn("Failed to advance embed cursor novelId={} version={}: {}", novelId, version, e.toString());
+            log.warn("推进向量化游标失败 novelId={} version={}: {}", novelId, version, e.toString());
         }
     }
 
@@ -264,7 +264,7 @@ public class EmbedWorker {
                 log.warn("版本 {}/{} 标记 FAILED（可续传）", novelId, version);
             }
         } catch (Exception e) {
-            log.warn("Failed to mark version failed novelId={} version={}: {}", novelId, version, e.toString());
+            log.warn("标记版本失败时出错 novelId={} version={}: {}", novelId, version, e.toString());
         }
     }
 
@@ -282,7 +282,7 @@ public class EmbedWorker {
             try {
                 sceneRepository.updateEmbedOutcome(pid, embedRunId, EmbedStatus.FAILED, reason);
             } catch (RuntimeException ex) {
-                log.warn("Failed to persist embed skip/fail for scene {}: {}", pid, ex.toString());
+                log.warn("持久化场景 {} 的向量化跳过/失败状态出错: {}", pid, ex.toString());
             }
         }
     }

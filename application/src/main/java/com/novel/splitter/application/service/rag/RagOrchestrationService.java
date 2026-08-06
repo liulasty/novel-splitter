@@ -73,7 +73,7 @@ public class RagOrchestrationService implements RagFacade {
             try {
                 answer = llmClient.chat(prompt);
             } catch (Exception e) {
-                log.error("LLM generation failed: {}", e.getMessage(), e);
+                log.error("LLM 生成失败: {}", e.getMessage(), e);
                 answer = Answer.builder()
                         .answer("很抱歉，生成回答时出现系统错误或格式异常。")
                         .citations(Collections.emptyList())
@@ -87,7 +87,7 @@ public class RagOrchestrationService implements RagFacade {
             stopWatch.stop();
             return answer;
         } finally {
-            log.info("RAG request completed in {} ms. Details:\n{}", System.currentTimeMillis() - startTime, stopWatch.prettyPrint());
+            log.info("RAG 请求耗时 {} ms 已完成。详情:\n{}", System.currentTimeMillis() - startTime, stopWatch.prettyPrint());
         }
     }
 
@@ -146,7 +146,7 @@ public class RagOrchestrationService implements RagFacade {
                     .stats(stats)
                     .build();
         } catch (Exception e) {
-            log.error("RAG preview failed", e);
+            log.error("RAG 预览失败", e);
             throw new RuntimeException("RAG preview failed", e);
         }
     }

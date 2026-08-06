@@ -68,7 +68,7 @@ public class DlqService {
             requeued++;
         }
         long remaining = queueMessageCount(normalized);
-        log.info("DLQ requeue: queue={} requeued={} remaining~={}", normalized, requeued, remaining);
+        log.info("DLQ 重投: queue={} requeued={} remaining~={}", normalized, requeued, remaining);
         return DlqRequeueResultDto.builder()
                 .queueName(normalized)
                 .requeued(requeued)
