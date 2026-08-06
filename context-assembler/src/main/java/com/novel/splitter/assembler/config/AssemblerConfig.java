@@ -59,4 +59,19 @@ public class AssemblerConfig {
      * 最大 Scene 数量限制 (同 maxChunks，保留以兼容)
      */
     private int maxScenes = 5;
+
+    /**
+     * 质量软加权混合权重（仅 ONNX 重排路径使用；启发式路径固定 0.1）
+     */
+    private double qualityScoreWeight = 0.15;
+
+    /**
+     * 相邻块扩展半径（±N，按 Scene.seq）；-1 关闭该特性
+     */
+    private int expandRadius = 1;
+
+    /**
+     * 相邻块扩展是否允许跨章
+     */
+    private boolean expandAcrossChapters = false;
 }
