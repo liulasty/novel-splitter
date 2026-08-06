@@ -9,7 +9,7 @@ class AssemblerConfigTest {
     @Test
     void newConfig_hasSafeDefaults() {
         AssemblerConfig c = new AssemblerConfig();
-        assertEquals(0.15, c.getQualityScoreWeight());
+        assertEquals(0.15, c.getQualityScoreWeight(), 1e-9);
         assertEquals(1, c.getExpandRadius());
         assertFalse(c.isExpandAcrossChapters());
     }
