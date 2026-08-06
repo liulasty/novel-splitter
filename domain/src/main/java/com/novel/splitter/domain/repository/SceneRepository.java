@@ -77,6 +77,12 @@ public interface SceneRepository {
     List<SceneCountByProfile> countScenesByNovelVersionAndChunk();
 
     /**
+     * 按 (novelId, version, chunk 分区) 的 seq 范围查询场景，用于相邻块扩展。
+     */
+    List<Scene> findByProfileAndSeqRange(String novelId, String version, int chunkSize, int chunkOverlap,
+                                         long fromSeq, long toSeq);
+
+    /**
      * 新一轮向量化前：将 profile 内场景标为待嵌入并绑定 run id。
      */
     int resetEmbedStateForRun(String novelId, String version, int chunkSize, int chunkOverlap, String embedRunId);

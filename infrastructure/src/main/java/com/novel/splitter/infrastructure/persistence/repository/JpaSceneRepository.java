@@ -41,6 +41,10 @@ public interface JpaSceneRepository extends JpaRepository<JpaSceneEntity, Long>,
     List<JpaSceneEntity> findByNovelIdAndVersionAndChunkSizeAndChunkOverlap(
             String novelId, String version, Integer chunkSize, Integer chunkOverlap);
 
+    @EntityGraph(attributePaths = {"novel", "chapter"})
+    List<JpaSceneEntity> findByNovelIdAndVersionAndChunkSizeAndChunkOverlapAndSeqBetween(
+            String novelId, String version, Integer chunkSize, Integer chunkOverlap, long fromSeq, long toSeq);
+
     @Query("SELECT s.id FROM JpaSceneEntity s WHERE s.novel.id = :nid AND s.version = :ver "
             + "AND s.chunkSize = :cs AND s.chunkOverlap = :co AND s.isDeleted = false ORDER BY s.id")
     List<Long> findPersistenceIdsByProfile(

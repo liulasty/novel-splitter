@@ -227,6 +227,15 @@ public class SceneRepositoryJpaImpl implements SceneRepository {
     }
 
     @Override
+    public List<Scene> findByProfileAndSeqRange(String novelId, String version, int chunkSize, int chunkOverlap,
+                                                long fromSeq, long toSeq) {
+        List<JpaSceneEntity> entities = jpaSceneRepository
+                .findByNovelIdAndVersionAndChunkSizeAndChunkOverlapAndSeqBetween(
+                        novelId, version, chunkSize, chunkOverlap, fromSeq, toSeq);
+        return entities.stream().map(sceneMapper::toDomain).collect(Collectors.toList());
+    }
+
+    @Override
     public List<Long> listPersistenceIdsByProfile(String novelId, String version, int chunkSize, int chunkOverlap) {
         return jpaSceneRepository.findPersistenceIdsByProfile(novelId, version, chunkSize, chunkOverlap);
     }
