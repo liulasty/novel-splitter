@@ -32,7 +32,7 @@ class ChromaCollectionNamingTest {
 
     @Test
     void nameLengthWithinChromaLimit() {
-        // Chroma recommends collection names <= 63 chars
+        // Chroma 建议 collection 名称不超过 63 个字符
         String name = VectorStore.collectionNameFor("abc123", "v1");
 
         assertTrue(name.length() <= 63,

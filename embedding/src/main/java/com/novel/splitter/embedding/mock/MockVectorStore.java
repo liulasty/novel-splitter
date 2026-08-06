@@ -55,7 +55,7 @@ public class MockVectorStore implements VectorStore {
 
     @Override
     public void save(Scene scene, float[] embedding) {
-        log.debug("Mock saving scene: {} (Vector dim: {})", scene.getId(), embedding.length);
+        log.debug("Mock 保存场景：{}（向量维度：{}）", scene.getId(), embedding.length);
         index.put(scene.getId(), embedding);
         if (scene.getMetadata() != null) {
             metadataMap.put(scene.getId(), scene.getMetadata());
@@ -65,7 +65,7 @@ public class MockVectorStore implements VectorStore {
 
     @Override
     public void saveBatch(List<Scene> scenes, List<float[]> embeddings) {
-        log.info("Mock saving batch of {} scenes", scenes.size());
+        log.info("Mock 批量保存 {} 个场景", scenes.size());
         for (int i = 0; i < scenes.size(); i++) {
             save(scenes.get(i), embeddings.get(i));
         }
@@ -73,7 +73,7 @@ public class MockVectorStore implements VectorStore {
 
     @Override
     public List<VectorRecord> search(float[] queryEmbedding, int topK, Map<String, Object> filter) {
-        log.info("Mock search with topK={}, filter={}", topK, filter);
+        log.info("Mock 检索：topK={}，filter={}", topK, filter);
         // 简单 Mock：直接返回前 K 个已存储的 ID，分数随机
         List<VectorRecord> results = new ArrayList<>();
         int limit = Math.min(topK, ids.size());
@@ -85,12 +85,12 @@ public class MockVectorStore implements VectorStore {
             if (meta != null) {
                 if (meta.getNovel() != null) metaMap.put("novelId", meta.getNovel());
                 if (meta.getVersion() != null) metaMap.put("version", meta.getVersion());
-                // include other metadata if needed
+                // 如需可包含其它元数据
             }
-            // For mock purposes, if version is missing in metadata but present in filter, add it to pass check
-            // Or better, ensure test data has version.
+            // 为满足 Mock 用途：若元数据缺少 version 但过滤条件中存在 version，则补上以通过校验
+            // 更稳妥的做法是确保测试数据本身带有 version。
             if (!metaMap.containsKey("version")) {
-                metaMap.put("version", "v1"); // Default for mock test
+                metaMap.put("version", "v1"); // Mock 测试默认值
             }
 
             results.add(new VectorRecord(id, 0.9 - (i * 0.1), metaMap));

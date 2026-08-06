@@ -43,7 +43,7 @@ public class ChromaIntegrationTest {
             return;
         }
 
-        // Create a dummy scene
+        // 创建一个虚拟场景
         String id = UUID.randomUUID().toString();
         Scene scene = Scene.builder()
                 .persistenceId(1L)
@@ -64,26 +64,25 @@ public class ChromaIntegrationTest {
                         .build())
                 .build();
 
-        // Create a dummy embedding (dimension 10 for simplicity, though real is 512/768)
-        // Chroma might expect specific dimensions if collection already exists with different dims.
-        // But for new collection, first insert defines dim.
-        // Let's use a small dimension.
+        // 创建一个虚拟向量（为简单起见用 10 维，实际为 512/768 维）
+        // 若 collection 已存在且维度不同，Chroma 可能对维度有特定要求；
+        // 但对于新建 collection，首次插入的向量即决定维度。这里使用较小的维度。
         float[] embedding = new float[10];
         for (int i = 0; i < 10; i++) {
             embedding[i] = (float) Math.random();
         }
 
-        // Save
+        // 保存
         try {
             chromaVectorStore.save(scene, embedding);
             System.out.println("Saved scene to ChromaDB");
         } catch (Exception e) {
             System.err.println("Failed to save to ChromaDB: " + e.getMessage());
-            // Skip in environments without an accessible local ChromaDB service.
+            // 在没有可访问的本地 ChromaDB 服务时跳过该集成测试。
             Assumptions.abort("Skipping Chroma integration test: " + e.getMessage());
         }
 
-        // Search
+        // 检索
         List<VectorRecord> results = chromaVectorStore.search(embedding, 1);
         
         Assertions.assertNotNull(results);

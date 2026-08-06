@@ -52,7 +52,7 @@ public class OnnxEmbeddingService implements EmbeddingService {
         long[][] attentionMaskBatch = new long[batchSize][];
         long[][] tokenTypeIdsBatch = new long[batchSize][];
 
-        // 1. Tokenize all texts (对所有文本进行分词处理)
+        // 1. 对所有文本进行分词处理
         for (int i = 0; i < batchSize; i++) {
             TokenizedInput input = tokenizer.tokenize(texts.get(i));
             inputIdsBatch[i] = input.getInputIds();
@@ -60,9 +60,8 @@ public class OnnxEmbeddingService implements EmbeddingService {
             tokenTypeIdsBatch[i] = input.getTokenTypeIds();
         }
 
-        // 2. Prepare Batched Tensors (准备批处理张量)
-        // The length of each tokenized input is fixed to MAX_LENGTH (512) in Tokenizer
-        // (在 Tokenizer 中，每个分词输入的长度被固定为最大长度 MAX_LENGTH，通常为 512)
+        // 2. 准备批处理张量
+        // 在 Tokenizer 中，每个分词输入的长度被固定为最大长度 MAX_LENGTH（512）
         int seqLength = inputIdsBatch[0].length;
         long[] shape = new long[]{batchSize, seqLength};
 
@@ -72,7 +71,7 @@ public class OnnxEmbeddingService implements EmbeddingService {
         OrtSession.Result result = null;
 
         try {
-            // Flatten 2D arrays to 1D for Tensor creation (将二维数组展平为一维，用于创建张量)
+            // 将二维数组展平为一维，用于创建张量
             long[] flatInputIds = new long[batchSize * seqLength];
             long[] flatAttentionMask = new long[batchSize * seqLength];
             long[] flatTokenTypeIds = new long[batchSize * seqLength];
@@ -94,18 +93,17 @@ public class OnnxEmbeddingService implements EmbeddingService {
             inputs.put("attention_mask", attentionMaskTensor);
             inputs.put("token_type_ids", tokenTypeIdsTensor);
 
-            // 3. Run Inference (True Batching) (执行推理，真正的批处理)
+            // 3. 执行推理（真正的批处理）
             result = modelHolder.getSession().run(inputs);
 
-            // 4. Extract Output (提取输出结果)
-            // Output shape is [batchSize, seqLength, hiddenSize] (输出形状为 [批次大小, 序列长度, 隐藏层维度])
+            // 4. 提取输出结果
+            // 输出形状为 [batchSize, seqLength, hiddenSize]（即 [批次大小, 序列长度, 隐藏层维度]）
             float[][][] lastHiddenState = (float[][][]) result.get(0).getValue();
 
-            // 5. Pooling and Normalize (池化与归一化)
+            // 5. 池化与归一化
             List<float[]> embeddings = new ArrayList<>(batchSize);
             for (int i = 0; i < batchSize; i++) {
-                // CLS Pooling: get the first token's embedding for each sequence in the batch
-                // (CLS 池化：获取批次中每个序列的第一个 token（即 [CLS] token）的嵌入向量作为句子向量)
+                // CLS 池化：获取批次中每个序列的第一个 token（即 [CLS] token）的嵌入向量作为句子向量
                 float[] clsEmbedding = lastHiddenState[i][0];
                 embeddings.add(normalize(clsEmbedding)); // 对向量进行 L2 归一化后加入结果集
             }
@@ -113,7 +111,7 @@ public class OnnxEmbeddingService implements EmbeddingService {
             return embeddings;
 
         } catch (Exception e) {
-            log.error("Batch embedding failed for {} texts", batchSize, e);
+            log.error("批量向量化失败，共 {} 条文本", batchSize, e);
             throw new RuntimeException("Batch embedding failed", e);
         } finally {
             // 确保释放 ONNX 运行时资源，防止内存泄漏
@@ -123,7 +121,7 @@ public class OnnxEmbeddingService implements EmbeddingService {
                 if (attentionMaskTensor != null) attentionMaskTensor.close();
                 if (tokenTypeIdsTensor != null) tokenTypeIdsTensor.close();
             } catch (Exception e) {
-                log.warn("Error closing ONNX resources", e);
+                log.warn("关闭 ONNX 资源时出错", e);
             }
         }
     }

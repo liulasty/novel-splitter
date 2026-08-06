@@ -29,7 +29,7 @@ public class Vocabulary {
     private String externalVocabPath;
 
     /** 内置词表资源路径（实际上是一个 JSON 格式文件） */
-    private static final String VOCAB_PATH = "embedding/vocab.txt"; // It's actually a JSON file
+    private static final String VOCAB_PATH = "embedding/vocab.txt"; // 该文件实际上是一个 JSON 文件
 
     /**
      * 默认构造函数
@@ -47,22 +47,22 @@ public class Vocabulary {
             InputStream is = null;
             // 判断是否配置了外部词表路径
             if (externalVocabPath != null && !externalVocabPath.isBlank()) {
-                log.info("Using external vocabulary from: {}", externalVocabPath);
+                log.info("使用外部词表：{}", externalVocabPath);
                 java.io.File vocabFile = new java.io.File(externalVocabPath);
                 if (vocabFile.exists()) {
                     is = new java.io.FileInputStream(vocabFile);
                 } else {
-                    log.error("External vocabulary file not found: {}", externalVocabPath);
+                    log.error("未找到外部词表文件：{}", externalVocabPath);
                     throw new java.io.FileNotFoundException("External vocabulary file not found: " + externalVocabPath);
                 }
             } else {
                 // 使用类路径下的内置词表
-                log.info("Using bundled vocabulary from classpath");
+                log.info("使用类路径下的内置词表");
                 ClassPathResource resource = new ClassPathResource(VOCAB_PATH);
                 if (resource.exists()) {
                     is = resource.getInputStream();
                 } else {
-                    log.error("Bundled vocabulary resource not found: {}", VOCAB_PATH);
+                    log.error("未找到内置词表资源：{}", VOCAB_PATH);
                     throw new java.io.FileNotFoundException("Bundled vocabulary resource not found: " + VOCAB_PATH);
                 }
             }
@@ -71,15 +71,13 @@ public class Vocabulary {
                 ObjectMapper mapper = new ObjectMapper();
                 JsonNode root = mapper.readTree(inputStream);
                 
-                // Handle both simple map format and HuggingFace tokenizer.json format
                 // 兼容解析简单的 Map 格式以及 HuggingFace tokenizer.json 格式的词表
                 JsonNode vocabNode = null;
                 if (root.has("model") && root.get("model").has("vocab")) {
                     vocabNode = root.get("model").get("vocab");
                 } else if (root.has("vocab")) {
-                     vocabNode = root.get("vocab"); // Some simple formats
+                     vocabNode = root.get("vocab"); // 一些简单的格式
                 } else {
-                    // Maybe it's a flat map?
                     // 如果都没有，可能是一个扁平的字典格式
                     vocabNode = root;
                 }
@@ -97,10 +95,10 @@ public class Vocabulary {
                     tokenToId.put(token, id);
                     idToToken.put(id, token);
                 }
-                log.info("Loaded vocabulary with {} tokens", tokenToId.size());
+                log.info("已加载词表，共 {} 个词元", tokenToId.size());
             }
         } catch (Exception e) {
-            log.error("Failed to load vocabulary", e);
+            log.error("词表加载失败", e);
             throw new RuntimeException("Failed to load vocabulary", e);
         }
     }

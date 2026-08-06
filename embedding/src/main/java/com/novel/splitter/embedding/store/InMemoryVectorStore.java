@@ -57,12 +57,12 @@ public class InMemoryVectorStore implements VectorStore {
             try {
                 Map<String, float[]> loaded = objectMapper.readValue(file, new TypeReference<Map<String, float[]>>() {});
                 vectorMap.putAll(loaded);
-                log.info("Loaded {} vectors from {}", vectorMap.size(), STORE_FILE);
+                log.info("已加载 {} 条向量，来源：{}", vectorMap.size(), STORE_FILE);
             } catch (IOException e) {
-                log.error("Failed to load vector store from file", e);
+                log.error("从文件加载向量存储失败", e);
             }
         } else {
-            log.info("No existing vector store found at {}, starting fresh.", STORE_FILE);
+            log.info("未在 {} 找到已有向量存储，将从空状态启动。", STORE_FILE);
         }
 
         File metaFile = new File(METADATA_FILE);
@@ -71,9 +71,9 @@ public class InMemoryVectorStore implements VectorStore {
             try {
                 Map<String, com.novel.splitter.domain.model.SceneMetadata> loadedMeta = objectMapper.readValue(metaFile, new TypeReference<Map<String, com.novel.splitter.domain.model.SceneMetadata>>() {});
                 metadataMap.putAll(loadedMeta);
-                log.info("Loaded {} metadata entries from {}", metadataMap.size(), METADATA_FILE);
+                log.info("已加载 {} 条元数据，来源：{}", metadataMap.size(), METADATA_FILE);
             } catch (IOException e) {
-                log.error("Failed to load metadata store from file", e);
+                log.error("从文件加载元数据存储失败", e);
             }
         }
     }
@@ -87,13 +87,13 @@ public class InMemoryVectorStore implements VectorStore {
         try {
             // 将向量数据序列化到文件
             objectMapper.writeValue(new File(STORE_FILE), vectorMap);
-            log.info("Persisted {} vectors to {}", vectorMap.size(), STORE_FILE);
-            
+            log.info("已持久化 {} 条向量到 {}", vectorMap.size(), STORE_FILE);
+
             // 将元数据序列化到文件
             objectMapper.writeValue(new File(METADATA_FILE), metadataMap);
-            log.info("Persisted {} metadata entries to {}", metadataMap.size(), METADATA_FILE);
+            log.info("已持久化 {} 条元数据到 {}", metadataMap.size(), METADATA_FILE);
         } catch (IOException e) {
-            log.error("Failed to persist vector store", e);
+            log.error("持久化向量存储失败", e);
         }
     }
 
@@ -106,7 +106,7 @@ public class InMemoryVectorStore implements VectorStore {
         // 清空内存中的映射表
         vectorMap.clear();
         metadataMap.clear();
-        log.info("Vector store cleared.");
+        log.info("向量存储已清空。");
     }
 
     /**
@@ -167,7 +167,7 @@ public class InMemoryVectorStore implements VectorStore {
             vectorMap.remove(id);
             metadataMap.remove(id);
         }
-        log.info("Deleted {} vectors matching filter {}", toRemove.size(), filter);
+        log.info("已删除 {} 条匹配过滤条件 {} 的向量", toRemove.size(), filter);
     }
 
     /**
@@ -179,7 +179,7 @@ public class InMemoryVectorStore implements VectorStore {
     @Override
     public void save(Scene scene, float[] embedding) {
         if (scene == null || scene.getId() == null) {
-            log.warn("Cannot save null scene or scene with null ID");
+            log.warn("无法保存空 scene 或 ID 为空的 scene");
             return;
         }
         // 将向量存入哈希表
@@ -232,12 +232,11 @@ public class InMemoryVectorStore implements VectorStore {
         for (Map.Entry<String, float[]> entry : vectorMap.entrySet()) {
             String id = entry.getKey();
             
-            // Filter Logic (过滤逻辑)
+            // 过滤逻辑
             if (filter != null && !filter.isEmpty()) {
                 com.novel.splitter.domain.model.SceneMetadata meta = metadataMap.get(id);
                 if (meta == null) {
-                    // Metadata missing but filter required -> skip
-                    // (如果记录缺失元数据，但又要求过滤，则跳过该记录)
+                    // 记录缺失元数据但要求过滤时，跳过该记录
                     continue;
                 }
                 
@@ -247,7 +246,7 @@ public class InMemoryVectorStore implements VectorStore {
                     Object expected = f.getValue();
                     Object actual = null;
                     
-                    // Simple field mapping (简单的字段映射，提取实际值用于比较)
+                    // 简单的字段映射（提取实际值用于比较）
                     if ("novelId".equals(key) || "novel".equals(key)) actual = meta.getNovel();
                     else if ("version".equals(key)) actual = meta.getVersion();
                     else if ("chunkSize".equals(key)) actual = meta.getChunkSize();
@@ -421,7 +420,7 @@ public class InMemoryVectorStore implements VectorStore {
     public void deleteByCollection(String collectionName) {
         collectionVectors.remove(collectionName);
         collectionMetadata.remove(collectionName);
-        log.info("Deleted collection '{}' from memory store", collectionName);
+        log.info("已从内存存储中删除 collection '{}'", collectionName);
     }
 
     @Override

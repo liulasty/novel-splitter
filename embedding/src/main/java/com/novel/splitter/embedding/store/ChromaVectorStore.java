@@ -100,14 +100,14 @@ public class ChromaVectorStore implements VectorStore {
     @PostConstruct
     public void initChromaCollection() {
         if (!eagerInit) {
-            log.info("Chroma eager init disabled (chroma.init.eager=false); collection binds on first use.");
+            log.info("已禁用 Chroma 启动时预绑定（chroma.init.eager=false）；collection 将在首次使用时绑定。");
             return;
         }
         synchronized (this) {
             bindCollectionLocked("startup");
         }
         long n = count();
-        log.info("Chroma collection '{}' ready ({}={}), vector count={}",
+        log.info("Chroma collection '{}' 已就绪（{}={}），向量总数={}",
                 collectionName, CHROMA_HNSW_SPACE_KEY, hnswSpace, n);
     }
 
@@ -149,7 +149,7 @@ public class ChromaVectorStore implements VectorStore {
             if (!isStaleCollectionNotFound(e)) {
                 throw chromaUserVisibleFailure("写入向量(/add)", e);
             }
-            log.warn("Chroma /add 404 (stale collection id); clearing cache and re-binding collection '{}' once.", collectionName);
+            log.warn("Chroma /add 返回 404（collection id 已失效）；已清空缓存并重新绑定 collection '{}' 一次。", collectionName);
             invalidateCachedCollectionId();
             ensureCollectionExists();
             try {
@@ -242,7 +242,7 @@ public class ChromaVectorStore implements VectorStore {
         ensureCollectionExists();
 
         if (filter == null || filter.isEmpty()) {
-            log.warn("Delete called with empty filter, ignoring to avoid accidental data loss. Use reset() to clear all.");
+            log.warn("收到空 filter 的删除请求，已忽略以避免误删数据。如需清空全部请使用 reset()。");
             return;
         }
 
@@ -253,12 +253,12 @@ public class ChromaVectorStore implements VectorStore {
         for (int attempt = 1; attempt <= max; attempt++) {
             try {
                 postDeleteWithOptionalStaleRebind(request);
-                log.info("Deleted documents from ChromaDB collection '{}' with filter: {}", collectionName, filter);
+                log.info("已从 ChromaDB collection '{}' 删除文档，过滤条件：{}", collectionName, filter);
                 return;
             } catch (RestClientResponseException e) {
                 if (attempt < max && isTransientChromaDeleteResponse(e)) {
                     log.warn(
-                            "Chroma /delete transient HTTP {} (attempt {}/{}); retrying after {}ms",
+                            "Chroma /delete 遇到临时性 HTTP {}（第 {}/{} 次尝试）；将在 {}ms 后重试",
                             e.getStatusCode().value(),
                             attempt,
                             max,
@@ -269,7 +269,7 @@ public class ChromaVectorStore implements VectorStore {
                 throw chromaUserVisibleFailure("删除向量(/delete)", e);
             } catch (RestClientException e) {
                 if (attempt < max) {
-                    log.warn("Chroma /delete transient client error (attempt {}/{}): {}; retrying after {}ms",
+                    log.warn("Chroma /delete 出现临时性客户端错误（第 {}/{} 次尝试）：{}；将在 {}ms 后重试",
                             attempt, max, e.getMessage(), deleteBackoffMs * attempt);
                     sleepDeleteBackoff(attempt);
                     continue;
@@ -289,7 +289,7 @@ public class ChromaVectorStore implements VectorStore {
             if (!isStaleCollectionNotFound(e)) {
                 throw e;
             }
-            log.warn("Chroma /delete 404 (stale collection id); clearing cache and re-binding collection '{}' once.", collectionName);
+            log.warn("Chroma /delete 返回 404（collection id 已失效）；已清空缓存并重新绑定 collection '{}' 一次。", collectionName);
             invalidateCachedCollectionId();
             ensureCollectionExists();
             postDeletePayload(request);
@@ -336,19 +336,19 @@ public class ChromaVectorStore implements VectorStore {
                         .uri(path)
                         .retrieve()
                         .toBodilessEntity();
-                log.info("Deleted ChromaDB collection: {}", collectionName);
+                log.info("已删除 ChromaDB collection: {}", collectionName);
             } catch (RestClientResponseException e) {
                 if (HttpStatus.NOT_FOUND.equals(e.getStatusCode())) {
-                    log.info("Chroma collection '{}' not found on reset (ok)", collectionName);
+                    log.info("重置时未找到 Chroma collection '{}'（正常）", collectionName);
                 } else {
-                    log.warn("Failed to delete collection {}: {}", collectionName, e.getMessage());
+                    log.warn("删除 collection {} 失败：{}", collectionName, e.getMessage());
                 }
             } catch (Exception e) {
-                log.warn("Failed to delete collection {}: {}", collectionName, e.getMessage());
+                log.warn("删除 collection {} 失败：{}", collectionName, e.getMessage());
             }
             bindCollectionLocked("after-reset");
         }
-        log.info("Reset ChromaDB collection: {}", collectionName);
+        log.info("已重置 ChromaDB collection: {}", collectionName);
     }
 
     @Override
@@ -358,20 +358,20 @@ public class ChromaVectorStore implements VectorStore {
             return getCountBody();
         } catch (RestClientResponseException e) {
             if (!isStaleCollectionNotFound(e)) {
-                log.error("Failed to get count from ChromaDB", e);
+                log.error("从 ChromaDB 获取向量总数失败", e);
                 return -1;
             }
-            log.warn("Chroma /count 404 (stale collection id); clearing cache and re-binding '{}' once.", collectionName);
+            log.warn("Chroma /count 返回 404（collection id 已失效）；已清空缓存并重新绑定 '{}' 一次。", collectionName);
             invalidateCachedCollectionId();
             ensureCollectionExists();
             try {
                 return getCountBody();
             } catch (RestClientResponseException e2) {
-                log.error("Failed to get count from ChromaDB after rebind", e2);
+                log.error("重绑后从 ChromaDB 获取向量总数仍失败", e2);
                 return -1;
             }
         } catch (Exception e) {
-            log.error("Failed to get count from ChromaDB", e);
+            log.error("从 ChromaDB 获取向量总数失败", e);
             return -1;
         }
     }
@@ -405,7 +405,7 @@ public class ChromaVectorStore implements VectorStore {
             if (!isStaleCollectionNotFound(e)) {
                 throw chromaUserVisibleFailure("检索(/query)", e);
             }
-            log.warn("Chroma /query 404 (stale collection id); clearing cache and re-binding '{}' once.", collectionName);
+            log.warn("Chroma /query 返回 404（collection id 已失效）；已清空缓存并重新绑定 '{}' 一次。", collectionName);
             invalidateCachedCollectionId();
             ensureCollectionExists();
             try {
@@ -452,7 +452,7 @@ public class ChromaVectorStore implements VectorStore {
         synchronized (this) {
             this.collectionId = null;
         }
-        log.warn("Cleared cached Chroma collection UUID for logical name '{}'", collectionName);
+        log.warn("已清空逻辑名称 '{}' 的 Chroma collection UUID 缓存", collectionName);
     }
 
     private static boolean isStaleCollectionNotFound(RestClientResponseException e) {
@@ -493,7 +493,7 @@ public class ChromaVectorStore implements VectorStore {
         if (existing != null && existing.getId() != null) {
             assertCollectionDistance(existing);
             this.collectionId = existing.getId();
-            log.info("Bound ChromaDB collection '{}' -> id {} ({})", collectionName, collectionId, reason);
+            log.info("已绑定 ChromaDB collection '{}' -> id {}（{}）", collectionName, collectionId, reason);
             return;
         }
 
@@ -510,7 +510,7 @@ public class ChromaVectorStore implements VectorStore {
                     .body(ChromaCollection.class);
             if (created != null && created.getId() != null) {
                 this.collectionId = created.getId();
-                log.info("Created ChromaDB collection: {} ({}) ({})", collectionName, collectionId, reason);
+                log.info("已创建 ChromaDB collection: {}（{}）（{}）", collectionName, collectionId, reason);
                 return;
             }
         } catch (RestClientResponseException e) {
@@ -519,7 +519,7 @@ public class ChromaVectorStore implements VectorStore {
                 if (race != null && race.getId() != null) {
                     assertCollectionDistance(race);
                     this.collectionId = race.getId();
-                    log.info("Bound existing ChromaDB collection after create race: {} ({}) ({})", collectionName, collectionId, reason);
+                    log.info("创建并发竞争后已绑定已有 ChromaDB collection: {}（{}）（{}）", collectionName, collectionId, reason);
                     return;
                 }
             }
@@ -550,22 +550,22 @@ public class ChromaVectorStore implements VectorStore {
         String actual = extractHnswSpace(coll.getMetadata());
         if (actual == null || actual.isBlank()) {
             String msg = "Chroma collection '" + collectionName
-                    + "' exists but has no " + CHROMA_HNSW_SPACE_KEY + " in metadata (cannot verify distance). "
-                    + "Expected " + CHROMA_HNSW_SPACE_KEY + "=" + hnswSpace + ". Delete and recreate the collection or align chroma.hnsw-space.";
+                    + "' 已存在，但其 metadata 中缺少 " + CHROMA_HNSW_SPACE_KEY + "（无法校验距离度量）。"
+                    + "期望 " + CHROMA_HNSW_SPACE_KEY + "=" + hnswSpace + "。请删除并重建 collection，或调整 chroma.hnsw-space 配置。";
             if (failOnDistanceMismatch) {
                 throw new IllegalStateException(msg);
             }
-            log.warn("{} (fail-on-distance-mismatch=false)", msg);
+            log.warn("{}（fail-on-distance-mismatch=false）", msg);
             return;
         }
         if (!hnswSpace.equalsIgnoreCase(actual)) {
-            String msg = "Chroma collection '" + collectionName + "' has " + CHROMA_HNSW_SPACE_KEY + "=" + actual
-                    + " but application expects " + hnswSpace + " (chroma.hnsw-space). Distance cannot be changed in place; "
-                    + "delete the collection or use admin rebuild.";
+            String msg = "Chroma collection '" + collectionName + "' 的 " + CHROMA_HNSW_SPACE_KEY + "=" + actual
+                    + "，但应用期望的是 " + hnswSpace + "（chroma.hnsw-space）。距离度量无法原地修改；"
+                    + "请删除该 collection 或使用管理端重建。";
             if (failOnDistanceMismatch) {
                 throw new IllegalStateException(msg);
             }
-            log.error("{} (fail-on-distance-mismatch=false; retrieval scores may be wrong)", msg);
+            log.error("{}（fail-on-distance-mismatch=false；检索分数可能不准）", msg);
         }
     }
 
@@ -673,7 +673,7 @@ public class ChromaVectorStore implements VectorStore {
                 if (colName.equals(collectionName)) {
                     this.collectionId = existing.getId();
                 }
-                log.info("Bound ChromaDB collection '{}' -> id {}", colName, existing.getId());
+                log.info("已绑定 ChromaDB collection '{}' -> id {}", colName, existing.getId());
                 return existing.getId();
             }
             // POST create
@@ -693,7 +693,7 @@ public class ChromaVectorStore implements VectorStore {
                     if (colName.equals(collectionName)) {
                         this.collectionId = created.getId();
                     }
-                    log.info("Created ChromaDB collection: {} -> id {}", colName, created.getId());
+                    log.info("已创建 ChromaDB collection: {} -> id {}", colName, created.getId());
                     return created.getId();
                 }
             } catch (RestClientResponseException e) {
@@ -705,7 +705,7 @@ public class ChromaVectorStore implements VectorStore {
                         if (colName.equals(collectionName)) {
                             this.collectionId = race.getId();
                         }
-                        log.info("Bound existing ChromaDB collection after create race: {} -> {}", colName, race.getId());
+                        log.info("创建并发竞争后已绑定已有 ChromaDB collection: {} -> {}", colName, race.getId());
                         return race.getId();
                     }
                 }
@@ -747,7 +747,7 @@ public class ChromaVectorStore implements VectorStore {
         if (colId == null) {
             ChromaCollection existing = getCollectionByNameOrNull(colName);
             if (existing == null || existing.getId() == null) {
-                log.info("Collection '{}' does not exist, deleteByCollection treated as success", colName);
+                log.info("Collection '{}' 不存在，deleteByCollection 按成功处理", colName);
                 return;
             }
             colId = existing.getId();
@@ -758,10 +758,10 @@ public class ChromaVectorStore implements VectorStore {
                     .uri(collectionsBasePath() + "/" + UriUtils.encodePathSegment(colName, StandardCharsets.UTF_8))
                     .retrieve()
                     .toBodilessEntity();
-            log.info("Deleted ChromaDB collection: {}", colName);
+            log.info("已删除 ChromaDB collection: {}", colName);
         } catch (RestClientResponseException e) {
             if (HttpStatus.NOT_FOUND.equals(e.getStatusCode())) {
-                log.info("Chroma collection '{}' already deleted (ok)", colName);
+                log.info("Chroma collection '{}' 已被删除（正常）", colName);
             } else {
                 throw new IllegalStateException("Failed to delete Chroma collection '" + colName + "': HTTP "
                         + e.getStatusCode().value(), e);
@@ -874,9 +874,9 @@ public class ChromaVectorStore implements VectorStore {
     public void createCollection(String name) {
         try {
             resolveOrCreateCollectionId(name);
-            log.info("Collection '{}' ready (created or already exists)", name);
+            log.info("Collection '{}' 已就绪（已创建或已存在）", name);
         } catch (Exception e) {
-            log.warn("Failed to create collection '{}': {}", name, e.getMessage());
+            log.warn("创建 collection '{}' 失败：{}", name, e.getMessage());
             throw new IllegalStateException("Failed to create collection: " + name, e);
         }
     }
@@ -900,7 +900,7 @@ public class ChromaVectorStore implements VectorStore {
             }
             return false;
         } catch (Exception e) {
-            log.warn("Failed to check collection existence for '{}': {}", name, e.getMessage());
+            log.warn("检查 collection '{}' 是否存在失败：{}", name, e.getMessage());
             return false;
         }
     }

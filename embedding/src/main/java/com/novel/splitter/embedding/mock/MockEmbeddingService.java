@@ -24,10 +24,10 @@ public class MockEmbeddingService implements EmbeddingService {
 
     @Override
     public List<float[]> embedBatch(List<String> texts) {
-        log.info("Mock embedding batch for {} items", texts.size());
+        log.info("Mock 批量向量化 {} 条文本", texts.size());
         List<float[]> result = new ArrayList<>(texts.size());
         for (String text : texts) {
-            log.debug("Mock embedding for text: {}...", text.substring(0, Math.min(20, text.length())));
+            log.debug("Mock 向量化文本：{}...", text.substring(0, Math.min(20, text.length())));
             result.add(generateRandomVector(dimension));
         }
         return result;

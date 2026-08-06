@@ -61,7 +61,7 @@ public class OnnxModelHolder {
     @PostConstruct
     public void initialize() {
         try {
-            log.info("Initializing ONNX Runtime Environment...");
+            log.info("正在初始化 ONNX Runtime 环境...");
             // 获取 ONNX 运行时环境
             this.env = OrtEnvironment.getEnvironment();
             
@@ -69,18 +69,18 @@ public class OnnxModelHolder {
 
             // 判断是否配置了外部模型路径
             if (externalModelPath != null && !externalModelPath.isBlank()) {
-                log.info("Using external ONNX model from: {}", externalModelPath);
+                log.info("使用外部 ONNX 模型：{}", externalModelPath);
                 File modelFile = new File(externalModelPath);
                 if (!modelFile.exists()) {
                     throw new IOException("External model file not found: " + externalModelPath);
                 }
                 modelPathToUse = modelFile.getAbsolutePath();
             } else {
-                log.info("Using bundled ONNX model from classpath");
+                log.info("使用类路径下的内置 ONNX 模型");
                 // 提取类路径下的内置模型文件到本次启动独立的临时目录，避免 Windows 文件映射锁导致覆盖失败
                 Path tempDir = Files.createTempDirectory("novel-splitter-embedding-");
                 this.extractedModelTempDir = tempDir;
-                log.info("Extracting bundled ONNX resources to temp dir: {}", tempDir);
+                log.info("正在将内置 ONNX 资源提取到临时目录：{}", tempDir);
                 
                 File modelFile = extractResource(MODEL_RESOURCE_DIR + MODEL_FILE, tempDir.resolve(MODEL_FILE));
                 extractResource(MODEL_RESOURCE_DIR + MODEL_DATA_FILE, tempDir.resolve(MODEL_DATA_FILE));
@@ -91,7 +91,7 @@ public class OnnxModelHolder {
                 modelPathToUse = modelFile.getAbsolutePath();
             }
 
-            log.info("Loading ONNX Model from {}", modelPathToUse);
+            log.info("正在从 {} 加载 ONNX 模型", modelPathToUse);
             
             // 配置 ONNX Session 的选项
             OrtSession.SessionOptions options = new OrtSession.SessionOptions();
@@ -99,22 +99,22 @@ public class OnnxModelHolder {
                 try {
                     // 尝试使用 CUDA 进行 GPU 加速（设备 ID 为 0）
                     options.addCUDA(0); // device id 0
-                    log.info("ONNX configured with CUDAExecutionProvider");
+                    log.info("ONNX 已配置使用 CUDAExecutionProvider");
                 } catch (Exception e) {
                     // 如果 CUDA 提供者加载失败，则退回到使用 CPU
-                    log.warn("Failed to add CUDAExecutionProvider, falling back to CPU. Error: {}", e.getMessage());
+                    log.warn("添加 CUDAExecutionProvider 失败，已回退到 CPU。错误信息：{}", e.getMessage());
                 }
             } else {
-                log.info("ONNX configured with default CPUExecutionProvider");
+                log.info("ONNX 已配置使用默认的 CPUExecutionProvider");
             }
             
             // 创建模型执行会话
             this.session = env.createSession(modelPathToUse, options);
             
-            log.info("ONNX Model loaded successfully. Inputs: {}", session.getInputNames());
+            log.info("ONNX 模型加载成功。输入：{}", session.getInputNames());
             
         } catch (Exception e) {
-            log.error("Failed to initialize ONNX model", e);
+            log.error("ONNX 模型初始化失败", e);
             throw new RuntimeException("Critical: Failed to load embedding model", e);
         }
     }
@@ -131,7 +131,7 @@ public class OnnxModelHolder {
         String safeResourcePath = Objects.requireNonNull(resourcePath, "resourcePath must not be null");
         ClassPathResource resource = new ClassPathResource(safeResourcePath);
         if (!resource.exists()) {
-             log.warn("Resource not found: {}", resourcePath);
+             log.warn("未找到资源：{}", resourcePath);
              return null;
         }
         
@@ -157,7 +157,7 @@ public class OnnxModelHolder {
                 env.close();
             }
         } catch (OrtException e) {
-            log.error("Error closing ONNX resources", e);
+            log.error("关闭 ONNX 资源时出错", e);
         } finally {
             cleanupTempDir();
         }
@@ -173,12 +173,12 @@ public class OnnxModelHolder {
                         try {
                             Files.deleteIfExists(path);
                         } catch (IOException e) {
-                            log.warn("Failed to delete temp path: {}", path, e);
+                            log.warn("删除临时路径失败：{}", path, e);
                         }
                     });
-            log.info("Cleaned extracted ONNX temp dir: {}", extractedModelTempDir);
+            log.info("已清理提取的 ONNX 临时目录：{}", extractedModelTempDir);
         } catch (IOException e) {
-            log.warn("Failed to cleanup extracted ONNX temp dir: {}", extractedModelTempDir, e);
+            log.warn("清理提取的 ONNX 临时目录失败：{}", extractedModelTempDir, e);
         } finally {
             extractedModelTempDir = null;
         }

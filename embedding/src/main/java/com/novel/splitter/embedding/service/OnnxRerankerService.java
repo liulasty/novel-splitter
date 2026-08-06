@@ -63,7 +63,7 @@ public class OnnxRerankerService {
     @PostConstruct
     public void init() {
         try {
-            log.info("Initializing ONNX Reranker model... modelPath='{}'", modelPath);
+            log.info("正在初始化 ONNX 重排模型... modelPath='{}'", modelPath);
 
             env = OrtEnvironment.getEnvironment();
 
@@ -71,7 +71,7 @@ public class OnnxRerankerService {
             if (!modelPath.isBlank()) {
                 Path tokenizerFile = Path.of(modelPath, "tokenizer.json");
                 if (!Files.exists(tokenizerFile)) {
-                    log.warn("Reranker tokenizer not found at {}, service will be unavailable", tokenizerFile);
+                    log.warn("在 {} 未找到重排器 tokenizer，服务将不可用", tokenizerFile);
                     return;
                 }
                 try (InputStream tokenizerIs = Files.newInputStream(tokenizerFile)) {
@@ -84,7 +84,7 @@ public class OnnxRerankerService {
             } else {
                 try (InputStream tokenizerIs = getClass().getResourceAsStream(TOKENIZER_PATH)) {
                     if (tokenizerIs == null) {
-                        log.warn("Reranker tokenizer not found at {}, service will be unavailable", TOKENIZER_PATH);
+                        log.warn("在 {} 未找到重排器 tokenizer，服务将不可用", TOKENIZER_PATH);
                         return;
                     }
                     tokenizer = HuggingFaceTokenizer.newInstance(tokenizerIs, Map.of(
@@ -100,14 +100,14 @@ public class OnnxRerankerService {
             if (!modelPath.isBlank()) {
                 Path modelFile = Path.of(modelPath, "model.onnx");
                 if (!Files.exists(modelFile)) {
-                    log.warn("Reranker model not found at {}, service will be unavailable", modelFile);
+                    log.warn("在 {} 未找到重排模型，服务将不可用", modelFile);
                     return;
                 }
                 modelBytes = Files.readAllBytes(modelFile);
             } else {
                 try (InputStream modelIs = getClass().getResourceAsStream(MODEL_PATH)) {
                     if (modelIs == null) {
-                        log.warn("Reranker model not found at {}, service will be unavailable", MODEL_PATH);
+                        log.warn("在 {} 未找到重排模型，服务将不可用", MODEL_PATH);
                         return;
                     }
                     modelBytes = modelIs.readAllBytes();
@@ -121,14 +121,14 @@ public class OnnxRerankerService {
                 session = env.createSession(modelBytes, options);
             }
 
-            log.info("Reranker model loaded. Inputs: {}, Outputs: {}",
+            log.info("重排模型加载完成。输入：{}，输出：{}",
                     session.getInputNames(), session.getOutputNames());
 
             this.available = true;
-            log.info("ONNX Reranker service initialized successfully");
+            log.info("ONNX 重排服务初始化成功");
 
         } catch (Exception e) {
-            log.error("Failed to initialize ONNX Reranker, service will be unavailable", e);
+            log.error("ONNX 重排器初始化失败，服务将不可用", e);
         }
     }
 
@@ -193,7 +193,7 @@ public class OnnxRerankerService {
                      "attention_mask", maskTensor
              ))) {
 
-            // logits shape: [batchSize, 1]
+            // logits 形状：[batchSize, 1]
             float[][] logits = (float[][]) result.get(0).getValue();
             List<Float> scores = new ArrayList<>(batchSize);
             for (float[] logit : logits) {
@@ -202,7 +202,7 @@ public class OnnxRerankerService {
             return scores;
 
         } catch (Exception e) {
-            log.warn("Reranker batch inference failed, falling back to serial per-item", e);
+            log.warn("重排器批量推理失败，降级为逐条串行", e);
             // 降级：逐条串行
             int failedCount = 0;
             int validCount = 0;
@@ -233,11 +233,11 @@ public class OnnxRerankerService {
         long[] inputIds = encoding.getIds();
         long[] attentionMask = encoding.getAttentionMask();
 
-        // Ensure sequence length matches what ONNX model expects
+        // 确保序列长度与 ONNX 模型期望的一致
         int seqLen = Math.min(inputIds.length, MAX_LENGTH);
         long[] shape = {1, seqLen};
 
-        // Truncate/pad to MAX_LENGTH
+        // 截断或填充到 MAX_LENGTH
         long[] trimmedIds = new long[seqLen];
         long[] trimmedMask = new long[seqLen];
         System.arraycopy(inputIds, 0, trimmedIds, 0, seqLen);
@@ -250,7 +250,7 @@ public class OnnxRerankerService {
                      "attention_mask", maskTensor
              ))) {
 
-            // logits shape: [1, 1]
+            // logits 形状：[1, 1]
             float[][] logits = (float[][]) result.get(0).getValue();
             float logit = logits[0][0];
 
@@ -258,7 +258,7 @@ public class OnnxRerankerService {
             return sigmoid(logit);
 
         } catch (OrtException e) {
-            log.warn("Reranker inference failed for doc: {}", truncate(doc, 50), e);
+            log.warn("文档重排推理失败：{}", truncate(doc, 50), e);
             return 0.0f;
         }
     }
@@ -278,7 +278,7 @@ public class OnnxRerankerService {
                 session.close();
             }
         } catch (OrtException e) {
-            log.warn("Error closing reranker session", e);
+            log.warn("关闭重排器会话时出错", e);
         }
     }
 }
