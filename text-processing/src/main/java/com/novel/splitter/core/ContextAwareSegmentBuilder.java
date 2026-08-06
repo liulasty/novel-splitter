@@ -170,7 +170,7 @@ public class ContextAwareSegmentBuilder extends SemanticSegmentBuilder {
                 return false; // 相似度低，建议切分
             }
         } catch (Exception e) {
-            log.warn("Error evaluating semantic merge, falling back to rule-based: {}", e.getMessage());
+            log.warn("语义合并评估出错，回退到基于规则的方式：{}", e.getMessage());
             // 发生异常时回退到基于规则的评估
             return null;
         }

@@ -196,7 +196,7 @@ public class ChapterRecognizer {
                             .endParagraphIndex(body.get(i - 1).getIndex())
                             .build());
                 }
-                // else: consecutive title (e.g. "书名第X章" + "第X章"), skip without creating empty chapter
+                // 否则为连续标题（如 "书名第X章" + "第X章"），跳过且不创建空章节
 
                 currentBodyStart = i;
                 currentTitle = p.getContent();

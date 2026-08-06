@@ -1,7 +1,7 @@
 package com.novel.splitter.core;
 
 /**
- * Drops low-signal lines common in crawled TXT (TOC headers, separator rules) before paragraph indexing.
+ * 在段落索引前剔除爬取 TXT 中常见的低价值行（目录头、分隔规则线等）。
  */
 public final class NovelLineNoiseFilter {
 
@@ -9,8 +9,8 @@ public final class NovelLineNoiseFilter {
     }
 
     /**
-     * @param content trimmed line (non-null)
-     * @return true if this line should not become a {@link com.novel.splitter.domain.model.RawParagraph}
+     * @param content 已 trim 的行（非 null）
+     * @return 若该行不应成为 {@link com.novel.splitter.domain.model.RawParagraph}，则返回 true
      */
     public static boolean shouldSkipParagraphLine(String content) {
         if (content.isEmpty()) {
@@ -22,14 +22,14 @@ public final class NovelLineNoiseFilter {
         if (content.length() < 3) {
             return false;
         }
-        // decorative lines (all dashes, equals, asterisks, etc.)
+        // 装饰性分隔线（全为横线、等号、星号等）
         if (content.codePoints().allMatch(cp ->
                 cp == '-' || cp == '—' || cp == '－' || cp == '='
                         || cp == '＝' || cp == '~' || cp == '_' || cp == '*'
                         || cp == '·' || Character.isWhitespace(cp))) {
             return true;
         }
-        // metadata / site banner lines
+        // 元数据 / 站点横幅行
         String lower = content.toLowerCase();
         if (isMetadataLine(content, lower)) {
             return true;
@@ -38,23 +38,23 @@ public final class NovelLineNoiseFilter {
     }
 
     private static boolean isMetadataLine(String content, String lower) {
-        // author line
+        // 作者行
         if (content.startsWith("作者") || content.startsWith("作者：") || content.startsWith("作者:")) {
             return true;
         }
-        // publish annotation: "发表于", "出品", "首发"
+        // 发布标注："发表于"、"出品"、"首发"
         if (lower.contains("发表于") || lower.contains("出品") || lower.contains("首发")) {
             return true;
         }
-        // standalone publication site/domain (e.g. "sexinsex", "sis", "eyny")
+        // 独立的发布站点/域名（如 "sexinsex"、"sis"、"eyny"）
         if (lower.matches(".*(sexinsex|sis|eyny|chinya|春满四合院|第一会所).*")) {
             return true;
         }
-        // standalone date line (e.g. "2020/10/06", "2014-7-1")
+        // 独立的日期行（如 "2020/10/06"、"2014-7-1"）
         if (content.matches("^\\d{4}[/\\-.]\\d{1,2}[/\\-.]\\d{1,2}$")) {
             return true;
         }
-        // continuation marker (e.g. "（待续）")
+        // 连载未完标记（如 "（待续）"）
         if (content.matches("^[（(].*[待续完结未终].*[）)]$") && content.length() < 20) {
             return true;
         }
