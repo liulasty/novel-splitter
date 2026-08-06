@@ -163,7 +163,12 @@ public interface JpaSceneRepository extends JpaRepository<JpaSceneEntity, Long>,
             @Param("ver") String version,
             @Param("rid") String embedRunId);
 
+    /**
+     * 显式 CAST 为 jsonb：避免 Hibernate 按 varchar 绑定参数导致 PG 报
+     * 「column metadata_json is of type jsonb but expression is of type character varying」。
+     */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query("UPDATE JpaSceneEntity s SET s.metadataJson = :json WHERE s.id = :id AND s.isDeleted = false")
+    @Query(value = "UPDATE scenes SET metadata_json = CAST(:json AS jsonb) WHERE id = :id AND is_deleted = false",
+            nativeQuery = true)
     int updateMetadataJson(@Param("id") Long persistenceId, @Param("json") String metadataJson);
 }

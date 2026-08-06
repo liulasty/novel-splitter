@@ -54,4 +54,29 @@ class SceneRepositoryJpaImplUpdateMetadataTest {
         assertDoesNotThrow(() -> repo.updateScenesMetadata(List.of(noMeta, noPid)));
         verify(jpa, never()).updateMetadataJson(Mockito.anyLong(), Mockito.anyString());
     }
+
+    @Test
+    void updateScenesMetadata_skipsWhenSerializationReturnsNull() {
+        JpaSceneRepository jpa = mock(JpaSceneRepository.class);
+        SceneMapper mapper = mock(SceneMapper.class);
+        SceneRepository repo = repo(jpa, mapper);
+
+        Scene s = Scene.builder().persistenceId(10L).metadata(new SceneMetadata()).build();
+        when(mapper.metadataToJson(s.getMetadata())).thenReturn(null);
+
+        repo.updateScenesMetadata(List.of(s));
+
+        verify(jpa, never()).updateMetadataJson(Mockito.anyLong(), Mockito.anyString());
+    }
+
+    @Test
+    void updateScenesMetadata_emptyOrNullList_noop() {
+        JpaSceneRepository jpa = mock(JpaSceneRepository.class);
+        SceneMapper mapper = mock(SceneMapper.class);
+        SceneRepository repo = repo(jpa, mapper);
+
+        assertDoesNotThrow(() -> repo.updateScenesMetadata(List.of()));
+        assertDoesNotThrow(() -> repo.updateScenesMetadata(null));
+        verify(jpa, never()).updateMetadataJson(Mockito.anyLong(), Mockito.anyString());
+    }
 }

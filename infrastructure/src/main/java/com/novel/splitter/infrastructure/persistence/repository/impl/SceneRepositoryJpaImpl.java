@@ -248,6 +248,8 @@ public class SceneRepositoryJpaImpl implements SceneRepository {
             String json = sceneMapper.metadataToJson(scene.getMetadata());
             if (json != null) {
                 jpaSceneRepository.updateMetadataJson(scene.getPersistenceId(), json);
+            } else {
+                log.warn("场景元数据序列化失败，跳过 persistenceId={}", scene.getPersistenceId());
             }
         }
     }
