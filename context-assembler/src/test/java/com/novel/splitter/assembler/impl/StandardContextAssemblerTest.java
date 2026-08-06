@@ -184,4 +184,20 @@ class StandardContextAssemblerTest {
         assertNull(result.get(0).getPrefixContext(), "首块不拼接前缀");
         assertEquals("上文", result.get(1).getPrefixContext(), "孤立块携带 prefixContext");
     }
+
+    @Test
+    void testAssemble_metadataIncludesStructuredFields() {
+        config.setExpandRadius(-1);
+        when(tokenCounter.count(anyString())).thenReturn(10);
+        Scene s1 = createScene("1", "正文", 1, 1, 0.9);
+        s1.getMetadata().setCharacters(List.of("萧炎"));
+        s1.getMetadata().setLocation("乌坦城");
+        s1.getMetadata().setRole("narration");
+
+        List<ContextBlock> result = assembler.assemble("q", List.of(s1), config);
+
+        assertEquals(List.of("萧炎"), result.get(0).getMetadata().get("characters"));
+        assertEquals("乌坦城", result.get(0).getMetadata().get("location"));
+        assertEquals("narration", result.get(0).getMetadata().get("role"));
+    }
 }

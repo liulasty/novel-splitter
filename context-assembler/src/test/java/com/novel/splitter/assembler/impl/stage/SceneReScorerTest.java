@@ -84,4 +84,17 @@ class SceneReScorerTest {
 
         assertEquals(0.8, list.get(0).getScore(), 1e-6);
     }
+
+    @Test
+    void heuristic_entityScoreHitsWhenCharactersPopulated() {
+        SceneMetadata meta = SceneMetadata.builder().characters(List.of("萧炎")).build();
+        Scene s1 = scene(0.5, null);
+        s1.setMetadata(meta);
+        List<Scene> list = List.of(s1);
+
+        reScorer.rescore(list, "萧炎", config);
+
+        // 0.6*0.5 + 0.2*0（关键词未命中） + 0.1*0.1（实体命中1个） + 0.1*0（质量未计算） - 0 = 0.31
+        assertEquals(0.31, list.get(0).getScore(), 1e-9);
+    }
 }

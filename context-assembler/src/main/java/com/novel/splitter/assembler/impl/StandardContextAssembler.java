@@ -88,6 +88,9 @@ public class StandardContextAssembler implements ContextAssembler {
                 metadata.put("novelName", scene.getMetadata().getNovel());
                 metadata.put("chapterTitle", scene.getMetadata().getChapterTitle());
                 metadata.put("chapterIndex", scene.getMetadata().getChapterIndex());
+                metadata.put("characters", scene.getMetadata().getCharacters());
+                metadata.put("location", scene.getMetadata().getLocation());
+                metadata.put("role", scene.getMetadata().getRole());
                 if (scene.getMetadata().getExtra() != null) {
                     metadata.putAll(scene.getMetadata().getExtra());
                 }
