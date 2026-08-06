@@ -25,7 +25,7 @@ public class RequestDebugInterceptor implements HandlerInterceptor {
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
         request.setAttribute(START_MS_ATTR, System.currentTimeMillis());
         if (log.isDebugEnabled()) {
-            log.debug("API request start, traceId={}, req={}",
+            log.debug("API 请求开始, traceId={}, req={}",
                     MDC.get(TraceIdInterceptor.TRACE_ID_KEY),
                     requestSummary(request));
         }
@@ -43,14 +43,14 @@ public class RequestDebugInterceptor implements HandlerInterceptor {
 
         if (log.isDebugEnabled()) {
             if (ex != null) {
-                log.debug("API request end, traceId={}, status={}, costMs={}, req={}, ex={}",
+                log.debug("API 请求结束, traceId={}, status={}, costMs={}, req={}, ex={}",
                         MDC.get(TraceIdInterceptor.TRACE_ID_KEY),
                         response.getStatus(),
                         costMs,
                         requestSummary(request),
                         ex.getClass().getSimpleName());
             } else {
-                log.debug("API request end, traceId={}, status={}, costMs={}, req={}",
+                log.debug("API 请求结束, traceId={}, status={}, costMs={}, req={}",
                         MDC.get(TraceIdInterceptor.TRACE_ID_KEY),
                         response.getStatus(),
                         costMs,

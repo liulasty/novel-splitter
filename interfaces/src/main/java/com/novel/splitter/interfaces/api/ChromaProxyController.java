@@ -23,7 +23,7 @@ public class ChromaProxyController {
         return chromaAdminService.proxyGet("/api/v2/tenants/" + DEFAULT_TENANT + "/databases/" + DEFAULT_DATABASE + "/collections");
     }
 
-    // --- System Endpoints ---
+    // --- 系统端点 ---
 
     @Operation(summary = "预检检查", description = "获取Chroma的预检检查状态")
     @GetMapping("/pre-flight-checks")
@@ -37,7 +37,7 @@ public class ChromaProxyController {
         return chromaAdminService.proxyGet("/api/v2/auth/identity");
     }
 
-    // --- Tenant Endpoints ---
+    // --- 租户端点 ---
 
     @Operation(summary = "获取租户列表", description = "获取所有租户信息")
     @GetMapping("/tenants")
@@ -57,7 +57,7 @@ public class ChromaProxyController {
         return chromaAdminService.proxyPatch("/api/v2/tenants/" + name, body);
     }
 
-    // --- Database Endpoints ---
+    // --- 数据库端点 ---
 
     @Operation(summary = "获取数据库列表", description = "获取指定租户下的所有数据库")
     @GetMapping("/tenants/{t}/databases")
@@ -83,7 +83,7 @@ public class ChromaProxyController {
         return chromaAdminService.proxyDelete("/api/v2/tenants/" + t + "/databases/" + d);
     }
 
-    // --- Collection Endpoints ---
+    // --- 集合端点 ---
 
     @Operation(summary = "创建集合", description = "在默认租户和数据库下创建新集合")
     @PostMapping("/collections")
@@ -109,7 +109,7 @@ public class ChromaProxyController {
         return chromaAdminService.proxyDelete("/api/v2/tenants/" + DEFAULT_TENANT + "/databases/" + DEFAULT_DATABASE + "/collections/" + id);
     }
 
-    // --- Collection Action Endpoints ---
+    // --- 集合操作端点 ---
 
     @Operation(summary = "添加文档", description = "向指定集合添加文档")
     @PostMapping("/collections/{id}/add")

@@ -5,8 +5,8 @@ import com.novel.splitter.application.port.out.TaskCachePort;
 import org.springframework.stereotype.Component;
 
 /**
- * Default task cache adapter: disabled (no-op).
- * Can be replaced by a real cache adapter (Caffeine/Redis) when needed.
+ * 默认任务缓存适配器：禁用（no-op）。
+ * 需要时可由真实缓存适配器（Caffeine/Redis）替换。
  */
 @Component
 public class NoOpTaskCacheAdapter implements TaskCachePort {
@@ -17,12 +17,12 @@ public class NoOpTaskCacheAdapter implements TaskCachePort {
 
     @Override
     public void put(String taskId, PollResponse value) {
-        // no-op
+        // 空操作
     }
 
     @Override
     public void evict(String taskId) {
-        // no-op
+        // 空操作
     }
 }
 

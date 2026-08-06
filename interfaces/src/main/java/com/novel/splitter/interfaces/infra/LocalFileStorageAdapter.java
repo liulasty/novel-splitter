@@ -58,12 +58,12 @@ public class LocalFileStorageAdapter implements FileStoragePort {
             throw new IllegalArgumentException("path must not be blank");
         }
         String p = absoluteOrRelativePath.trim();
-        // Try interpret as already-relative first.
+        // 先尝试将其视为已是相对路径。
         try {
             resolve(p);
             return p.replace('\\', '/');
         } catch (RuntimeException ignored) {
-            // fallthrough
+            // 未命中则继续按绝对路径处理
         }
 
         Path abs = Paths.get(p).toAbsolutePath().normalize();
@@ -89,7 +89,7 @@ public class LocalFileStorageAdapter implements FileStoragePort {
                 try {
                     Files.deleteIfExists(p);
                 } catch (IOException e) {
-                    log.warn("Failed to delete {}", p, e);
+                    log.warn("删除失败: {}", p, e);
                 }
             });
         }
