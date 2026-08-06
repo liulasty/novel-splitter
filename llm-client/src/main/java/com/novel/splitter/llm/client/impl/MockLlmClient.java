@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
  */
 public class MockLlmClient implements LlmClient {
 
-    private static final Pattern NOUN_PATTERN = Pattern.compile("\\b[A-Za-z\\u4e00-\\u9fa5]+\\b"); // Simple word matching for English and Chinese
+    private static final Pattern NOUN_PATTERN = Pattern.compile("\\b[A-Za-z\\u4e00-\\u9fa5]+\\b"); // 对英文和中文的简单单词匹配
 
     @Override
     public Answer chat(Prompt prompt) {

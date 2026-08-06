@@ -39,7 +39,7 @@ public class RobustLlmClient {
             return validateAndRepair(answer);
 
         } catch (Exception e) {
-            log.error("LLM chat failed: {}", e.getMessage());
+            log.error("LLM 对话失败: {}", e.getMessage());
             throw e;
         }
     }
@@ -67,7 +67,7 @@ public class RobustLlmClient {
         }
 
         if (modified) {
-            log.debug("Auto-repaired LLM answer format: {}", answer);
+            log.debug("已自动修复 LLM 回答格式: {}", answer);
         }
         
         return answer;

@@ -11,13 +11,13 @@ public class CozeProperties {
     private String apiKey;
     private String botId;
     private String userId = "user_default";
-    private int timeoutSeconds = 300; // Default timeout: 5 minutes
+    private int timeoutSeconds = 300; // 默认超时时间：5 分钟
     private RateLimitConfig rateLimit;
 
     @Data
     public static class RateLimitConfig {
         private boolean enabled = true;
-        private int maxRequests = 2; // Coze rate limits can be strict for free tier
+        private int maxRequests = 2; // Coze 免费套餐的限流可能较严格
         private int durationSeconds = 60;
     }
 }

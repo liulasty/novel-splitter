@@ -20,7 +20,7 @@ class CozeLlmClientTest {
         CozeProperties properties = new CozeProperties();
         properties.setApiKey("test-key");
         properties.setBotId("test-bot-id");
-        properties.setBaseUrl("http://localhost:8080"); // Mock URL
+        properties.setBaseUrl("http://localhost:8080"); // Mock 地址
         
         CozeProperties.RateLimitConfig rateLimit = new CozeProperties.RateLimitConfig();
         rateLimit.setEnabled(true);
@@ -30,24 +30,24 @@ class CozeLlmClientTest {
 
         cozeLlmClient = new CozeLlmClient(properties, objectMapper);
 
-        // Reflection to get the RestClient's underlying MockRestServiceServer
-        // Since CozeLlmClient builds its own RestClient, we need to inject a mock-capable one or use a different approach.
-        // For simplicity in this environment, let's just test the logic if possible, or we might need to refactor Client to accept RestClient builder.
-        // Actually, Spring's RestClient.builder() creates a real client. To mock it, we usually need `RestClient.Builder` to be injected or configured.
-        
-        // However, since we cannot easily change the production code signature right now without breaking things, 
-        // let's try a partial integration test approach or just rely on the fact that we implemented it carefully.
-        // 
-        // A better approach for unit testing here would be to mock the RestClient. 
-        // But `RestClient` is final or hard to mock directly without a wrapper.
+        // 通过反射获取 RestClient 底层的 MockRestServiceServer
+        // 由于 CozeLlmClient 内部自行构建 RestClient，我们需要注入一个可 mock 的实现或改用其他方案。
+        // 为简化本环境下的测试，尽量只测逻辑；或者可能需要重构 Client 以接受 RestClient.Builder。
+        // 实际上，Spring 的 RestClient.builder() 会创建真实的客户端。要 mock 它，通常需要注入或配置 RestClient.Builder。
+
+        // 不过，目前不便轻易修改生产代码签名（以免破坏现有功能），
+        // 因此退而采用部分集成测试方式，或者依赖我们已仔细实现的代码。
         //
-        // Let's Skip complex mocking for now and trust the implementation, 
-        // but we can create a simple manual test runner if the user wants to verify connectivity.
-        // 
-        // Alternatively, we can use @RestClientTest if we were in a full Spring context, but that's heavy.
+        // 这里更好的单元测试方案是 mock RestClient。
+        // 但 RestClient 是 final 类，没有包装层很难直接 mock。
+        //
+        // 暂时跳过复杂的 mock，信任当前实现；
+        // 如果用户需要验证连通性，可以编写一个简单的手动测试运行器。
+        //
+        // 另一种方案是使用 @RestClientTest（在完整 Spring 上下文下），但那样较重量级。
     }
-    
-    // Placeholder test to ensure class compiles and basic init works
+
+    // 占位测试，确保类可编译且基础初始化正常
     @Test
     void shouldInitialize() {
         assertThat(cozeLlmClient).isNotNull();

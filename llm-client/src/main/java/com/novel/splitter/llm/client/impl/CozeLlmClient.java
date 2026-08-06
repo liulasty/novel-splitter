@@ -18,8 +18,8 @@ import java.util.LinkedList;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Coze API Client Implementation.
- * Uses Coze v3 Chat API (Non-streaming with Polling).
+ * Coze API 客户端实现。
+ * 使用 Coze v3 Chat API（非流式 + 轮询）。
  */
 @Slf4j
 public class CozeLlmClient implements LlmClient {
@@ -40,7 +40,7 @@ public class CozeLlmClient implements LlmClient {
                 properties.getRateLimit().getMaxRequests(),
                 properties.getRateLimit().getDurationSeconds()
         );
-        log.info("Initialized CozeLlmClient with url: {}, botId: {}", properties.getBaseUrl(), properties.getBotId());
+        log.info("CozeLlmClient 初始化完成，URL: {}, botId: {}", properties.getBaseUrl(), properties.getBotId());
     }
 
     @Override
@@ -49,17 +49,17 @@ public class CozeLlmClient implements LlmClient {
             throw new IllegalArgumentException("Coze Bot ID is not configured. Please set COZE_BOT_ID in .env or application.yml");
         }
 
-        // Rate Limit Check
+        // 速率限制检查
         rateLimiter.acquire();
 
-        log.info("Starting Coze chat session for Bot ID: {}", properties.getBotId());
+        log.info("正在为 Bot ID: {} 启动 Coze 对话会话", properties.getBotId());
 
-        // 1. Construct Message Content
-        // Coze bots have their own system prompt, but we need to inject our RAG context and instructions.
-        // We will combine everything into a single User message to ensure it's processed.
+        // 1. 构建消息内容
+        // Coze 机器人有自己的系统提示词，但我们需要注入我们的 RAG 上下文和指令。
+        // 我们会把所有内容合并成一条用户消息，确保其被处理。
         StringBuilder fullContent = new StringBuilder();
-        
-        // System Instruction Part
+
+        // 系统指令部分
         fullContent.append("[System Instruction]\n");
         fullContent.append(prompt.getSystemInstruction());
         if (prompt.getOutputConstraint() != null && !prompt.getOutputConstraint().isEmpty()) {
@@ -67,7 +67,7 @@ public class CozeLlmClient implements LlmClient {
         }
         fullContent.append("\n\nYou MUST respond with valid JSON matching the schema provided.\n\n");
 
-        // Context Part
+        // 上下文部分
         if (prompt.getContextBlocks() != null && !prompt.getContextBlocks().isEmpty()) {
             fullContent.append("[Context Information]\n");
             for (ContextBlock block : prompt.getContextBlocks()) {
@@ -85,11 +85,11 @@ public class CozeLlmClient implements LlmClient {
             fullContent.append("\n");
         }
 
-        // Question Part
+        // 问题部分
         fullContent.append("[User Question]\n").append(prompt.getUserQuestion());
         fullContent.append("\n\nPlease answer the question in the specified JSON format.");
 
-        // 2. Create Chat
+        // 2. 创建对话
         CozeChatRequest request = CozeChatRequest.builder()
                 .bot_id(properties.getBotId())
                 .user_id(properties.getUserId())
@@ -121,23 +121,23 @@ public class CozeLlmClient implements LlmClient {
             }
 
             if (chatResponse.getData() == null) {
-                // If code is 0 but data is null, that's unexpected for a success response
+                // 如果 code 为 0 但 data 为空，对成功响应而言属于意外情况
                 throw new RuntimeException("Failed to create Coze chat: Success code (0) but empty data. Full response: " + chatResponse);
             }
 
             String chatId = chatResponse.getData().getId();
             String conversationId = chatResponse.getData().getConversation_id();
             
-            log.info("Coze Chat created. ID: {}, Status: {}", chatId, chatResponse.getData().getStatus());
+            log.info("Coze 对话已创建，ID: {}, 状态: {}", chatId, chatResponse.getData().getStatus());
 
-            // 3. Poll for Completion
+            // 3. 轮询等待完成
             waitForCompletion(chatId, conversationId);
 
-            // 4. Retrieve Messages
+            // 4. 获取消息
             return retrieveAnswer(chatId, conversationId);
 
         } catch (Exception e) {
-            log.error("Coze API call failed", e);
+            log.error("Coze API 调用失败", e);
             throw new RuntimeException("Coze API call failed: " + e.getMessage(), e);
         }
     }
@@ -149,7 +149,7 @@ public class CozeLlmClient implements LlmClient {
 
         while (!"completed".equals(status) && attempt < maxRetries) {
             try {
-                TimeUnit.SECONDS.sleep(1); // Poll every 1 second
+                TimeUnit.SECONDS.sleep(1); // 每 1 秒轮询一次
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new RuntimeException("Interrupted while waiting for Coze response");
@@ -172,7 +172,7 @@ public class CozeLlmClient implements LlmClient {
                     }
                 }
             } catch (Exception e) {
-                log.warn("Failed to poll Coze status: {}", e.getMessage());
+                log.warn("轮询 Coze 状态失败: {}", e.getMessage());
             }
             attempt++;
         }
@@ -196,15 +196,15 @@ public class CozeLlmClient implements LlmClient {
             throw new RuntimeException("Failed to retrieve Coze messages");
         }
 
-        // Find the assistant's answer
+        // 查找助手的回答
         String answerContent = listResponse.getData().stream()
                 .filter(msg -> "assistant".equals(msg.getRole()) && "answer".equals(msg.getType()))
                 .map(CozeMessageListResponse.CozeMessageDetail::getContent)
-                .reduce("", (a, b) -> a + b); // Combine parts if any
+                .reduce("", (a, b) -> a + b); // 如有多个部分则合并
 
-        log.info("Coze raw response content: {}", answerContent);
-        
-        // Clean up Markdown
+        log.info("Coze 原始响应内容: {}", answerContent);
+
+        // 清理 Markdown
         if (answerContent.contains("```json")) {
             answerContent = answerContent.replace("```json", "").replace("```", "");
         } else if (answerContent.contains("```")) {
@@ -220,12 +220,12 @@ public class CozeLlmClient implements LlmClient {
         try (JsonParser parser = objectMapper.createParser(answerContent)) {
             return parser.readValueAs(Answer.class);
         } catch (Exception e) {
-            log.error("Failed to parse JSON from Coze response: {}", answerContent);
+            log.error("从 Coze 响应解析 JSON 失败: {}", answerContent);
             throw new RuntimeException("Invalid JSON from Coze: " + e.getMessage(), e);
         }
     }
 
-    // Rate Limiter
+    // 限流器
     private static class RateLimiter {
         private final int maxRequests;
         private final long durationMillis;

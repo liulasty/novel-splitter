@@ -16,7 +16,7 @@ public class GeminiProperties {
     @Data
     public static class RateLimitConfig {
         private boolean enabled = true;
-        private int maxRequests = 15; // Gemini Free tier is higher usually (15 RPM)
+        private int maxRequests = 15; // Gemini 免费套餐限制通常更高 (15 RPM)
         private int durationSeconds = 60;
     }
 }
