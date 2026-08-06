@@ -78,8 +78,8 @@ public class SceneMerger {
         }
         
         // 允许少许重叠或间隔 (例如差值 <= 1)
-        // s1.end = 10, s2.start = 11 -> adjacent
-        // s1.end = 10, s2.start = 12 -> gap = 1 (ok)
+        // s1.end = 10, s2.start = 11 -> 邻接
+        // s1.end = 10, s2.start = 12 -> 间隔 1（可接受）
         int gap = s2.getStartParagraphIndex() - s1.getEndParagraphIndex();
         return gap <= 2 && gap >= -5; // 允许少量重叠或间隔
     }

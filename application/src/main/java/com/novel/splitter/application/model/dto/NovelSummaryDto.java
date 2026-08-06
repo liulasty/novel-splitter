@@ -6,7 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * DB-first novel summary for listings.
+ * 面向列表展示的小说摘要（数据来自数据库，而非文件名推断）。
  */
 @Data
 @Builder

@@ -3,9 +3,9 @@ package com.novel.splitter.application.port.out;
 import com.novel.splitter.application.model.dto.PollResponse;
 
 /**
- * Task cache port for fast polling.
+ * 用于快速轮询的任务缓存端口。
  *
- * Contract: taskId is tracking-only and must not leak into business storage.
+ * 约定：taskId 仅用于追踪，不得泄漏进业务存储。
  */
 public interface TaskCachePort {
     PollResponse get(String taskId);

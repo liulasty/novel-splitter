@@ -15,8 +15,8 @@ public class SplitTaskDto {
     private TaskType taskType;
     private String novelId;
     /**
-     * Human-facing display title for the novel (from DB).
-     * Optional for backward compatibility.
+     * 小说展示标题（面向用户，来自数据库）。
+     * 可选，为向后兼容保留。
      */
     private String novelTitle;
     private String fileName;

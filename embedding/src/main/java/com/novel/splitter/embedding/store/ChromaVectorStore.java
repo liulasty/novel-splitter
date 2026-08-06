@@ -665,7 +665,7 @@ public class ChromaVectorStore implements VectorStore {
                 collectionIdByCollection.put(colName, collectionId);
                 return collectionId;
             }
-            // GET by name
+            // 按名称 GET
             ChromaCollection existing = getCollectionByNameOrNull(colName);
             if (existing != null && existing.getId() != null) {
                 assertCollectionDistance(existing);
@@ -676,7 +676,7 @@ public class ChromaVectorStore implements VectorStore {
                 log.info("已绑定 ChromaDB collection '{}' -> id {}", colName, existing.getId());
                 return existing.getId();
             }
-            // POST create
+            // POST 创建
             Map<String, Object> createBody = Map.of(
                     "name", colName,
                     "metadata", Map.of(CHROMA_HNSW_SPACE_KEY, hnswSpace)

@@ -114,7 +114,7 @@ public interface VectorStore {
      * 删除一个集合及其包含的全部向量；集合不存在视为成功。
      */
     default void deleteCollection(String name) {
-        // no-op
+        // 空操作
     }
 
     /**

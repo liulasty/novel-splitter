@@ -31,7 +31,7 @@ public class MockVectorStore implements VectorStore {
 
     @Override
     public void delete(Map<String, Object> filter) {
-        // Mock delete
+        // 模拟删除
     }
 
     @Override

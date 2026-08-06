@@ -6,9 +6,9 @@ import java.nio.file.Path;
 import java.util.List;
 
 /**
- * File storage port.
+ * 文件存储端口。
  *
- * Application layer speaks in storage-root relative paths; adapters decide how/where to persist.
+ * 应用层使用相对存储根目录的路径通信；由各适配器决定如何/何处持久化。
  */
 public interface FileStoragePort {
     void write(String relativePath, InputStream content, boolean replaceExisting) throws IOException;
@@ -18,8 +18,8 @@ public interface FileStoragePort {
     Path toAbsolutePath(String relativePath) throws IOException;
 
     /**
-     * Normalize an absolute or relative path into a storage-root relative path using '/' separators.
-     * Implementations should reject paths that point outside the storage root.
+     * 将绝对或相对路径归一化为使用 '/' 分隔符的、相对存储根目录的路径。
+     * 实现应拒绝指向存储根目录之外的路径。
      */
     String toRelativePath(String absoluteOrRelativePath) throws IOException;
 

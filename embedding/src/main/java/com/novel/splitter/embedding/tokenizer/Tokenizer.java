@@ -30,9 +30,7 @@ public class Tokenizer {
         // 简单的规范化处理：防止空指针异常
         if (text == null) text = "";
         
-        // Simple normalization: just trim? 
-        // BGE handles Chinese chars by putting spaces, but our vocab map likely has raw chars.
-        // Let's iterate characters.
+        // 简单规范化：直接 trim 就行吗？
         // BGE 模型在处理中文字符时通常会加上空格，但这里的词表大概率包含原始中文字符，
         // 因此直接通过逐字符遍历进行分词。
         
@@ -45,21 +43,17 @@ public class Tokenizer {
             char c = text.charAt(i);
             String token = String.valueOf(c);
             
-            // Try to find token in vocab
             // 尝试在词汇表中查找当前字符对应的词元 ID
             Long id = vocabulary.getId(token);
             if (id == null) {
-                // Try lower case? BGE usually is uncased but config said lowercase: false
-                // But let's try just in case for English
-                // Actually, let's stick to simple lookup first.
-                // If not found, use UNK
+                // 试试转小写？BGE 通常不区分大小写，但配置里是 lowercase: false
+                // 不过为了英文先试一下也无妨；实际上先坚持简单查找。
                 // 如果在词表中未找到该字符，则使用 [UNK] (未知) 标记的 ID
                 id = vocabulary.getUnkId();
             }
             
             ids.add(id);
             
-            // Truncate if too long (reserve space for SEP)
             // 截断过长的文本，保留一个位置给末尾的 [SEP] 标记
             if (ids.size() >= MAX_LENGTH - 1) {
                 break;
@@ -69,7 +63,6 @@ public class Tokenizer {
         // 在序列有效内容的末尾添加 [SEP] 标记
         ids.add(vocabulary.getSepId());
         
-        // Padding
         // 执行填充操作，确保最终输出的序列长度符合 MAX_LENGTH 的要求
         int actualLength = ids.size();
         long[] inputIds = new long[MAX_LENGTH];
