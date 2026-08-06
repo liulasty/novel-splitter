@@ -169,7 +169,7 @@ public class RagOrchestrationService implements RagFacade {
     /**
      * 根据请求参数构建 AssemblerConfig，请求中提供的值覆盖服务端默认值。
      */
-    private AssemblerConfig buildAssemblerConfig(com.novel.splitter.retrieval.dto.RagRequest request) {
+    AssemblerConfig buildAssemblerConfig(com.novel.splitter.retrieval.dto.RagRequest request) {
         AssemblerConfig config = new AssemblerConfig();
         config.setMaxChunks(defaultAssemblerConfig.getMaxChunks());
         config.setMaxChunkLength(defaultAssemblerConfig.getMaxChunkLength());
@@ -178,6 +178,9 @@ public class RagOrchestrationService implements RagFacade {
         config.setEnableMerge(defaultAssemblerConfig.isEnableMerge());
         config.setEnableRescore(defaultAssemblerConfig.isEnableRescore());
         config.setEnableKeywordBoost(defaultAssemblerConfig.isEnableKeywordBoost());
+        config.setQualityScoreWeight(defaultAssemblerConfig.getQualityScoreWeight());
+        config.setExpandRadius(defaultAssemblerConfig.getExpandRadius());
+        config.setExpandAcrossChapters(defaultAssemblerConfig.isExpandAcrossChapters());
 
         if (request.getMaxScenes() != null && request.getMaxScenes() > 0) {
             config.setMaxScenes(request.getMaxScenes());
