@@ -3,6 +3,7 @@ package com.novel.splitter.assembler.impl;
 import com.novel.splitter.assembler.api.ContextAssembler;
 import com.novel.splitter.assembler.config.AssemblerConfig;
 import com.novel.splitter.assembler.impl.stage.SceneDeduplicator;
+import com.novel.splitter.assembler.impl.stage.SceneExpander;
 import com.novel.splitter.assembler.impl.stage.SceneMerger;
 import com.novel.splitter.assembler.impl.stage.SceneReScorer;
 import com.novel.splitter.assembler.impl.stage.TokenBudgetAllocator;
@@ -27,6 +28,7 @@ public class StandardContextAssembler implements ContextAssembler {
     private final SceneMerger merger;
     private final TokenBudgetAllocator allocator;
     private final TokenCounter tokenCounter;
+    private final SceneExpander expander;
 
     @Override
     public List<ContextBlock> assemble(String question, List<Scene> retrievedScenes, AssemblerConfig config) {
@@ -38,6 +40,9 @@ public class StandardContextAssembler implements ContextAssembler {
         // Stage 1: ReScore
         // 注意：ReScore 会直接修改 Scene 对象的 score 字段
         reScorer.rescore(retrievedScenes, question, config);
+
+        // Stage 1.5: 相邻块扩展（邻居继承锚点衰减分，插入在去重/合并前）
+        retrievedScenes = expander.expand(retrievedScenes, config);
 
         // Stage 2: Deduplicate
         List<Scene> uniqueScenes = deduplicator.deduplicate(retrievedScenes);

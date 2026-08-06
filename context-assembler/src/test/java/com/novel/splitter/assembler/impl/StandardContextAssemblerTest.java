@@ -6,6 +6,7 @@ import com.novel.splitter.assembler.support.TokenCounter;
 import com.novel.splitter.domain.model.ContextBlock;
 import com.novel.splitter.domain.model.Scene;
 import com.novel.splitter.domain.model.SceneMetadata;
+import com.novel.splitter.domain.repository.SceneRepository;
 import com.novel.splitter.embedding.service.OnnxRerankerService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,14 +34,16 @@ class StandardContextAssemblerTest {
         config.setEnableMerge(false); // Default false for simple tests
         config.setEnableRescore(false);
         config.setMaxScenes(5);
+        config.setExpandRadius(-1); // 既有测试禁用相邻扩展，保持行为不变
 
         OnnxRerankerService rerankerService = Mockito.mock(OnnxRerankerService.class);
         SceneReScorer reScorer = new SceneReScorer(rerankerService, config);
         SceneDeduplicator deduplicator = new SceneDeduplicator();
         SceneMerger merger = new SceneMerger(tokenCounter);
         TokenBudgetAllocator allocator = new TokenBudgetAllocator(tokenCounter);
+        SceneExpander expander = new SceneExpander(Mockito.mock(SceneRepository.class));
 
-        assembler = new StandardContextAssembler(reScorer, deduplicator, merger, allocator, tokenCounter);
+        assembler = new StandardContextAssembler(reScorer, deduplicator, merger, allocator, tokenCounter, expander);
     }
 
     private Scene createScene(String id, String text, int chapterIndex, int paragraphIndex, double score) {
