@@ -15,6 +15,11 @@ export function CitationItem({ citation, index }: { citation: Citation; index: n
     const chapterTitle = citation.metadata?.chapterTitle || citation.metadata?.chapter_title || citation.metadata?.chapter || "未知章节";
     const confidence = citation.score !== undefined ? ((1 - citation.score) * 100).toFixed(1) + '%' : '--';
 
+    const md = citation.metadata || {};
+    const characters = Array.isArray(md.characters) ? md.characters : [];
+    const location = md.location;
+    const role = md.role;
+
     return (
         <div
             className={cn(
@@ -29,6 +34,21 @@ export function CitationItem({ citation, index }: { citation: Citation; index: n
                     <span className="bg-white/60 px-1.5 py-0.5 rounded font-normal truncate max-w-[120px]" title={chapterTitle}>
                         {chapterTitle}
                     </span>
+                    {role && (
+                        <span className="bg-white/60 px-1.5 py-0.5 rounded text-[10px] font-normal truncate max-w-[80px]" title={role}>
+                            {role}
+                        </span>
+                    )}
+                    {location && (
+                        <span className="bg-white/60 px-1.5 py-0.5 rounded text-[10px] font-normal truncate max-w-[80px]" title={location}>
+                            {location}
+                        </span>
+                    )}
+                    {characters.length > 0 && (
+                        <span className="bg-white/60 px-1.5 py-0.5 rounded text-[10px] font-normal truncate max-w-[120px]" title={characters.join('、')}>
+                            {characters.slice(0, 3).join('、')}{characters.length > 3 ? '…' : ''}
+                        </span>
+                    )}
                     {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                 </span>
                 {citation.score !== undefined && (
