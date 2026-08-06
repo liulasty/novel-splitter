@@ -408,8 +408,8 @@ function ContextTab({ result }: { result: RagDebugResponse }) {
                                 </span>
                             )}
                             {Array.isArray((b.sceneMetadata as any)?.characters) && (b.sceneMetadata as any).characters.length > 0 && (
-                                <span className="shrink-0 rounded border border-[#6B7280]/30 bg-[#F3F4F6] px-1.5 py-0.5 text-[11px] text-[#6B7280]" style={mono}>
-                                    {(b.sceneMetadata as any).characters.slice(0, 3).join('、')}
+                                <span className="shrink-0 rounded border border-[#6B7280]/30 bg-[#F3F4F6] px-1.5 py-0.5 text-[11px] text-[#6B7280] truncate max-w-[120px]" style={mono} title={(b.sceneMetadata as any).characters.join('、')}>
+                                    {(b.sceneMetadata as any).characters.slice(0, 3).join('、')}{(b.sceneMetadata as any).characters.length > 3 ? '…' : ''}
                                 </span>
                             )}
                             <span className="shrink-0 rounded border border-[#D1D5DB] bg-[#F0EDE8] px-1.5 py-0.5 text-[11px] text-[#6B7280]" style={mono}>
