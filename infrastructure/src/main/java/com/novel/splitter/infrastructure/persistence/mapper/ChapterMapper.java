@@ -23,13 +23,13 @@ public class ChapterMapper {
         if (domain == null) return null;
         JpaChapterEntity entity = new JpaChapterEntity();
         entity.setId(domain.getId());
-        // entity.novel handled in repository impl
+        // entity.novel 在 repository 实现中处理
         entity.setTitle(domain.getTitle());
         entity.setIndexNum(domain.getIndex());
         entity.setStartLine(domain.getStartParagraphIndex());
         entity.setEndLine(domain.getEndParagraphIndex());
         entity.setWordCount(domain.getWordCount());
-        // entity.isDeleted handled by repository layer
+        // entity.isDeleted 由 repository 层处理
         return entity;
     }
 }

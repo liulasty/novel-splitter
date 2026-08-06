@@ -68,7 +68,7 @@ public class SplitTaskRepositoryJpaImpl implements SplitTaskRepository {
         if (novelId == null || novelId.isBlank()) {
             return List.of();
         }
-        // Spring Data method fixed to top50; caller should pass limit <= 50.
+        // Spring Data 方法固定查询 top50；调用方传入的 limit 需 <= 50。
         return jpaSplitTaskRepository.findTop50ByNovelIdOrderByUpdatedAtDesc(novelId).stream()
                 .limit(Math.max(0, limit))
                 .map(entity -> {

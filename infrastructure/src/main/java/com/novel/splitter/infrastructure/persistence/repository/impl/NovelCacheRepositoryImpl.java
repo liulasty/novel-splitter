@@ -57,7 +57,7 @@ public class NovelCacheRepositoryImpl implements NovelCacheRepository {
         try {
             Files.createDirectories(novelDir);
         } catch (Exception e) {
-            log.error("Failed to create parsed directory: {}", novelDir, e);
+            log.error("创建解析目录失败: {}", novelDir, e);
         }
         return novelDir.resolve("chapter_" + chapterIndex + ".json");
     }
@@ -67,9 +67,9 @@ public class NovelCacheRepositoryImpl implements NovelCacheRepository {
         Path path = parsedChapterPath(novelId, chapterIndex);
         try {
             JsonUtils.writeToFile(path, chapterData);
-            log.debug("Saved Chapter cache for novelId {} chapter {} to {}", novelId, chapterIndex, path);
+            log.debug("已保存章节缓存, novelId={} chapter={} 至 {}", novelId, chapterIndex, path);
         } catch (Exception e) {
-            log.error("Failed to save Chapter cache for novelId {} chapter {}", novelId, chapterIndex, e);
+            log.error("保存章节缓存失败, novelId={} chapter={}", novelId, chapterIndex, e);
             throw new RuntimeException("Chapter cache save failed", e);
         }
     }
@@ -83,7 +83,7 @@ public class NovelCacheRepositoryImpl implements NovelCacheRepository {
         try {
             return JsonUtils.readFromFile(path, ChapterData.class);
         } catch (Exception e) {
-            log.error("Failed to load Chapter cache for novelId {} chapter {}", novelId, chapterIndex, e);
+            log.error("加载章节缓存失败, novelId={} chapter={}", novelId, chapterIndex, e);
             throw new RuntimeException("Chapter cache load failed", e);
         }
     }
@@ -97,7 +97,7 @@ public class NovelCacheRepositoryImpl implements NovelCacheRepository {
         try {
             return Files.list(novelDir).filter(p -> p.getFileName().toString().startsWith("chapter_") && p.getFileName().toString().endsWith(".json"));
         } catch (IOException e) {
-            log.error("Failed to list chapter files for novelId {}", novelId, e);
+            log.error("列出章节文件失败, novelId={}", novelId, e);
             return Stream.empty();
         }
     }
@@ -129,9 +129,9 @@ public class NovelCacheRepositoryImpl implements NovelCacheRepository {
         try {
             deleteDirectoryRecursivelyIfExists(rawDir);
             deleteDirectoryRecursivelyIfExists(parsedDir);
-            log.info("Removed novel artifacts for novelId {}", novelId);
+            log.info("已移除小说产物, novelId={}", novelId);
         } catch (Exception e) {
-            log.warn("Failed to remove novel artifacts for novelId {}", novelId, e);
+            log.warn("移除小说产物失败, novelId={}", novelId, e);
         }
     }
 
@@ -140,9 +140,9 @@ public class NovelCacheRepositoryImpl implements NovelCacheRepository {
         Path parsedDir = parsedDirPath(novelId);
         try {
             deleteDirectoryRecursivelyIfExists(parsedDir);
-            log.info("Removed parsed artifacts for novelId {}", novelId);
+            log.info("已移除解析产物, novelId={}", novelId);
         } catch (Exception e) {
-            log.warn("Failed to remove parsed artifacts for novelId {}", novelId, e);
+            log.warn("移除解析产物失败, novelId={}", novelId, e);
         }
     }
 
@@ -153,7 +153,7 @@ public class NovelCacheRepositoryImpl implements NovelCacheRepository {
                 try {
                     Files.deleteIfExists(p);
                 } catch (IOException e) {
-                    log.warn("Failed to delete file: {}", p);
+                    log.warn("删除文件失败: {}", p);
                 }
             });
         }

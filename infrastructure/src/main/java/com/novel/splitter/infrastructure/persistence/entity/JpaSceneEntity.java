@@ -41,10 +41,10 @@ public class JpaSceneEntity {
     private String sceneId;
 
     /**
-     * Legacy column kept for DB backward compatibility.
+     * 为兼容历史数据而保留的旧字段。
      * <p>
-     * P0 contract: scenes/chapters must not depend on human-facing novelName.
-     * This value is written as a stable key (novelId) and is not used for queries.
+     * P0 约定：scenes/chapters 不得依赖面向用户的 novelName。
+     * 该值仅作为稳定键（novelId）写入，不参与查询。
      */
     @Column(name = "novel_name")
     private String legacyNovelName;

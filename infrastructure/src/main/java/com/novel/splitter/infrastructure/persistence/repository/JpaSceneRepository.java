@@ -23,7 +23,7 @@ public interface JpaSceneRepository extends JpaRepository<JpaSceneEntity, Long>,
     @Query("SELECT s.id as id, s.chapterIndex as chapterIndex, 'SCENE' as type, s.wordCount as tokenCount, SUBSTRING(s.text, 1, 150) as textContent FROM JpaSceneEntity s")
     Page<SceneLightweightProjection> findLightweightScenes(Pageable pageable);
 
-    // Custom query method for SubTask 2.2: "按 ID 列表查询的方法"
+    // SubTask 2.2 自定义查询方法：按 ID 列表查询
     @EntityGraph(attributePaths = {"novel", "chapter"})
     List<JpaSceneEntity> findByIdIn(List<Long> ids);
 

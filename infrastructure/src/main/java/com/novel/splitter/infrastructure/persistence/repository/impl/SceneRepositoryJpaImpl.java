@@ -118,7 +118,7 @@ public class SceneRepositoryJpaImpl implements SceneRepository {
                 // (novelId, version, seq) 唯一约束冲突 → 该 seq 已落库，幂等跳过。
                 // 失败实体残留在持久化上下文中会导致后续 flush 报 "don't flush after an exception"，
                 // 故必须清空上下文（IDENTITY 主键在 persist 时已执行 INSERT，失败即未写入）。
-                log.debug("Scene seq={} already exists for novelId={} version={}, skipped idempotently",
+                log.debug("场景 seq={} 已存在, novelId={} version={}, 幂等跳过",
                         s.getSeq(), novelId, version);
                 entityManager.clear();
             }
