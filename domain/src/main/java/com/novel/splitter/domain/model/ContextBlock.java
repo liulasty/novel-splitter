@@ -39,4 +39,21 @@ public class ContextBlock {
 
     /** 扩展元数据 */
     private Map<String, Object> metadata;
+
+    /** 前文上下文（上一场景结尾的重叠文本），用于组装时衔接语义；引用/溯源不显示 */
+    private String prefixContext;
+
+    public static final String PREFIX_LEAD = "[上文接续]\n";
+    public static final String PREFIX_BODY_SEP = "\n[正文]\n";
+
+    /**
+     * 供 LLM 序列化使用的正文：若设置了 prefixContext 则拼上「上文接续 + 分隔符」，
+     * 否则返回原始 content。引用/溯源仍用 {@link #getContent()}，保持干净。
+     */
+    public String effectiveContent() {
+        if (prefixContext == null || prefixContext.isBlank()) {
+            return content;
+        }
+        return PREFIX_LEAD + prefixContext + PREFIX_BODY_SEP + content;
+    }
 }
