@@ -14,8 +14,8 @@ import java.util.Set;
 
 /**
  * Stage 1.5: 相邻块扩展 (Adjacent Expansion)
- * 按锚点 Scene 的 seq 拉取前后相邻场景补全上下文；邻居继承锚点分数 × 衰减系数。
- * 插在 ReScore 之后、Deduplicate 之前：邻居不会被重排器打低分丢弃。
+ * 按锚点 Scene 的 seq 拉取前后相邻场景补全上下文；邻居跳过重排，继承锚点重排后的分数 × 衰减系数。
+ * 插在 ReScore 之后、Deduplicate 之前：邻居若参与重排会被打低分丢弃，故跳过重排、直接继承锚点分。
  */
 @Component
 @RequiredArgsConstructor
@@ -62,7 +62,10 @@ public class SceneExpander {
 
             double anchorScore = anchor.getScore() != null ? anchor.getScore() : 0.0;
             for (Scene neighbor : neighbors) {
-                if (neighbor.getId() != null && existingIds.contains(neighbor.getId())) {
+                if (neighbor.getId() == null) {
+                    continue; // 无 id 无法去重/溯源，跳过（生产场景 id 恒非空）
+                }
+                if (existingIds.contains(neighbor.getId())) {
                     continue;
                 }
                 if (!acrossChapters && neighbor.getChapterIndex() != anchor.getChapterIndex()) {
@@ -74,9 +77,7 @@ public class SceneExpander {
                 long distance = Math.abs(neighbor.getSeq() - seq);
                 double decay = Math.pow(DECAY_BASE, distance);
                 neighbor.setScore(anchorScore * decay);
-                if (neighbor.getId() != null) {
-                    existingIds.add(neighbor.getId());
-                }
+                existingIds.add(neighbor.getId());
                 expanded.add(neighbor);
             }
         }

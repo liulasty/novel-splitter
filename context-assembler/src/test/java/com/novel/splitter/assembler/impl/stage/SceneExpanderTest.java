@@ -84,4 +84,17 @@ class SceneExpanderTest {
 
         assertEquals(1, out.size());
     }
+
+    @Test
+    void expand_skipsNullIdNeighbor() {
+        Scene anchor = scene("s2", 2L, 1, 0.8);
+        Scene nullId = scene("s1", 1L, 1, 0.0);
+        nullId.setId(null);
+        when(repo.findByProfileAndSeqRange("n1", "v1", 478, 65, 1L, 3L))
+                .thenReturn(List.of(anchor, nullId));
+
+        List<Scene> out = expander.expand(List.of(anchor), config);
+
+        assertEquals(1, out.size());
+    }
 }
