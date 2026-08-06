@@ -20,8 +20,8 @@ public interface SplitTaskRepository {
     List<String> findTaskIdsByNovelIdAndStatuses(String novelId, List<SplitTask.TaskStatus> statuses);
 
     /**
-     * Terminal tasks whose {@link SplitTask#getVersion()} equals {@code version}.
-     * Chunk profile is not stored on {@link SplitTask}; all terminal tasks for this version string match.
+     * 返回 {@link SplitTask#getVersion()} 等于 {@code version} 的终态任务。
+     * {@link SplitTask} 不保存 chunk 参数；该 version 字符串下所有终态任务均匹配。
      */
     List<String> findTaskIdsByNovelIdAndVersionAndStatuses(String novelId, String version, List<SplitTask.TaskStatus> statuses);
 

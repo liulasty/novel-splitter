@@ -7,7 +7,7 @@ import lombok.NoArgsConstructor;
 import java.io.Serializable;
 
 /**
- * Fine-grained embed work unit: one scene (DB row) per message.
+ * 细粒度的向量化工作单元：每条消息对应一个场景（DB 行）。
  */
 @Data
 @NoArgsConstructor
@@ -18,8 +18,8 @@ public class EmbedSceneTaskMessage implements Serializable {
     private String version;
     private int chunkSize;
     private int chunkOverlap;
-    /** Must match {@code split_tasks.current_embed_run_id} for the task. */
+    /** 必须与该任务的 {@code split_tasks.current_embed_run_id} 一致。 */
     private String embedRunId;
-    /** DB primary key of {@code scenes} row. */
+    /** {@code scenes} 行的数据库主键。 */
     private Long scenePersistenceId;
 }

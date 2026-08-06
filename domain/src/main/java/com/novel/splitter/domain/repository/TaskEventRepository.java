@@ -10,6 +10,6 @@ public interface TaskEventRepository {
     List<TaskProgressEvent> findByTaskId(String taskId);
     List<TaskProgressEvent> findByTaskIdSince(String taskId, long sinceTimestamp);
 
-    /** Bulk-delete progress rows for the given task ids (no-op if empty). */
+    /** 批量删除指定任务 id 的进度记录（为空时不执行任何操作）。 */
     int deleteByTaskIds(Collection<String> taskIds);
 }

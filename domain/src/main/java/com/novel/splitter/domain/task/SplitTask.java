@@ -17,7 +17,7 @@ public class SplitTask {
     private int totalScenes;
     private java.util.concurrent.atomic.AtomicInteger completedScenes = new java.util.concurrent.atomic.AtomicInteger(0);
 
-    /** UUID for the current embed orchestration run; stale MQ messages must match this. */
+    /** 当前向量化编排运行的 UUID；过期的 MQ 消息必须与此一致。 */
     private String currentEmbedRunId;
 
     public enum TaskStatus {

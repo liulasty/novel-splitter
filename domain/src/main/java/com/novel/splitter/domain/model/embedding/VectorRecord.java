@@ -14,7 +14,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class VectorRecord {
-    /** Scene ID */
+    /** 场景 ID */
     private String chunkId;
     
     /** 相似度分数 */

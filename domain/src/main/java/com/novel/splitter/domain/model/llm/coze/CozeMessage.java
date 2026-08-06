@@ -10,7 +10,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CozeMessage {
-    private String role; // user, assistant
+    private String role; // 取值：user、assistant
     private String content;
-    private String content_type; // text
+    private String content_type; // 取值：text
 }

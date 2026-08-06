@@ -15,15 +15,15 @@ import java.util.List;
 public class CleanupTaskMessage implements Serializable {
     private Long cleanupTaskId;
     private String targetId;
-    private String targetType; // NOVEL or VERSION
+    private String targetType; // NOVEL 或 VERSION
     private String version;
     /**
-     * Recommended primary identifier for cleanup.
-     * For new messages, prefer setting novelId and leaving targetId for backward compatibility.
+     * 清理操作的推荐主标识。
+     * 新消息建议设置 novelId，并保留 targetId 以兼容旧数据。
      */
     private String novelId;
     /**
-     * Optional legacy name (used for backward compatibility and UX).
+     * 可选的旧名称（用于向后兼容与用户体验）。
      */
     private String novelName;
 

@@ -88,6 +88,6 @@ public class Scene {
 
     private EmbedStatus embedStatus;
     private String embedError;
-    /** Which embed run last wrote this row (audit / resume filter). */
+    /** 最近一次写入该行的向量化运行（用于审计 / 续传过滤）。 */
     private String embedRunId;
 }

@@ -16,7 +16,7 @@ public class CozeChatResponse {
         private String id;
         private String conversation_id;
         private String bot_id;
-        private String status; // created, in_progress, completed, failed, requires_action
+        private String status; // 取值：created、in_progress、completed、failed、requires_action
         private Object last_error;
     }
 }

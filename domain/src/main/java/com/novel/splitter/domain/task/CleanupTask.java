@@ -14,9 +14,9 @@ import java.time.LocalDateTime;
 public class CleanupTask {
     private Long id;
     private String targetId;
-    private String targetType; // e.g. "NOVEL", "VERSION"
-    private String version;    // Optional, if targetType is VERSION
-    private String status;     // e.g. "PENDING", "SUCCESS", "FAILED"
+    private String targetType; // 例如："NOVEL"、"VERSION"
+    private String version;    // 可选，targetType 为 VERSION 时使用
+    private String status;     // 例如："PENDING"、"SUCCESS"、"FAILED"
     private String errorMessage;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

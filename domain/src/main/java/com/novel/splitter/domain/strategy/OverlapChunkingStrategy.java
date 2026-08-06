@@ -88,22 +88,22 @@ public class OverlapChunkingStrategy implements ChunkingStrategy {
             return text.length();
         }
         
-        // Try to find a good break point within the last 40% of the chunk
+        // 尝试在块末尾 40% 范围内寻找更合理的断点
         int lookbackLimit = Math.max(start + chunkSize / 2, maxEnd - (chunkSize * 4 / 10));
         
-        // 1. Look for double newline
+        // 1. 优先寻找连续空行
         int doubleNewline = text.lastIndexOf("\n\n", maxEnd);
         if (doubleNewline >= lookbackLimit) return doubleNewline + 2;
         
-        // 2. Look for single newline
+        // 2. 其次寻找单个换行
         int singleNewline = text.lastIndexOf("\n", maxEnd);
         if (singleNewline >= lookbackLimit) return singleNewline + 1;
         
-        // 3. Look for major punctuation marks
+        // 3. 最后寻找主要标点符号
         for (int i = maxEnd - 1; i >= lookbackLimit; i--) {
             char c = text.charAt(i);
             if (c == '。' || c == '！' || c == '？' || c == '!' || c == '?') {
-                // include the closing quote if it's there
+                // 若存在结束引号则一并纳入
                 if (i + 1 < text.length() && (text.charAt(i + 1) == '”' || text.charAt(i + 1) == '"' || text.charAt(i + 1) == '’')) {
                     return i + 2;
                 }
@@ -111,7 +111,7 @@ public class OverlapChunkingStrategy implements ChunkingStrategy {
             }
         }
         
-        // Fallback to maxEnd
+        // 兜底：直接使用 maxEnd
         return maxEnd;
     }
 

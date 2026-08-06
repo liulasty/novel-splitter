@@ -18,7 +18,7 @@ public class CozeMessageListResponse {
         private String conversation_id;
         private String bot_id;
         private String role;
-        private String type; // answer, follow_up, verbose
+        private String type; // 取值：answer、follow_up、verbose
         private String content;
         private String content_type;
     }

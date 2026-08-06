@@ -102,7 +102,7 @@ public interface SceneRepository {
                                                 String embedRunId);
 
     /**
-     * Infer (chunkSize, chunkOverlap) from any scene row participating in an embed run (for resume when task row has no chunk columns).
+     * 从参与某次向量化运行的任意场景行推断 (chunkSize, chunkOverlap)（用于任务行缺少 chunk 列时的续传）。
      */
     Optional<int[]> resolveChunkProfileForEmbedRun(String novelId, String version, String embedRunId);
 }
