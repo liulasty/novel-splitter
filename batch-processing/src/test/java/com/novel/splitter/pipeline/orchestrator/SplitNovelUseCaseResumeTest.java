@@ -203,5 +203,6 @@ class SplitNovelUseCaseResumeTest {
         @Override public long countEmbedByRunAndStatus(String novelId, String version, int chunkSize, int chunkOverlap, String embedRunId, EmbedStatus status) { throw unsupported(); }
         @Override public List<Long> listPersistenceIdsForEmbedResume(String novelId, String version, int chunkSize, int chunkOverlap, String embedRunId) { throw unsupported(); }
         @Override public Optional<int[]> resolveChunkProfileForEmbedRun(String novelId, String version, String embedRunId) { throw unsupported(); }
+        @Override public List<Scene> findByProfileAndSeqRange(String novelId, String version, int chunkSize, int chunkOverlap, long fromSeq, long toSeq) { throw unsupported(); }
     }
 }
