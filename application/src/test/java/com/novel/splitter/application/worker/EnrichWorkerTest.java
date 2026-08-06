@@ -72,4 +72,39 @@ class EnrichWorkerTest {
         worker.processEnrichTask(new EnrichTaskMessage("p", "novel", "v1", List.of()));
         verifyNoInteractions(repo);
     }
+
+    @Test
+    void processEnrichTask_chapterReturnsEmpty_stillWritesOtherChapters() {
+        Scene s1 = Scene.builder().persistenceId(1L).id("s1").chapterIndex(1)
+                .metadata(new SceneMetadata()).build();
+        Scene s2 = Scene.builder().persistenceId(2L).id("s2").chapterIndex(2)
+                .metadata(new SceneMetadata()).build();
+        when(repo.findByIds(List.of(1L, 2L))).thenReturn(List.of(s1, s2));
+        when(extractor.extract(List.of(s1))).thenReturn(List.of()); // 章节1 返回空（真实降级路径）
+        when(extractor.extract(List.of(s2)))
+                .thenReturn(List.of(new SceneExtractionDto("s2", List.of("药老"), null, null, "dialogue")));
+
+        worker.processEnrichTask(new EnrichTaskMessage("p", "novel", "v1", List.of(1L, 2L)));
+
+        assertNull(s1.getMetadata().getRole());
+        assertEquals("dialogue", s2.getMetadata().getRole());
+        verify(repo).updateScenesMetadata(List.of(s2));
+    }
+
+    @Test
+    void processEnrichTask_rerunPreservesNullFields() {
+        SceneMetadata meta = SceneMetadata.builder().role("dialogue").location("乌坦城").build();
+        Scene s1 = Scene.builder().persistenceId(1L).id("s1").chapterIndex(1).metadata(meta).build();
+        when(repo.findByIds(List.of(1L))).thenReturn(List.of(s1));
+        // 二次抽取：role/location/time 为 null（未识别），characters 为空数组
+        when(extractor.extract(List.of(s1)))
+                .thenReturn(List.of(new SceneExtractionDto("s1", List.of(), null, null, null)));
+
+        worker.processEnrichTask(new EnrichTaskMessage("p", "novel", "v1", List.of(1L)));
+
+        assertEquals(List.of(), s1.getMetadata().getCharacters()); // 空数组清空
+        assertEquals("dialogue", s1.getMetadata().getRole());       // null 保留旧值
+        assertEquals("乌坦城", s1.getMetadata().getLocation());      // null 保留旧值
+        verify(repo).updateScenesMetadata(List.of(s1));
+    }
 }

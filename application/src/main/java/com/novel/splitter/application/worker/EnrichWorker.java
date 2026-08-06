@@ -78,6 +78,10 @@ public class EnrichWorker {
         }
     }
 
+    /**
+     * 合并式写入：仅覆盖非 null 的抽取字段。location/time/role 为 null 时保留旧值
+     * （避免二次抽取暂时未识别时破坏已有数据）；characters 为空数组 [] 则视为清空。
+     */
     private void apply(Scene scene, SceneExtractionDto dto) {
         SceneMetadata meta = scene.getMetadata();
         if (meta == null) {
