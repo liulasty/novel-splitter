@@ -35,7 +35,7 @@ public class SceneReScorer {
 
     @PostConstruct
     public void init() {
-        log.info("Reranker switch status: enable={}, serviceAvailable={}",
+        log.info("重排器开关状态: enable={}, serviceAvailable={}",
                 config.isEnableReranker(), rerankerService.isAvailable());
     }
 
@@ -63,7 +63,7 @@ public class SceneReScorer {
         try {
             scores = rerankerService.rerank(question, texts);
         } catch (Exception e) {
-            log.warn("ONNX reranker failed, falling back to heuristic scoring", e);
+            log.warn("ONNX 重排模型失败，回退到启发式评分", e);
             rerankWithHeuristic(scenes, question);
             return;
         }

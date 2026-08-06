@@ -50,8 +50,8 @@ public class TokenBudgetAllocator {
 
             // Token 预算（软约束）：超过时记录警告但仍然保留
             if (currentTokens + sceneTokens > maxTokens) {
-                log.warn("Adding scene {} ({} tokens) exceeds max context tokens ({}), "
-                        + "but included because maxScenes={} not yet reached ({}/{}).",
+                log.warn("添加场景 {}（{} tokens）超出最大上下文 token 数（{}），"
+                        + "但因 maxScenes={} 尚未达到（{}/{}）而仍然保留。",
                         scene.getId(), sceneTokens, maxTokens, maxScenes, selected.size(), maxScenes);
             }
 

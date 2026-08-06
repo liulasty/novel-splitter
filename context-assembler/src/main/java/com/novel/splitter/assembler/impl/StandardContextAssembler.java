@@ -37,30 +37,30 @@ public class StandardContextAssembler implements ContextAssembler {
             return Collections.emptyList();
         }
 
-        // Stage 1: ReScore
+        // Stage 1: 重评分
         // 注意：ReScore 会直接修改 Scene 对象的 score 字段
         reScorer.rescore(retrievedScenes, question, config);
 
         // Stage 1.5: 相邻块扩展（邻居继承锚点衰减分，插入在去重/合并前）
         retrievedScenes = expander.expand(retrievedScenes, config);
 
-        // Stage 2: Deduplicate
+        // Stage 2: 去重
         List<Scene> uniqueScenes = deduplicator.deduplicate(retrievedScenes);
         int dedupCount = uniqueScenes.size();
 
-        // Stage 3: Merge Adjacent
+        // Stage 3: 合并相邻场景
         List<Scene> mergedScenes = merger.merge(uniqueScenes, config);
         int mergedCount = mergedScenes.size();
 
-        // Stage 4: Token Budget Control
+        // Stage 4: Token 预算控制
         List<Scene> finalScenes = allocator.allocate(mergedScenes, config);
         int finalCount = finalScenes.size();
-        
-        // Calculate stats
+
+        // 计算统计信息
         int totalTokens = finalScenes.stream().mapToInt(s -> tokenCounter.count(s.getText())).sum();
         int truncatedCount = mergedCount - finalCount;
 
-        // Stage 5: Final Sort & Build
+        // Stage 5: 最终排序与构建
         // 5.1 计算 Rank (基于 Score 在 finalScenes 中的排名)
         List<Scene> rankedScenes = new ArrayList<>(finalScenes);
         rankedScenes.sort(Comparator.comparingDouble((Scene s) -> s.getScore() != null ? s.getScore() : 0.0).reversed());
@@ -92,7 +92,7 @@ public class StandardContextAssembler implements ContextAssembler {
                     metadata.putAll(scene.getMetadata().getExtra());
                 }
             }
-            // Ensure mergedSceneIds is visible
+            // 确保 mergedSceneIds 可见
             if (scene.getMetadata() != null && scene.getMetadata().getExtra() != null) {
                 Object mergedIds = scene.getMetadata().getExtra().get("mergedSceneIds");
                 if (mergedIds != null) {
@@ -113,7 +113,7 @@ public class StandardContextAssembler implements ContextAssembler {
             prev = scene;
         }
 
-        // Log Output
+        // 输出日志
         log.info("\n[Assembler]\n" +
                 "- 原始检索数量: {}\n" +
                 "- 去重后数量: {}\n" +
