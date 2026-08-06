@@ -283,6 +283,13 @@ public class NovelController {
         novelFacadeService.deleteVersion(novelId, versionTag);
     }
 
+    @Operation(summary = "触发语义抽取（re-enrich）", description = "对指定版本的全部场景投递 enrich 消息，LLM 抽取 characters/location/time/role")
+    @PostMapping("/{novelId}/re-enrich")
+    public void reEnrich(@PathVariable String novelId,
+                         @RequestParam(value = "version", required = false) String version) {
+        novelFacadeService.reEnrich(novelId, version);
+    }
+
     @Operation(summary = "获取章节识别策略列表", description = "返回系统内置的所有章节识别策略，供前端下拉选择")
     @GetMapping("/chapter-strategies")
     public List<Map<String, String>> listChapterStrategies() {

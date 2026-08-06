@@ -112,4 +112,9 @@ public interface NovelFacadeService {
      * 基线解析（阶段一入口）：复用重解析逻辑投 Load 队列。
      */
     TaskSubmitResponseDto baselineParse(String novelId, ReparseChaptersRequestDto request) throws IOException;
+
+    /**
+     * 触发对指定版本全部场景的语义抽取（re-enrich）。version 为空时使用活动版本。
+     */
+    void reEnrich(String novelId, String version);
 }

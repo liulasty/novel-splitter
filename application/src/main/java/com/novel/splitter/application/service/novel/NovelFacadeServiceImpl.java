@@ -11,6 +11,7 @@ import com.novel.splitter.application.model.dto.CreateVersionRequest;
 import com.novel.splitter.application.model.dto.NovelVersionDto;
 import com.novel.splitter.application.mapper.DtoMapper;
 import com.novel.splitter.application.service.download.DownloadService;
+import com.novel.splitter.application.service.enrich.ReEnrichService;
 import com.novel.splitter.application.service.knowledge.KnowledgeBaseService;
 import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.application.orchestration.EmbedPipelineOrchestrator;
@@ -105,6 +106,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
     private final NovelVersionRepository novelVersionRepository;
     private final NovelVersionService novelVersionService;
     private final KnowledgeBaseService knowledgeBaseService;
+    private final ReEnrichService reEnrichService;
 
     @Override
     public List<NovelStatRecordDto> getNovelStats() {
@@ -690,6 +692,11 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
             throw new IllegalArgumentException("novelId must not be blank");
         }
         return reparseChapters(novelId.trim(), request != null ? request : new ReparseChaptersRequestDto());
+    }
+
+    @Override
+    public void reEnrich(String novelId, String version) {
+        reEnrichService.reEnrich(novelId, version);
     }
 
     private String nextVersionTag(String novelId) {
