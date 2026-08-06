@@ -200,6 +200,7 @@ class SplitNovelUseCaseResumeTest {
         @Override public int resetEmbedStateForRun(String novelId, String version, int chunkSize, int chunkOverlap, String embedRunId) { throw unsupported(); }
         @Override public void updateEmbedOutcome(Long persistenceId, String embedRunId, EmbedStatus status, String embedError) { throw unsupported(); }
         @Override public void batchUpdateEmbedOutcome(List<Long> persistenceIds, String embedRunId, EmbedStatus status, String embedError) { throw unsupported(); }
+        @Override public void updateScenesMetadata(List<Scene> scenes) { throw unsupported(); }
         @Override public long countEmbedByRunAndStatus(String novelId, String version, int chunkSize, int chunkOverlap, String embedRunId, EmbedStatus status) { throw unsupported(); }
         @Override public List<Long> listPersistenceIdsForEmbedResume(String novelId, String version, int chunkSize, int chunkOverlap, String embedRunId) { throw unsupported(); }
         @Override public Optional<int[]> resolveChunkProfileForEmbedRun(String novelId, String version, String embedRunId) { throw unsupported(); }

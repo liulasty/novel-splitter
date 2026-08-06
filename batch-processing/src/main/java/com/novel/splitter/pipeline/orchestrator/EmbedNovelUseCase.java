@@ -6,6 +6,7 @@ import com.novel.splitter.embedding.api.VectorStore;
 import com.novel.splitter.domain.repository.SceneRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -25,6 +26,13 @@ public class EmbedNovelUseCase {
     private final EmbeddingService embeddingService;
     private final VectorStore vectorStore;
     private final SceneRepository sceneRepository;
+
+    /**
+     * 是否把场景的 prefixContext 拼接到 embedding 输入文本（opt-in，默认关闭）。
+     * 开启时向量能带上前文连贯信息，而 Chroma 存储的 documents 仍保持干净正文。
+     */
+    @Value("${splitter.embedding.use-prefix-context:false}")
+    private boolean usePrefixContext;
 
     /**
      * 对给定 DB 主键做 ONNX + Chroma 批量写入；整批原子（任一步失败则抛异常，不返回部分成功）。
@@ -53,7 +61,7 @@ public class EmbedNovelUseCase {
         List<Scene> validScenes = new ArrayList<>();
         for (Scene scene : scenes) {
             if (scene.getText() != null && !scene.getText().trim().isEmpty()) {
-                texts.add(scene.getText());
+                texts.add(embeddingText(scene));
                 validScenes.add(scene);
             } else {
                 log.warn("场景 ID {} 文本为空，跳过", scene.getId());
@@ -77,5 +85,21 @@ public class EmbedNovelUseCase {
             log.error("嵌入批次处理失败（首个 persistence id: {}）", scenePersistenceIds.get(0), e);
             throw new RuntimeException("Batch embed processing failed", e);
         }
+    }
+
+    /**
+     * 构造送入 embedding 服务的文本：开启 use-prefix-context 且场景有 prefixContext 时，
+     * 拼「前缀 + 正文」；Chroma 存储的 documents 仍用 Scene::getText，正文保持干净。
+     */
+    private String embeddingText(Scene scene) {
+        String text = scene.getText();
+        if (!usePrefixContext) {
+            return text;
+        }
+        String prefix = scene.getPrefixContext();
+        if (prefix == null || prefix.isBlank()) {
+            return text;
+        }
+        return prefix + "\n" + text;
     }
 }
