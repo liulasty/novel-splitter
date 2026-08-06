@@ -83,6 +83,11 @@ public interface SceneRepository {
                                          long fromSeq, long toSeq);
 
     /**
+     * 批量更新场景元数据（语义抽取结果写回 metadata_json）。
+     */
+    void updateScenesMetadata(List<Scene> scenes);
+
+    /**
      * 新一轮向量化前：将 profile 内场景标为待嵌入并绑定 run id。
      */
     int resetEmbedStateForRun(String novelId, String version, int chunkSize, int chunkOverlap, String embedRunId);

@@ -162,4 +162,8 @@ public interface JpaSceneRepository extends JpaRepository<JpaSceneEntity, Long>,
             @Param("nid") String novelId,
             @Param("ver") String version,
             @Param("rid") String embedRunId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE JpaSceneEntity s SET s.metadataJson = :json WHERE s.id = :id AND s.isDeleted = false")
+    int updateMetadataJson(@Param("id") Long persistenceId, @Param("json") String metadataJson);
 }

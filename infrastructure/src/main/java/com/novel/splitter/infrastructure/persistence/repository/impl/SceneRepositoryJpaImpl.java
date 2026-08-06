@@ -236,6 +236,23 @@ public class SceneRepositoryJpaImpl implements SceneRepository {
     }
 
     @Override
+    @Transactional
+    public void updateScenesMetadata(List<Scene> scenes) {
+        if (scenes == null || scenes.isEmpty()) {
+            return;
+        }
+        for (Scene scene : scenes) {
+            if (scene.getPersistenceId() == null || scene.getMetadata() == null) {
+                continue;
+            }
+            String json = sceneMapper.metadataToJson(scene.getMetadata());
+            if (json != null) {
+                jpaSceneRepository.updateMetadataJson(scene.getPersistenceId(), json);
+            }
+        }
+    }
+
+    @Override
     public List<Long> listPersistenceIdsByProfile(String novelId, String version, int chunkSize, int chunkOverlap) {
         return jpaSceneRepository.findPersistenceIdsByProfile(novelId, version, chunkSize, chunkOverlap);
     }
