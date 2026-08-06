@@ -34,9 +34,9 @@ public abstract class AbstractDownloader implements NovelDownloader {
     public List<DownloadChapter> download(String url) {
         try {
             // 1. 获取目录
-            log.info("Fetching catalog from: {}", url);
+            log.info("正在从 {} 获取目录", url);
             List<DownloadChapter> chapters = fetchCatalog(url);
-            log.info("Found {} chapters.", chapters.size());
+            log.info("共发现 {} 章", chapters.size());
 
             // 2. 并发下载正文
             downloadContents(chapters);
@@ -72,12 +72,12 @@ public abstract class AbstractDownloader implements NovelDownloader {
                     chapter.setContent(content);
                     chapter.setSuccess(true);
                 } catch (Exception e) {
-                    log.error("Failed to download chapter: {}", chapter.getTitle(), e);
+                    log.error("章节下载失败：{}", chapter.getTitle(), e);
                     chapter.setSuccess(false);
                 } finally {
                     int current = counter.incrementAndGet();
                     if (current % 10 == 0 || current == total) {
-                        log.info("Progress: {}/{}", current, total);
+                        log.info("进度：{}/{}", current, total);
                     }
                 }
             }, executor);
