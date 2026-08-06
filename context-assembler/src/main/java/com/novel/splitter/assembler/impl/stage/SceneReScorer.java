@@ -69,7 +69,14 @@ public class SceneReScorer {
         }
 
         for (int i = 0; i < scenes.size() && i < scores.size(); i++) {
-            scenes.get(i).setScore(scores.get(i).doubleValue());
+            double rerank = scores.get(i);
+            double q = qualityScoreOf(scenes.get(i));
+            double w = config.getQualityScoreWeight();
+            if (w > 0 && q > 0) {
+                scenes.get(i).setScore(rerank * (1 - w) + q * w);
+            } else {
+                scenes.get(i).setScore(rerank);
+            }
         }
     }
 
@@ -85,7 +92,9 @@ public class SceneReScorer {
             double entityScore = calculateEntityScore(scene.getMetadata(), keywords);
             double lengthPenalty = calculateLengthPenalty(scene.getText());
 
-            double finalScore = (vectorScore * 0.6) + (keywordScore * 0.2) + (entityScore * 0.2) - lengthPenalty;
+            double quality = qualityScoreOf(scene);
+            double finalScore = (vectorScore * 0.6) + (keywordScore * 0.2)
+                    + (entityScore * 0.1) + (quality * 0.1) - lengthPenalty;
             if (finalScore < 0) finalScore = 0;
 
             scene.setScore(finalScore);
@@ -154,5 +163,17 @@ public class SceneReScorer {
             return (content.length() - 2000) * 0.0001;
         }
         return 0.0;
+    }
+
+    /**
+     * 质量分；未计算（<= SCORE_NOT_COMPUTED=-1）或无值时返回 0，不参与混合。
+     * 启发式路径权重固定 0.1，不受 config.qualityScoreWeight 影响。
+     */
+    private double qualityScoreOf(Scene scene) {
+        if (scene == null || scene.getMetadata() == null || scene.getMetadata().getQualityScore() == null) {
+            return 0.0;
+        }
+        double q = scene.getMetadata().getQualityScore();
+        return q <= SceneMetadata.SCORE_NOT_COMPUTED ? 0.0 : q;
     }
 }
