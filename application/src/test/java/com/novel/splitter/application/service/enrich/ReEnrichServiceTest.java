@@ -16,6 +16,8 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -36,6 +38,8 @@ class ReEnrichServiceTest {
 
     @Test
     void reEnrich_explicitVersion_publishesEnrichWithSceneIds() {
+        when(novelRepository.findById("novel"))
+                .thenReturn(Optional.of(Novel.builder().activeVersionTag("v9").build()));
         Scene s1 = Scene.builder().persistenceId(10L).build();
         Scene s2 = Scene.builder().persistenceId(20L).build();
         when(sceneRepository.findAllByNovelIdAndVersion("novel", "v2")).thenReturn(List.of(s1, s2));
@@ -64,8 +68,32 @@ class ReEnrichServiceTest {
     }
 
     @Test
-    void reEnrich_noVersionAndNoActive_throws() {
+    void reEnrich_novelNotFound_throws() {
         when(novelRepository.findById("novel")).thenReturn(Optional.empty());
         assertThrows(IllegalArgumentException.class, () -> service.reEnrich("novel", null));
+    }
+
+    @Test
+    void reEnrich_novelExistsButNoActiveVersion_throws() {
+        when(novelRepository.findById("novel"))
+                .thenReturn(Optional.of(Novel.builder().build())); // activeVersionTag 为 null
+        assertThrows(IllegalArgumentException.class, () -> service.reEnrich("novel", null));
+    }
+
+    @Test
+    void reEnrich_novelNotFoundWithExplicitVersion_throws() {
+        when(novelRepository.findById("novel")).thenReturn(Optional.empty());
+        assertThrows(IllegalArgumentException.class, () -> service.reEnrich("novel", "v2"));
+    }
+
+    @Test
+    void reEnrich_emptySceneList_noop() {
+        when(novelRepository.findById("novel"))
+                .thenReturn(Optional.of(Novel.builder().activeVersionTag("v2").build()));
+        when(sceneRepository.findAllByNovelIdAndVersion("novel", "v2")).thenReturn(List.of());
+
+        service.reEnrich("novel", "v2");
+
+        verify(taskQueuePort, never()).sendEnrich(any());
     }
 }

@@ -27,23 +27,31 @@ public class ReEnrichService {
     private final TaskQueuePort taskQueuePort;
 
     public void reEnrich(String novelId, String version) {
-        String resolved = version;
+        String id = novelId != null ? novelId.trim() : null;
+        if (id == null || id.isBlank()) {
+            throw new IllegalArgumentException("novelId 不能为空");
+        }
+        // 始终校验小说存在（含软删过滤），避免显式 version 时 typo 的 novelId 静默返回 200
+        Novel novel = novelRepository.findById(id).orElse(null);
+        if (novel == null) {
+            throw new IllegalArgumentException("小说不存在: " + id);
+        }
+        String resolved = version != null ? version.trim() : null;
         if (resolved == null || resolved.isBlank()) {
-            Novel novel = novelRepository.findById(novelId).orElse(null);
-            if (novel != null && novel.getActiveVersionTag() != null && !novel.getActiveVersionTag().isBlank()) {
+            if (novel.getActiveVersionTag() != null && !novel.getActiveVersionTag().isBlank()) {
                 resolved = novel.getActiveVersionTag();
             }
         }
         if (resolved == null || resolved.isBlank()) {
             throw new IllegalArgumentException("未指定 version 且小说无活动版本，无法 re-enrich");
         }
-        List<Scene> scenes = sceneRepository.findAllByNovelIdAndVersion(novelId, resolved);
+        List<Scene> scenes = sceneRepository.findAllByNovelIdAndVersion(id, resolved);
         List<Long> sceneIds = scenes.stream().map(Scene::getPersistenceId).collect(Collectors.toList());
         if (sceneIds.isEmpty()) {
-            log.warn("re-enrich：novelId={} version={} 无场景，跳过", novelId, resolved);
+            log.warn("re-enrich：novelId={} version={} 无场景，跳过", id, resolved);
             return;
         }
-        taskQueuePort.sendEnrich(new EnrichTaskMessage(null, novelId, resolved, sceneIds));
-        log.info("re-enrich 已投递 {} 个场景：novelId={} version={}", sceneIds.size(), novelId, resolved);
+        taskQueuePort.sendEnrich(new EnrichTaskMessage(null, id, resolved, sceneIds));
+        log.info("re-enrich 已投递 {} 个场景：novelId={} version={}", sceneIds.size(), id, resolved);
     }
 }
