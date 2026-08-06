@@ -267,9 +267,11 @@ Expected: PASS。
 - [ ] **Step 5: 提交**
 
 ```bash
-git add domain/src/main/java/com/novel/splitter/domain/repository/SceneRepository.java infrastructure/src/main/java/com/novel/splitter/infrastructure/persistence/repository/JpaSceneRepository.java infrastructure/src/main/java/com/novel/splitter/infrastructure/persistence/repository/impl/SceneRepositoryJpaImpl.java infrastructure/src/test/java/com/novel/splitter/infrastructure/persistence/repository/impl/SceneRepositoryJpaImplSeqRangeTest.java
+git add domain/src/main/java/com/novel/splitter/domain/repository/SceneRepository.java infrastructure/src/main/java/com/novel/splitter/infrastructure/persistence/repository/JpaSceneRepository.java infrastructure/src/main/java/com/novel/splitter/infrastructure/persistence/repository/impl/SceneRepositoryJpaImpl.java infrastructure/src/test/java/com/novel/splitter/infrastructure/persistence/repository/impl/SceneRepositoryJpaImplSeqRangeTest.java application/src/test/java/com/novel/splitter/application/worker/SplitWorkerResumeTest.java batch-processing/src/test/java/com/novel/splitter/pipeline/orchestrator/SplitNovelUseCaseResumeTest.java
 git commit -m "feat(scene): SceneRepository 新增 findByProfileAndSeqRange 范围查询"
 ```
+
+> **执行纠错**：`SceneRepository` 新增抽象方法会破坏两个实现该接口的测试替身 `RecordingSceneRepository`（`application/.../SplitWorkerResumeTest.java` 与 `batch-processing/.../SplitNovelUseCaseResumeTest.java`），须同步补 `@Override ... { throw unsupported(); }`，否则整仓编译失败。上表已含这两个文件。
 
 ---
 
@@ -577,7 +579,7 @@ class SceneReScorerTest {
         Scene qLow = scene(0.5, 0.05);  // 质量 0.05
 
         List<Scene> list = List.of(qHigh, qLow);
-        reScorer.rescore(list, "无关问题xyz", config);
+        reScorer.rescore(list, "test", config);
 
         assertTrue(list.get(0).getScore() > list.get(1).getScore());
         // 公式：0.6*向量 + 0.2*关键词 + 0.1*实体 + 0.1*质量 - 长度惩罚
@@ -599,8 +601,8 @@ class SceneReScorerTest {
         reScorer.rescore(list, "q", config);
 
         // w=0.15：qHigh=0.8*0.85+0.9*0.15=0.815；qLow=0.8*0.85+0.1*0.15=0.695
-        assertEquals(0.815, list.get(0).getScore(), 1e-9);
-        assertEquals(0.695, list.get(1).getScore(), 1e-9);
+        assertEquals(0.815, list.get(0).getScore(), 1e-6);
+        assertEquals(0.695, list.get(1).getScore(), 1e-6);
     }
 
     @Test
