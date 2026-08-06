@@ -143,6 +143,9 @@ git add domain/src/main/java/com/novel/splitter/domain/repository/SceneRepositor
 git commit -m "feat(scene): SceneRepository 新增 updateScenesMetadata 写回语义元数据"
 ```
 
+> **执行纠错 1**：`SceneRepository` 新增抽象方法 `updateScenesMetadata` 会破坏两个实现该接口的测试替身 `RecordingSceneRepository`（`application/.../SplitWorkerResumeTest.java` 与 `batch-processing/.../SplitNovelUseCaseResumeTest.java`）编译——同 Phase 1 Task 3。应在 Task 1 同步补 `@Override updateScenesMetadata { throw unsupported(); }`；执行时分别由 Task 2 与 Task 5 补上。
+> **执行纠错 2**：`batch-processing` 模块原无 Mockito/spring-test 依赖，EmbedNovelUseCaseTest（Task 5）无法编译，需在 `batch-processing/pom.xml` 补 `spring-boot-starter-test`（test scope，模式同其它模块）。
+
 ---
 
 ### Task 2: SceneExtractionDto + SceneSemanticExtractor（LLM 抽取服务）
