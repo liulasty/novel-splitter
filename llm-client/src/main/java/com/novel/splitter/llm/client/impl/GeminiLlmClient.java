@@ -80,7 +80,7 @@ public class GeminiLlmClient implements LlmClient {
                     String chapterTag = block.getSceneMetadata() != null && block.getSceneMetadata().getChapterTitle() != null
                         ? "(" + block.getSceneMetadata().getChapterTitle() + ") "
                         : "";
-                    userContentBuilder.append("内容: ").append(chapterTag).append(block.getContent()).append("\n");
+                    userContentBuilder.append("内容: ").append(chapterTag).append(block.effectiveContent()).append("\n");
                     userContentBuilder.append("---\n");
                 }
                 userContentBuilder.append("\n");

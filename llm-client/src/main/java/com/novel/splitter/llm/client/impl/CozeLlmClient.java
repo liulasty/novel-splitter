@@ -79,7 +79,7 @@ public class CozeLlmClient implements LlmClient {
                 String chapterTag = block.getSceneMetadata() != null && block.getSceneMetadata().getChapterTitle() != null
                     ? "(" + block.getSceneMetadata().getChapterTitle() + ") "
                     : "";
-                fullContent.append("Content: ").append(chapterTag).append(block.getContent()).append("\n");
+                fullContent.append("Content: ").append(chapterTag).append(block.effectiveContent()).append("\n");
                 fullContent.append("---\n");
             }
             fullContent.append("\n");

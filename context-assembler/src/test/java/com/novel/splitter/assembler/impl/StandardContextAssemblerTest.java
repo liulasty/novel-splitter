@@ -165,4 +165,23 @@ class StandardContextAssemblerTest {
         // Check if merged IDs are present
         assertNotNull(result.get(0).getMetadata().get("mergedSceneIds"));
     }
+
+    @Test
+    void testAssemble_prefixContextOnlyForIsolatedBlock() {
+        config.setExpandRadius(-1); // setUp 已禁用扩展
+        when(tokenCounter.count(anyString())).thenReturn(10);
+
+        Scene s1 = createScene("1", "A", 1, 1, 0.9);
+        s1.setEndParagraphIndex(1);
+        Scene s2 = createScene("2", "B", 1, 5, 0.8); // start=5 与上一块 end=1 有 gap
+        s2.setStartParagraphIndex(5);
+        s2.setEndParagraphIndex(5);
+        s2.setPrefixContext("上文");
+
+        List<ContextBlock> result = assembler.assemble("q", Arrays.asList(s1, s2), config);
+
+        assertEquals(2, result.size());
+        assertNull(result.get(0).getPrefixContext(), "首块不拼接前缀");
+        assertEquals("上文", result.get(1).getPrefixContext(), "孤立块携带 prefixContext");
+    }
 }

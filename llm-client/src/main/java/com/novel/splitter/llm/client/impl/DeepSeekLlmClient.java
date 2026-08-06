@@ -64,27 +64,8 @@ public class DeepSeekLlmClient implements LlmClient {
         messages.add(OpenAiMessage.builder().role("system").content(systemContent).build());
 
         // User message
-        StringBuilder userContent = new StringBuilder();
-        if (prompt.getContextBlocks() != null && !prompt.getContextBlocks().isEmpty()) {
-            userContent.append("Context Information:\n");
-            for (ContextBlock block : prompt.getContextBlocks()) {
-                userContent.append("---\n");
-                userContent.append("Chunk ID: ").append(block.getChunkId()).append("\n");
-                if (block.getSceneMetadata() != null) {
-                    userContent.append("Source: ").append(block.getSceneMetadata().getChapterTitle()).append("\n");
-                }
-                String chapterTag = block.getSceneMetadata() != null && block.getSceneMetadata().getChapterTitle() != null
-                    ? "(" + block.getSceneMetadata().getChapterTitle() + ") "
-                    : "";
-                userContent.append("Content: ").append(chapterTag).append(block.getContent()).append("\n");
-                userContent.append("---\n");
-            }
-            userContent.append("\n");
-        }
-        userContent.append("User Question: ").append(prompt.getUserQuestion());
-        userContent.append("\n\nPlease answer the question in the specified JSON format.");
-
-        messages.add(OpenAiMessage.builder().role("user").content(userContent.toString()).build());
+        String userContent = buildUserContent(prompt);
+        messages.add(OpenAiMessage.builder().role("user").content(userContent).build());
 
         // 2. Build Request
         OpenAiRequest request = OpenAiRequest.builder()
@@ -133,6 +114,29 @@ public class DeepSeekLlmClient implements LlmClient {
             log.error("DeepSeek API call failed", e);
             throw new RuntimeException("DeepSeek API call failed: " + e.getMessage(), e);
         }
+    }
+
+    static String buildUserContent(Prompt prompt) {
+        StringBuilder userContent = new StringBuilder();
+        if (prompt.getContextBlocks() != null && !prompt.getContextBlocks().isEmpty()) {
+            userContent.append("Context Information:\n");
+            for (ContextBlock block : prompt.getContextBlocks()) {
+                userContent.append("---\n");
+                userContent.append("Chunk ID: ").append(block.getChunkId()).append("\n");
+                if (block.getSceneMetadata() != null) {
+                    userContent.append("Source: ").append(block.getSceneMetadata().getChapterTitle()).append("\n");
+                }
+                String chapterTag = block.getSceneMetadata() != null && block.getSceneMetadata().getChapterTitle() != null
+                    ? "(" + block.getSceneMetadata().getChapterTitle() + ") "
+                    : "";
+                userContent.append("Content: ").append(chapterTag).append(block.effectiveContent()).append("\n");
+                userContent.append("---\n");
+            }
+            userContent.append("\n");
+        }
+        userContent.append("User Question: ").append(prompt.getUserQuestion());
+        userContent.append("\n\nPlease answer the question in the specified JSON format.");
+        return userContent.toString();
     }
 
     // Simple Token Bucket Rate Limiter

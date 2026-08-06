@@ -75,10 +75,14 @@ public class StandardContextAssembler implements ContextAssembler {
                 .thenComparingInt(Scene::getStartParagraphIndex));
 
         List<ContextBlock> blocks = new ArrayList<>();
+        Scene prev = null;
         for (Scene scene : finalScenes) {
             int tokens = tokenCounter.count(scene.getText());
             int rank = rankMap.getOrDefault(scene.getId(), 0);
-            
+
+            // 与上一块有段落 gap 的孤立块携带 prefixContext，供 LLM 序列化补上文
+            boolean isolated = prev != null && isGap(prev, scene);
+
             Map<String, Object> metadata = new HashMap<>();
             if (scene.getMetadata() != null) {
                 metadata.put("novelName", scene.getMetadata().getNovel());
@@ -99,12 +103,14 @@ public class StandardContextAssembler implements ContextAssembler {
             blocks.add(ContextBlock.builder()
                     .chunkId(scene.getId())
                     .content(scene.getText())
+                    .prefixContext(isolated ? scene.getPrefixContext() : null)
                     .sceneMetadata(scene.getMetadata())
                     .tokenCount(tokens)
                     .rank(rank)
                     .score(scene.getScore() != null ? scene.getScore() : 0.0)
                     .metadata(metadata)
                     .build());
+            prev = scene;
         }
 
         // Log Output
@@ -118,5 +124,10 @@ public class StandardContextAssembler implements ContextAssembler {
                 originalCount, dedupCount, mergedCount, finalCount, totalTokens, truncatedCount);
 
         return blocks;
+    }
+
+    /** 孤立块：与上一块首尾有段落 gap（paragraphIndex 不连续），需要前缀补上下文 */
+    private boolean isGap(Scene prev, Scene cur) {
+        return cur.getStartParagraphIndex() > prev.getEndParagraphIndex() + 1;
     }
 }

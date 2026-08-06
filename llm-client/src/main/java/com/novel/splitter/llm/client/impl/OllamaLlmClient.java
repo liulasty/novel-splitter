@@ -76,7 +76,7 @@ public class OllamaLlmClient implements LlmClient {
                 String chapterTag = block.getSceneMetadata() != null && block.getSceneMetadata().getChapterTitle() != null
                     ? "(" + block.getSceneMetadata().getChapterTitle() + ") "
                     : "";
-                userContent.append("Content: ").append(chapterTag).append(block.getContent()).append("\n");
+                userContent.append("Content: ").append(chapterTag).append(block.effectiveContent()).append("\n");
                 userContent.append("---\n");
             }
             userContent.append("\n");
