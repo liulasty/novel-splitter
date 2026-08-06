@@ -43,12 +43,13 @@ class ChromaVectorStoreMetadataTest {
     }
 
     @Test
-    void buildChromaMetadata_omitsNullStructuredKeys() {
+    void buildChromaMetadata_omitsNullOrEmptyStructuredKeys() {
         Scene s = Scene.builder()
                 .id("s1").persistenceId(1L)
                 .metadata(SceneMetadata.builder()
                         .novel("n1").version("v1").chunkSize(478).chunkOverlap(65)
                         .sequenceNum(1)
+                        .characters(List.of()) // 空列表：与 null 一样不写入
                         .build())
                 .build();
 
