@@ -100,6 +100,7 @@ public class EmbedNovelUseCase {
         if (prefix == null || prefix.isBlank()) {
             return text;
         }
+        // 换行分隔：BGE 逐字符分词，\n 为中性 token，能清晰分隔前缀与正文
         return prefix + "\n" + text;
     }
 }

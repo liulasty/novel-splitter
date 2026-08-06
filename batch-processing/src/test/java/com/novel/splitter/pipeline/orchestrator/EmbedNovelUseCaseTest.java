@@ -66,4 +66,16 @@ class EmbedNovelUseCaseTest {
 
         verify(embeddingService).embedBatch(List.of("正文"));
     }
+
+    @Test
+    void embedBatch_prefixContextNull_fallsBackToText() {
+        ReflectionTestUtils.setField(useCase, "usePrefixContext", true);
+        Scene s = Scene.builder().persistenceId(1L).id("s1").text("正文").build(); // prefixContext 为 null
+        when(sceneRepository.findByIds(List.of(1L))).thenReturn(List.of(s));
+        when(embeddingService.embedBatch(List.of("正文"))).thenReturn(List.of(new float[]{1f}));
+
+        useCase.embedBatch(List.of(1L));
+
+        verify(embeddingService).embedBatch(List.of("正文"));
+    }
 }
