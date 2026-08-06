@@ -46,6 +46,9 @@ public class RagServiceImpl implements RagRetrievalService {
         query.setVersion(version);
         query.setChunkSize(request.getChunkSize());
         query.setChunkOverlap(request.getChunkOverlap());
+        query.setCharacterFilter(request.getCharacterFilter());
+        query.setLocationFilter(request.getLocationFilter());
+        query.setTimeFilter(request.getTimeFilter());
         return retrievalService.retrieve(query);
     }
 

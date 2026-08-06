@@ -50,11 +50,20 @@ public class RetrievalQuery {
      */
     private Integer chapterTo;
 
-    /** 
-     * 文本角色或功能分类 
-     * // 例如："narration"（旁白）、"dialogue"（对话），用于针对特定类型的文本进行过滤 
+    /**
+     * 文本角色或功能分类
+     * // 例如："narration"（旁白）、"dialogue"（对话），用于针对特定类型的文本进行过滤
      */
     private String role;
+
+    /** 按出场人物过滤（需 retrieval.structured-filter.enabled 打开） */
+    private String characterFilter;
+
+    /** 按故事地点过滤（需 retrieval.structured-filter.enabled 打开） */
+    private String locationFilter;
+
+    /** 按故事时间过滤（需 retrieval.structured-filter.enabled 打开） */
+    private String timeFilter;
 
     /** 
      * 返回的最相关结果数量 (Top-K) 

@@ -48,4 +48,13 @@ public class RagRequest {
     private Integer maxContextTokens;
     /** 回答目标 Token 数，≤0 表示不限制；会影响提示词中的输出长度约束 */
     private Integer maxAnswerTokens;
+
+    /** 按出场人物过滤（需 retrieval.structured-filter.enabled 打开） */
+    private String characterFilter;
+
+    /** 按故事地点过滤 */
+    private String locationFilter;
+
+    /** 按故事时间过滤 */
+    private String timeFilter;
 }
