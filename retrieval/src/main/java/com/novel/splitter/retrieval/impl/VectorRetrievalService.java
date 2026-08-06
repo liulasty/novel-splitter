@@ -12,6 +12,7 @@ import com.novel.splitter.domain.repository.SceneRepository;
 import com.novel.splitter.retrieval.api.RetrievalService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -34,12 +35,26 @@ public class VectorRetrievalService implements RetrievalService {
     private static final String META_VERSION = "version";
     private static final String META_CHUNK_SIZE = "chunkSize";
     private static final String META_CHUNK_OVERLAP = "chunkOverlap";
+    private static final String META_ROLE = "role";
+    private static final String META_CHARACTERS = "characters";
+    private static final String META_LOCATION = "location";
+    private static final String META_TIME = "time";
     private static final String KEY_SEPARATOR = "::";
+
+    /** 场景功能合法取值（对应 SceneMetadata.role / 抽取的 role 字段） */
+    private static final List<String> KNOWN_SCENE_FUNCTIONS =
+            List.of("dialogue", "narration", "action", "transition");
 
     private final EmbeddingService embeddingService;
     private final VectorStore vectorStore;
     private final SceneRepository sceneRepository;
     private final NovelRepository novelRepository;
+
+    @Value("${retrieval.role-filter.enabled:false}")
+    private boolean roleFilterEnabled;
+
+    @Value("${retrieval.structured-filter.enabled:false}")
+    private boolean structuredFilterEnabled;
 
     /**
      * 根据检索查询对象执行向量检索，并返回相关的场景列表
@@ -109,6 +124,24 @@ public class VectorRetrievalService implements RetrievalService {
         if (chunkSize != null && chunkOverlap != null) {
             filter.put(META_CHUNK_SIZE, chunkSize);
             filter.put(META_CHUNK_OVERLAP, chunkOverlap);
+        }
+
+        if (roleFilterEnabled) {
+            String sceneFunction = mapQueryRoleToSceneFunction(query.getRole());
+            if (sceneFunction != null) {
+                filter.put(META_ROLE, sceneFunction);
+            }
+        }
+        if (structuredFilterEnabled) {
+            if (query.getCharacterFilter() != null && !query.getCharacterFilter().isBlank()) {
+                filter.put(META_CHARACTERS, java.util.Map.of("$contains", query.getCharacterFilter()));
+            }
+            if (query.getLocationFilter() != null && !query.getLocationFilter().isBlank()) {
+                filter.put(META_LOCATION, query.getLocationFilter());
+            }
+            if (query.getTimeFilter() != null && !query.getTimeFilter().isBlank()) {
+                filter.put(META_TIME, query.getTimeFilter());
+            }
         }
 
         log.info("执行向量搜索，过滤条件: {} 集合: {}", filter,
@@ -236,5 +269,16 @@ public class VectorRetrievalService implements RetrievalService {
             log.warn("解析小说 {} 的活动版本失败: {}", novelId, e.toString());
         }
         return null;
+    }
+
+    /**
+     * 查询意图（RetrievalQuery.role，如"他说了什么"→dialogue）→ 场景功能（SceneMetadata.role）。
+     * 两者概念不同但取值在此重合；仅接受已知场景功能，避免脏值导致过滤返回空集。
+     */
+    private String mapQueryRoleToSceneFunction(String queryRole) {
+        if (queryRole == null) {
+            return null;
+        }
+        return KNOWN_SCENE_FUNCTIONS.contains(queryRole) ? queryRole : null;
     }
 }
