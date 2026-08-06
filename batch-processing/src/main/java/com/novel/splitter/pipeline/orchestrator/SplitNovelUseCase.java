@@ -61,10 +61,10 @@ public class SplitNovelUseCase {
         List<Scene> valid = new ArrayList<>();
         for (Scene s : scenes) {
             String text = s.getText();
-            // count non-whitespace chars (metadata-heavy scenes have inflated length from newlines)
+            // 统计非空白字符数（元数据较重的场景会因换行符导致长度虚高）
             int contentLen = text == null ? 0 : text.replaceAll("\\s+", "").length();
             if (contentLen < minLength) {
-                log.warn("Scene {} (chapter {}) too short: {} content chars ({} raw), skipping",
+                log.warn("场景 {}（章节 {}）过短：有效内容 {} 字符（原始 {} 字符），已跳过",
                         s.getId(), s.getChapterTitle(), contentLen, text != null ? text.length() : 0);
                 continue;
             }
@@ -131,7 +131,7 @@ public class SplitNovelUseCase {
                                Integer overrideChunkSize, Integer overrideChunkOverlap,
                                int startChapterIndex, long startSceneSeq,
                                BiConsumer<Integer, String> progressCallback) {
-        log.info("=== Start Split Phase for novelId={} title={} ===", novelId, novelTitle);
+        log.info("=== 开始切分阶段：novelId={}，title={} ===", novelId, novelTitle);
 
         int persistBatch = effectivePersistBatchSize();
         List<Scene> batchScenes = new ArrayList<>(persistBatch);
@@ -250,7 +250,7 @@ public class SplitNovelUseCase {
             }
         }
 
-        log.info("Generated {} scene fragments (before length filter), {} accepted for novelId={} title='{}'",
+        log.info("已生成 {} 个场景片段（长度过滤前），接受 {} 个，novelId={}，title='{}'",
                 scenesCount, totalValidAccepted, novelId, novelTitle);
 
         if (progressCallback != null) {
@@ -271,7 +271,7 @@ public class SplitNovelUseCase {
         }
 
         if (allSavedSceneIds.isEmpty()) {
-            log.warn("No scenes persisted after split for novelId={}", novelId);
+            log.warn("切分后无场景落盘，novelId={}", novelId);
             if (progressCallback != null) {
                 lastProgress = Math.max(lastProgress, IngestProgress.SAVE_END);
                 progressCallback.accept(lastProgress, "无有效场景落盘");

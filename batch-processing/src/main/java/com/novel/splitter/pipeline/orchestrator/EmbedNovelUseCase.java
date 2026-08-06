@@ -56,7 +56,7 @@ public class EmbedNovelUseCase {
                 texts.add(scene.getText());
                 validScenes.add(scene);
             } else {
-                log.warn("Skipping scene ID {} due to empty text", scene.getId());
+                log.warn("场景 ID {} 文本为空，跳过", scene.getId());
             }
         }
         if (validScenes.isEmpty()) {
@@ -74,7 +74,7 @@ public class EmbedNovelUseCase {
                     .map(Scene::getPersistenceId)
                     .collect(Collectors.toList());
         } catch (Exception e) {
-            log.error("Error processing embed batch (first persistence id: {})", scenePersistenceIds.get(0), e);
+            log.error("嵌入批次处理失败（首个 persistence id: {}）", scenePersistenceIds.get(0), e);
             throw new RuntimeException("Batch embed processing failed", e);
         }
     }

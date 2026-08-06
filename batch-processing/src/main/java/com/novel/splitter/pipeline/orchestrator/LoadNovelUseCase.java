@@ -42,7 +42,7 @@ public class LoadNovelUseCase {
             BiConsumer<Integer, String> progressCallback,
             String chapterTitleRegex,
             String recognitionStrategy) throws Exception {
-        log.info("=== Start Load Phase for: {} (novelId: {}, strategy: {}) ===", novelPath, novelId,
+        log.info("=== 开始加载阶段：{}（novelId: {}，strategy: {}） ===", novelPath, novelId,
                 recognitionStrategy != null ? recognitionStrategy : "CN_CHAPTER");
         progressCallback.accept(IngestProgress.LOAD_START, "开始读取文件...");
         Novel novel = novelLoader.load(novelId, novelPath, chapterTitleRegex, recognitionStrategy);

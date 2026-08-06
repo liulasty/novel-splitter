@@ -52,7 +52,7 @@ public class LocalNovelLoader {
         RecognitionStrategyType strategyTypeEnum = RecognitionStrategyType.fromString(strategyType);
         ChapterRecognitionStrategy strategy = strategyRegistry.require(strategyTypeEnum, chapterTitleRegex);
         boolean isVolumeChapter = strategyTypeEnum == RecognitionStrategyType.VOLUME_CHAPTER;
-        log.info("Loading novel from: {} (strategy: {}, custom regex: {})",
+        log.info("正在从 {} 加载小说（strategy: {}，custom regex: {}）",
                 path, strategyTypeEnum, chapterTitleRegex != null && !chapterTitleRegex.isBlank());
 
         Pattern pattern = strategy.pattern();
@@ -76,7 +76,7 @@ public class LocalNovelLoader {
         List<String> rawLines = FileUtils.readLinesAutoDetectEncoding(path);
         int lineOffset = ChapterRecognizer.skipLeadingTableOfContents(rawLines, pattern);
         if (lineOffset > 0) {
-            log.info("Skipped {} leading lines as table-of-contents / decorative block", lineOffset);
+            log.info("已跳过开头 {} 行（目录 / 装饰性分隔块）", lineOffset);
         }
 
         List<Chapter> chapters = new ArrayList<>();
@@ -160,7 +160,7 @@ public class LocalNovelLoader {
             if (novelId != null) {
                 saveChapterCache(novelId, 1, new ChapterData(synthetic, new ArrayList<>(currentChapterParagraphs)));
             }
-            log.info("No chapter headings matched; saved as single chapter \"全文\" ({} paragraphs)", currentChapterParagraphs.size());
+            log.info("未匹配到任何章节标题，已保存为单章 \"全文\"（共 {} 段）", currentChapterParagraphs.size());
         }
 
         if (currentChapterBuilder != null) {
@@ -187,7 +187,7 @@ public class LocalNovelLoader {
             }
         }
 
-        log.info("Loaded novel '{}' by '{}'. Chapters: {}", title, author, chapters.size());
+        log.info("已加载小说 '{}'，作者 '{}'，共 {} 章", title, author, chapters.size());
 
         return Novel.builder()
                 .title(title)
