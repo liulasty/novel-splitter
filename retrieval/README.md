@@ -7,7 +7,7 @@
 - **RAG 全流程编排**：提供 `RagFacade` 门面类，统筹“查询向量化 → 向量相似度检索 → 上下文组装 → LLM 提示词生成 → LLM 推理”的完整链路。
 - **语义相似度检索**：通过 `RetrievalService` 和 `VectorRetrievalService` 将用户的自然语言提问转换为 Embedding，并在目标小说的集合（Collection）中检索 Top-K 场景。
 - **智能意图分类**：通过 `AnswerPolicyClassifier` 和 `RuleBasedPolicyClassifier`，根据问题的复杂度或类型（如事实性、总结性），自动选择最优的大语言模型响应策略。
-- **查询与结果适配**：提供 `RagRequest` 和 `RetrievalQueryBuilder`，标准化检索条件（如最小置信度过滤）；利用 `ContextAdapter` 统一上下文格式，并支持返回详细的诊断信息（`RagDebugResponse`）。
+- **查询与结果适配**：提供 `RagRequest` 和 `RetrievalQueryBuilder`，标准化检索条件（如最小置信度过滤）；通过 `RagDebugResponse` 返回检索诊断信息（上下文统一格式由 context-assembler 模块的组装阶段完成）。
 
 ## 技术栈
 - 核心语言：Java 21
