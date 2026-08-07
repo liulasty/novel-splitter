@@ -71,7 +71,7 @@ docker compose --env-file config/.env.dev up -d --build # rebuild & restart chan
 
 ## Project Architecture
 
-**Novel Splitter** converts Chinese web-novels into RAG-ready semantic scenes. It downloads, cleans, structurally parses, semantically splits, vector-embeds, and provides a 5-stage context assembly pipeline for LLM Q&A.
+**Novel Splitter** converts Chinese web-novels into RAG-ready semantic scenes. It cleans, structurally parses, semantically splits, enriches, vector-embeds, and provides a 5-stage context assembly pipeline for LLM Q&A.
 
 ### Module Layout (Maven multi-module, DDD-style)
 
@@ -80,15 +80,39 @@ domain/            — Entities (Novel, Scene, Chapter, SplitTask), repository i
 application/       — Facade (NovelFacadeServiceImpl), MQ consumers (SplitWorker, EmbedWorker), DTO mapping, application.yml
 infrastructure/    — JPA repository impls, entity↔domain mappers (MapStruct), FileUtils, JsonUtils
 interfaces/        — REST controllers, GlobalExceptionHandler, ApiResponse, AuthInterceptor, Spring Boot entry point
-batch-processing/  — Pipeline: PipelineContext (ID-only), Stage interface, Load/Split/Embed use cases
+batch-processing/  — Pipeline: Load/Split/Embed use cases
 text-processing/   — NLP: ChapterRecognizer, MarkdownParagraphSplitter, ContextAwareSegmentBuilder, SceneAssembler
-validation/        — Quality: SceneValidator, SemanticSegmentBuilder, dialogue/length strategies
+validation/        — Quality: SemanticSegmentBuilder, dialogue/length strategies
 embedding/         — ONNX Runtime (BGE-Small-ZH), Tokenizer/Vocabulary, ChromaVectorStore
 retrieval/         — RAG: RagFacade, VectorRetrievalService, AnswerPolicyClassifier, RetrievalQueryBuilder
 context-assembler/ — 5-stage: ReScorer → Deduplicator → Merger → TokenBudgetAllocator → FinalAssembly
 llm-client/        — LlmClient interface, DeepSeek/Gemini/Coze/Ollama clients, RobustLlmClient (retry+circuit)
 novel-splitter-web/— React 19 + Vite + Zustand + TanStack Query + TailwindCSS 4
 ```
+
+### Design Pattern (Hexagonal / Ports & Adapters)
+
+Core architecture is **六边形架构（Ports & Adapters，端口与适配器）** 叠加 DDD 分层。依赖方向严格由外向内，无反向依赖：
+
+```
+interfaces ──→ application ──→ domain
+infrastructure ──→ domain        (application 不依赖 infrastructure)
+```
+
+- **出站端口**（定义在 application，只依赖 domain）：`application/port/out/` → `FileStoragePort`、`TaskQueuePort`、`TaskCachePort`
+- **出站适配器**（位于外围的 interfaces）：`interfaces/infra/` → `LocalFileStorageAdapter`、`RabbitTaskQueueAdapter`、`NoOpTaskCacheAdapter`
+- **仓储端口**：`domain/repository/` 接口即端口；`infrastructure/persistence/repository/impl/*JpaImpl` 为 JPA 适配器
+- **入站侧**：REST Controller（`interfaces/api`）为驱动适配器，`NovelFacadeService` 为入站端口
+
+叠加的其它模式：
+
+- **Facade 门面**：`NovelFacadeServiceImpl`
+- **Repository 仓储**：domain 接口 + infrastructure JPA 实现
+- **Strategy 策略**：`ChapterRecognitionStrategy`、`DialogueStrategy`、`LengthLimitStrategy`、`ChunkingStrategy`、`AnswerPolicyClassifier`
+- **Use Case 用例**：无状态的 `LoadNovelUseCase` / `SplitNovelUseCase` / `EmbedNovelUseCase`
+- **事件/消息驱动**：RabbitMQ workers，编排只留在 application 层
+
+注意：`retrieval`、`context-assembler`、`llm-client` 等处理引擎模块被 application 直接依赖，作为被编排的领域服务——这是**六边形为主、带模块化分层**的务实混合，而非教科书式纯净六边形。
 
 ### Data Flow (MQ-driven async pipeline)
 

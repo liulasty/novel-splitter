@@ -24,7 +24,7 @@
 | `ChapterRecognizer` | 服务类 | 识别小说章节边界，抽取章节标题及内容元数据。 |
 | `SceneAssembler` | 服务类 | 核心组装引擎，基于相关性打分将段落聚合为完整的连贯场景。 |
 | `SemanticDensityAnalyzer` | 工具/服务类 | 分析文本语义密度（关键词频率、实体密度等），辅助决定切分点。 |
-| `SplitRule` | 接口 | 文本拆分与组合规则的抽象接口，其实现类如 `LengthRule` 规范拆分逻辑。 |
+| `SplitRule` | 接口 | 文本拆分与组合规则的抽象接口，其实现类如 `DynamicWindowRule` 规范拆分逻辑。 |
 
 ## 扩展点
 - **扩展点 1**：扩展 `ParagraphSplitter` 支持对 PDF 提取文本或 HTML 的段落切分逻辑。
