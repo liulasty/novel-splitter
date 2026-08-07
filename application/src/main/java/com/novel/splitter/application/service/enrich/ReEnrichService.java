@@ -1,21 +1,18 @@
 package com.novel.splitter.application.service.enrich;
 
-import com.novel.splitter.application.port.out.TaskQueuePort;
 import com.novel.splitter.domain.model.Novel;
 import com.novel.splitter.domain.model.Scene;
 import com.novel.splitter.domain.repository.NovelRepository;
 import com.novel.splitter.domain.repository.SceneRepository;
-import com.novel.splitter.domain.task.EnrichTaskMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
- * 对已有小说触发 re-enrich：收集指定版本（缺省用活动版本）的全部场景 ID，
- * 投递 EnrichTaskMessage 到 novel.task.enrich 队列。
+ * 对已有小说触发 re-enrich：收集指定版本（缺省用活动版本）的全部场景，
+ * 交给 {@link EnrichPublisher} 按章投递（避免单消息承载整本书触发 MQ ack 超时）。
  */
 @Service
 @RequiredArgsConstructor
@@ -24,7 +21,7 @@ public class ReEnrichService {
 
     private final SceneRepository sceneRepository;
     private final NovelRepository novelRepository;
-    private final TaskQueuePort taskQueuePort;
+    private final EnrichPublisher enrichPublisher;
 
     public void reEnrich(String novelId, String version) {
         String id = novelId != null ? novelId.trim() : null;
@@ -46,12 +43,11 @@ public class ReEnrichService {
             throw new IllegalArgumentException("未指定 version 且小说无活动版本，无法 re-enrich");
         }
         List<Scene> scenes = sceneRepository.findAllByNovelIdAndVersion(id, resolved);
-        List<Long> sceneIds = scenes.stream().map(Scene::getPersistenceId).collect(Collectors.toList());
-        if (sceneIds.isEmpty()) {
+        if (scenes.isEmpty()) {
             log.warn("re-enrich：novelId={} version={} 无场景，跳过", id, resolved);
             return;
         }
-        taskQueuePort.sendEnrich(new EnrichTaskMessage(null, id, resolved, sceneIds));
-        log.info("re-enrich 已投递 {} 个场景：novelId={} version={}", sceneIds.size(), id, resolved);
+        enrichPublisher.publishByChapter(null, id, resolved, scenes);
+        log.info("re-enrich 已投递 {} 个场景：novelId={} version={}", scenes.size(), id, resolved);
     }
 }

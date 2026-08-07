@@ -4,7 +4,6 @@ import com.novel.splitter.application.config.RabbitConfig;
 import com.novel.splitter.application.orchestration.EmbedPipelineOrchestrator;
 import com.novel.splitter.domain.task.SplitTask;
 import com.novel.splitter.domain.task.SplitTaskMessage;
-import com.novel.splitter.domain.task.EnrichTaskMessage;
 import com.novel.splitter.domain.enums.TaskType;
 import com.novel.splitter.pipeline.model.ResolvedChunkingParams;
 import com.novel.splitter.pipeline.orchestrator.SplitNovelUseCase;
@@ -15,7 +14,10 @@ import com.novel.splitter.domain.enums.NovelStatus;
 import com.novel.splitter.domain.enums.SplitStrategy;
 import com.novel.splitter.domain.enums.VersionStatus;
 import com.novel.splitter.domain.model.NovelVersion;
+import com.novel.splitter.domain.model.Scene;
 import com.novel.splitter.domain.repository.NovelVersionRepository;
+import com.novel.splitter.domain.repository.SceneRepository;
+import com.novel.splitter.application.service.enrich.EnrichPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -36,6 +38,8 @@ public class SplitWorker {
 
     private final NovelService novelService;
     private final NovelVersionRepository novelVersionRepository;
+    private final SceneRepository sceneRepository;
+    private final EnrichPublisher enrichPublisher;
 
     @org.springframework.beans.factory.annotation.Value("${splitter.ingestion.batch-size:10}")
     private int batchSize;
@@ -145,7 +149,9 @@ public class SplitWorker {
 
             if (novelId != null) {
                 novelService.updateNovelStatus(novelId, NovelStatus.SPLIT_COMPLETED);
-                if (message.isTriggerEmbed()) {
+                // 全有或全无：enrich 开启时不得在中间态自动 embed，由用户分析完成后再手动向量化；
+                // enrich 关闭时 0% 为合法状态，保持原自动 embed。
+                if (message.isTriggerEmbed() && !enrichEnabled) {
                     String embedTaskId = java.util.UUID.randomUUID().toString();
                     taskService.createTask(
                             embedTaskId,
@@ -163,14 +169,11 @@ public class SplitWorker {
                             chunkParams.chunkOverlap());
                     log.info("任务 {} 已自动串联 EMBED 阶段（编排），embedTaskId={}", taskId, embedTaskId);
                 }
-                // 预留: 发送消息到 ENRICH_TASK_QUEUE 进行 AI 语义增强
+                // 语义增强：按章拆投，避免单消息承载整本书触发 MQ ack 超时
                 if (enrichEnabled) {
-                    rabbitTemplate.convertAndSend(
-                            RabbitConfig.EXCHANGE_NAME,
-                            "enrich",
-                            new EnrichTaskMessage(taskId, novelId, version, sceneIds)
-                    );
-                    log.info("任务 {} 已发送 ENRICH 语义增强任务", taskId);
+                    List<Scene> newScenes = sceneRepository.findByIds(sceneIds);
+                    enrichPublisher.publishByChapter(taskId, novelId, version, newScenes);
+                    log.info("任务 {} 已发送 ENRICH 语义增强任务（按章投递）", taskId);
                 }
             }
 

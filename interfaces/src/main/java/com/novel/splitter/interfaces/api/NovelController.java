@@ -283,9 +283,18 @@ public class NovelController {
         novelFacadeService.deleteVersion(novelId, versionTag);
     }
 
+    @Operation(summary = "清除版本语义分析（回退至 0%）",
+            description = "清除该版本全部场景的 role/characters/location/time，使 enrich 回到 0% 合法状态（不可逆），可立即向量化或重新分析")
+    @DeleteMapping("/{novelId}/versions/{versionTag}/enrich")
+    public void clearVersionEnrich(
+            @PathVariable("novelId") String novelId,
+            @PathVariable("versionTag") String versionTag) {
+        novelFacadeService.resetVersionEnrich(novelId, versionTag);
+    }
+
     @Operation(summary = "触发语义抽取（re-enrich）", description = "对指定版本的全部场景投递 enrich 消息，LLM 抽取 characters/location/time/role")
     @PostMapping("/{novelId}/re-enrich")
-    public void reEnrich(@PathVariable String novelId,
+    public void reEnrich(@PathVariable("novelId") String novelId,
                          @RequestParam(value = "version", required = false) String version) {
         novelFacadeService.reEnrich(novelId, version);
     }

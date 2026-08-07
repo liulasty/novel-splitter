@@ -147,6 +147,10 @@ export interface NovelVersionDto {
   createdAt?: number | null;
   updatedAt?: number | null;
   active: boolean;
+  /** 语义抽取完成度（0-100，%场景含非空语义字段）；无场景时为 null */
+  enrichProgress?: number | null;
+  /** 语义抽取是否全部完成 */
+  enrichComplete?: boolean;
 }
 
 export interface CreateVersionRequest {
@@ -364,6 +368,19 @@ export const novelApi = {
   deleteVersion: async (novelId: string, versionTag: string): Promise<void> => {
     await apiClient.delete<ApiEnvelope<void>, void>(
       `/novels/${encodeURIComponent(novelId)}/versions/${encodeURIComponent(versionTag)}`
+    );
+  },
+
+  reEnrich: async (novelId: string, version?: string): Promise<void> => {
+    const qs = version ? `?version=${encodeURIComponent(version)}` : '';
+    await apiClient.post<ApiEnvelope<void>, void>(
+      `/novels/${encodeURIComponent(novelId)}/re-enrich${qs}`
+    );
+  },
+
+  deleteVersionEnrich: async (novelId: string, versionTag: string): Promise<void> => {
+    await apiClient.delete<ApiEnvelope<void>, void>(
+      `/novels/${encodeURIComponent(novelId)}/versions/${encodeURIComponent(versionTag)}/enrich`
     );
   },
 

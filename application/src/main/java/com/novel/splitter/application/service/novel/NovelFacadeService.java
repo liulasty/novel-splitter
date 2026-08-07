@@ -117,4 +117,7 @@ public interface NovelFacadeService {
      * 触发对指定版本全部场景的语义抽取（re-enrich）。version 为空时使用活动版本。
      */
     void reEnrich(String novelId, String version);
+
+    /** 清除版本 enrich 数据（回退至 0%，不可逆），使版本回到可向量化状态。 */
+    void resetVersionEnrich(String novelId, String versionTag);
 }

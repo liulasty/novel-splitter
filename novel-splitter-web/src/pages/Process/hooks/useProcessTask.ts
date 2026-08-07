@@ -275,6 +275,32 @@ export function useProcessTask() {
         },
     });
 
+    const reEnrichMutation = useMutation({
+        mutationFn: (versionTag: string) => novelApi.reEnrich(currentNovelId, versionTag),
+        onSuccess: (_data, versionTag) => {
+            toast.success(`已提交语义分析任务：${versionTag}，完成后方可向量化`);
+            if (currentNovelId) {
+                queryClient.invalidateQueries({ queryKey: ['versions', currentNovelId] });
+            }
+        },
+        onError: (error: unknown) => {
+            toast.error(getApiErrorMessage(error, '发起语义分析失败'));
+        },
+    });
+
+    const resetVersionEnrichMutation = useMutation({
+        mutationFn: (versionTag: string) => novelApi.deleteVersionEnrich(currentNovelId, versionTag),
+        onSuccess: (_data, versionTag) => {
+            toast.success(`已清除 ${versionTag} 的语义分析，回退至 0%`);
+            if (currentNovelId) {
+                queryClient.invalidateQueries({ queryKey: ['versions', currentNovelId] });
+            }
+        },
+        onError: (error: unknown) => {
+            toast.error(getApiErrorMessage(error, '清除语义分析失败'));
+        },
+    });
+
     const handleChapterParse = () => {
         if (!currentNovelId) {
             toast.error('请先选择小说');
@@ -391,6 +417,16 @@ export function useProcessTask() {
             deleteVersion: (versionTag: string) => {
                 if (!guardNovelSelected()) return;
                 deleteVersionMutation.mutate(versionTag);
+            },
+            reEnrich: (versionTag: string) => {
+                if (!guardNovelSelected()) return;
+                reEnrichMutation.mutate(versionTag);
+            },
+            resetVersionEnrich: (versionTag: string) => {
+                if (!guardNovelSelected()) return;
+                if (window.confirm(`清除版本 ${versionTag} 的全部语义分析字段并回退至 0%？该操作不可逆。`)) {
+                    resetVersionEnrichMutation.mutate(versionTag);
+                }
             },
         },
     };

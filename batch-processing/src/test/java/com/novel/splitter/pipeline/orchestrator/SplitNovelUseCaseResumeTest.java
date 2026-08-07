@@ -191,6 +191,9 @@ class SplitNovelUseCaseResumeTest {
         @Override public List<Long> listPersistenceIdsByProfile(String novelId, String version, int chunkSize, int chunkOverlap) { throw unsupported(); }
         @Override public long countByProfile(String novelId, String version, int chunkSize, int chunkOverlap) { throw unsupported(); }
         @Override public long countAllByNovelIdAndVersion(String novelId, String version) { throw unsupported(); }
+        @Override public long countActiveByNovelIdAndVersion(String novelId, String version) { return 0L; }
+        @Override public long countEnrichedByNovelIdAndVersion(String novelId, String version) { return 0L; }
+        @Override public int clearEnrichMetadata(String novelId, String version) { return 0; }
         @Override public PagedResult<Scene> findLightweightScenes(PageQuery pageQuery) { throw unsupported(); }
         @Override public PagedResult<Scene> findByNovelId(String novelId, PageQuery pageQuery) { throw unsupported(); }
         @Override public PagedResult<Scene> findByProfile(String novelId, String version, int chunkSize, int chunkOverlap, PageQuery pageQuery) { throw unsupported(); }

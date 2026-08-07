@@ -69,6 +69,20 @@ public interface JpaSceneRepository extends JpaRepository<JpaSceneEntity, Long>,
     @Query("SELECT COUNT(s) FROM JpaSceneEntity s WHERE s.novel.id = ?1 AND s.version = ?2")
     long countByNovelIdAndVersionAllChunks(String novelId, String version);
 
+    @Query(value = "SELECT count(*) FROM scenes WHERE novel_id = :nid AND version = :ver AND is_deleted = false", nativeQuery = true)
+    long countActiveByNovelIdAndVersion(@Param("nid") String novelId, @Param("ver") String version);
+
+    @Query(value = "SELECT count(*) FROM scenes WHERE novel_id = :nid AND version = :ver AND is_deleted = false "
+            + "AND metadata_json IS NOT NULL AND metadata_json->>'role' IS NOT NULL AND metadata_json->>'role' <> ''",
+            nativeQuery = true)
+    long countEnrichedByNovelIdAndVersion(@Param("nid") String novelId, @Param("ver") String version);
+
+    @Modifying
+    @Query(value = "UPDATE scenes SET metadata_json = metadata_json - 'role' - 'characters' - 'location' - 'time' "
+            + "WHERE novel_id = :nid AND version = :ver AND is_deleted = false",
+            nativeQuery = true)
+    int clearEnrichMetadata(@Param("nid") String novelId, @Param("ver") String version);
+
     @Query("select coalesce(max(e.seq), 0) from JpaSceneEntity e where e.novel.id = :novelId and e.version = :version")
     Optional<Long> findMaxSeq(@Param("novelId") String novelId, @Param("version") String version);
 

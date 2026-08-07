@@ -32,6 +32,7 @@ public enum BusinessErrorCode {
     CHROMA_CONNECTION_FAILED(5000, "向量数据库连接失败"),
     CHROMA_QUERY_FAILED(5001, "向量查询失败"),
     CHROMA_COLLECTION_NOT_FOUND(5002, "集合不存在"),
+    VERSION_ENRICH_INCONSISTENT(5003, "语义分析不一致，需达到 0% 或 100% 后才能向量化"),
 
     // DLQ 死信 (6000–6999)
     DLQ_MESSAGE_NOT_FOUND(6000, "死信消息不存在"),

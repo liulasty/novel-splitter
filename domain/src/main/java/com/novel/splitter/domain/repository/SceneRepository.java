@@ -61,6 +61,18 @@ public interface SceneRepository {
     /** 同一 business version 下所有 chunk 分区的场景总数 */
     long countAllByNovelIdAndVersion(String novelId, String version);
 
+    /** 同一 business version 下未删除的场景总数（跨 chunk 分区） */
+    long countActiveByNovelIdAndVersion(String novelId, String version);
+
+    /**
+     * 同一 business version 下已具备语义抽取结果（metadata_json 含非空 role 或非空 characters）的场景数，
+     * 用于 enrich 完成度展示。判据必须校验 jsonb 值非空——null 字段也会被序列化写入 JSON。
+     */
+    long countEnrichedByNovelIdAndVersion(String novelId, String version);
+
+    /** 清除版本全部场景的 enrich 字段（role/characters/location/time），回到 0% 合法状态；返回清除行数。 */
+    int clearEnrichMetadata(String novelId, String version);
+
     PagedResult<Scene> findLightweightScenes(PageQuery pageQuery);
 
     PagedResult<Scene> findByNovelId(String novelId, PageQuery pageQuery);

@@ -1,6 +1,7 @@
 package com.novel.splitter.application.worker;
 
 import com.novel.splitter.application.orchestration.EmbedPipelineOrchestrator;
+import com.novel.splitter.application.service.enrich.EnrichPublisher;
 import com.novel.splitter.application.service.novel.NovelService;
 import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.domain.enums.EmbedStatus;
@@ -82,7 +83,8 @@ class SplitWorkerResumeTest {
         SplitNovelUseCase realUseCase = new SplitNovelUseCase(resumeCacheRepo(), sceneRepo, resumeChapterRepo());
         InMemoryNovelVersionRepository versionRepo = new InMemoryNovelVersionRepository();
         SplitWorker worker = new SplitWorker(
-                realUseCase, taskService, rabbitTemplate, embedPipelineOrchestrator, novelService, versionRepo);
+                realUseCase, taskService, rabbitTemplate, embedPipelineOrchestrator, novelService, versionRepo,
+                mock(SceneRepository.class), mock(EnrichPublisher.class));
         stubCommon();
 
         worker.processSplitTask(msg("t1"));
@@ -117,7 +119,8 @@ class SplitWorkerResumeTest {
                 .build();
         versionRepo.save(preset);
         SplitWorker worker = new SplitWorker(
-                useCase, taskService, rabbitTemplate, embedPipelineOrchestrator, novelService, versionRepo);
+                useCase, taskService, rabbitTemplate, embedPipelineOrchestrator, novelService, versionRepo,
+                mock(SceneRepository.class), mock(EnrichPublisher.class));
         stubCommon();
 
         worker.processSplitTask(msg("t3"));
@@ -139,7 +142,8 @@ class SplitWorkerResumeTest {
 
         InMemoryNovelVersionRepository versionRepo = new InMemoryNovelVersionRepository();
         SplitWorker worker = new SplitWorker(
-                useCase, taskService, rabbitTemplate, embedPipelineOrchestrator, novelService, versionRepo);
+                useCase, taskService, rabbitTemplate, embedPipelineOrchestrator, novelService, versionRepo,
+                mock(SceneRepository.class), mock(EnrichPublisher.class));
         stubCommon();
 
         worker.processSplitTask(msg("t4"));
@@ -273,6 +277,9 @@ class SplitWorkerResumeTest {
         @Override public List<Long> listPersistenceIdsByProfile(String novelId, String version, int chunkSize, int chunkOverlap) { throw unsupported(); }
         @Override public long countByProfile(String novelId, String version, int chunkSize, int chunkOverlap) { throw unsupported(); }
         @Override public long countAllByNovelIdAndVersion(String novelId, String version) { throw unsupported(); }
+        @Override public long countActiveByNovelIdAndVersion(String novelId, String version) { return 0L; }
+        @Override public long countEnrichedByNovelIdAndVersion(String novelId, String version) { return 0L; }
+        @Override public int clearEnrichMetadata(String novelId, String version) { return 0; }
         @Override public PagedResult<Scene> findLightweightScenes(PageQuery pageQuery) { throw unsupported(); }
         @Override public PagedResult<Scene> findByNovelId(String novelId, PageQuery pageQuery) { throw unsupported(); }
         @Override public PagedResult<Scene> findByProfile(String novelId, String version, int chunkSize, int chunkOverlap, PageQuery pageQuery) { throw unsupported(); }

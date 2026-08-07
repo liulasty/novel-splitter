@@ -8,6 +8,7 @@ import com.novel.splitter.application.model.dto.TaskSubmitResponseDto;
 import com.novel.splitter.application.orchestration.EmbedPipelineOrchestrator;
 import com.novel.splitter.application.port.out.TaskQueuePort;
 import com.novel.splitter.application.service.download.DownloadService;
+import com.novel.splitter.application.service.enrich.EnrichConsistencyService;
 import com.novel.splitter.application.service.knowledge.KnowledgeBaseService;
 import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.domain.enums.NovelStatus;
@@ -64,6 +65,7 @@ class NovelVersionApiFlowTest {
     @Mock private NovelVersionRepository novelVersionRepository;
     @Mock private NovelVersionService novelVersionService;
     @Mock private KnowledgeBaseService knowledgeBaseService;
+    @Mock private EnrichConsistencyService enrichConsistencyService;
 
     @InjectMocks
     private NovelFacadeServiceImpl novelFacadeService;

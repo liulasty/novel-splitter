@@ -43,4 +43,10 @@ public class NovelVersionDto {
 
     /** 是否当前活跃版本（novel.activeVersionTag 相等） */
     private boolean active;
+
+    /** 语义抽取完成度（0-100，%场景含非空语义字段）；无场景时为 null */
+    private Integer enrichProgress;
+
+    /** 语义抽取是否全部完成（有场景且 enrichProgress == 100） */
+    private boolean enrichComplete;
 }

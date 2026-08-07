@@ -57,6 +57,8 @@ export interface ProcessActions {
   startEmbed: (versionTag: string) => void;
   activate: (versionTag: string) => void;
   deleteVersion: (versionTag: string) => void;
+  reEnrich: (versionTag: string) => void;
+  resetVersionEnrich: (versionTag: string) => void;
 }
 
 /** ProcessingPanel 派生的门控布尔，各 tab 用于按钮禁用 */

@@ -14,6 +14,7 @@ import org.mockito.Mockito;
 import java.util.List;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -33,7 +34,25 @@ class ReEnrichServiceTest {
         sceneRepository = Mockito.mock(SceneRepository.class);
         novelRepository = Mockito.mock(NovelRepository.class);
         taskQueuePort = Mockito.mock(TaskQueuePort.class);
-        service = new ReEnrichService(sceneRepository, novelRepository, taskQueuePort);
+        service = new ReEnrichService(sceneRepository, novelRepository, new EnrichPublisher(taskQueuePort));
+    }
+
+    @Test
+    void reEnrich_groupsScenesByChapter_publishesOneMessagePerChapter() {
+        when(novelRepository.findById("novel"))
+                .thenReturn(Optional.of(Novel.builder().activeVersionTag("v2").build()));
+        when(sceneRepository.findAllByNovelIdAndVersion("novel", "v2")).thenReturn(List.of(
+                Scene.builder().persistenceId(1L).chapterIndex(1).build(),
+                Scene.builder().persistenceId(2L).chapterIndex(1).build(),
+                Scene.builder().persistenceId(3L).chapterIndex(2).build()));
+
+        service.reEnrich("novel", "v2");
+
+        ArgumentCaptor<EnrichTaskMessage> captor = ArgumentCaptor.forClass(EnrichTaskMessage.class);
+        verify(taskQueuePort, Mockito.times(2)).sendEnrich(captor.capture());
+        assertThat(captor.getAllValues())
+                .extracting(EnrichTaskMessage::getSceneIds)
+                .containsExactlyInAnyOrder(List.of(1L, 2L), List.of(3L));
     }
 
     @Test

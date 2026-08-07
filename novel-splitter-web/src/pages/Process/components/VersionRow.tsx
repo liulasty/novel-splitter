@@ -14,6 +14,8 @@ interface VersionRowProps {
   onStartEmbed: () => void;
   onActivate: () => void;
   onDelete: () => void;
+  onReEnrich: () => void;
+  onResetEnrich: () => void;
 }
 
 const STATUS_META: Record<string, { label: string; className: string }> = {
@@ -46,11 +48,16 @@ export function VersionRow({
   onStartEmbed,
   onActivate,
   onDelete,
+  onReEnrich,
+  onResetEnrich,
 }: VersionRowProps) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const status = version.status || 'PENDING';
   const meta = STATUS_META[status] ?? { label: status, className: 'bg-slate-100 text-slate-600' };
+  const enrichProgress = version.enrichProgress ?? null;
+  const enrichComplete = version.enrichComplete === true;
+  const enrichIntermediate = enrichProgress != null && enrichProgress > 0 && enrichProgress < 100;
   const isProcessing = status === 'SPLITTING' || status === 'EMBEDDING';
 
   // 续传目标：SPLITTING 续切分，EMBEDDING/FAILED 续向量化（startEmbed 允许 FAILED 重入）
@@ -84,6 +91,24 @@ export function VersionRow({
           )}
         </div>
         <span className={cn('text-xs font-semibold px-2.5 py-0.5 rounded-full', meta.className)}>{meta.label}</span>
+        {enrichProgress != null && ['SPLIT_DONE', 'EMBEDDING', 'EMBED_DONE', 'ACTIVE'].includes(status) && (
+          enrichProgress === 100 ? (
+            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600">
+              语义分析完成
+            </span>
+          ) : enrichProgress === 0 ? (
+            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500">
+              未启动语义分析
+            </span>
+          ) : (
+            <span
+              className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-700"
+              title="语义分析进行中：结构化标签与过滤尚不可用，完成后或放弃后方可向量化"
+            >
+              ⌛ 语义分析中（{enrichProgress}%）
+            </span>
+          )
+        )}
       </div>
 
       {/* 切分参数 */}
@@ -178,11 +203,43 @@ export function VersionRow({
           <button
             type="button"
             onClick={onStartEmbed}
-            disabled={isStartingEmbed}
+            disabled={isStartingEmbed || enrichIntermediate}
             className="inline-flex items-center gap-1.5 h-8 px-4 rounded-full text-sm font-medium text-white bg-gradient-to-r from-fuchsia-500 to-purple-600 hover:from-fuchsia-600 hover:to-purple-700 hover:shadow transition-all disabled:opacity-40 disabled:pointer-events-none"
           >
             {isStartingEmbed ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
             发起向量化
+          </button>
+        )}
+        {status === 'SPLIT_DONE' && enrichIntermediate && (
+          <div className="w-full flex flex-wrap items-center gap-2 text-xs text-amber-600">
+            <span>语义分析进行中（{enrichProgress}%），完成后或放弃后方可向量化。</span>
+            <button
+              type="button"
+              onClick={onReEnrich}
+              className="h-6 px-2.5 rounded-full border border-amber-300 bg-amber-50 hover:bg-amber-100"
+            >
+              继续分析
+            </button>
+            <button
+              type="button"
+              onClick={onResetEnrich}
+              className="h-6 px-2.5 rounded-full border border-red-200 bg-red-50 text-red-600 hover:bg-red-100"
+            >
+              放弃分析（回退至 0%）
+            </button>
+          </div>
+        )}
+
+        {status === 'ACTIVE' && enrichComplete && (
+          <button
+            type="button"
+            onClick={onStartEmbed}
+            disabled={isStartingEmbed}
+            title="若此前向量化早于语义抽取，重跑一次可让结构化标签与过滤生效（幂等，会清空并重建该版本向量）"
+            className="inline-flex items-center gap-1.5 h-8 px-4 rounded-full text-xs font-medium border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-all disabled:opacity-40 disabled:pointer-events-none"
+          >
+            {isStartingEmbed ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+            重新向量化
           </button>
         )}
 

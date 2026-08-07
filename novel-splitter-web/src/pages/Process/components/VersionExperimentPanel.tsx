@@ -86,6 +86,8 @@ export function VersionExperimentPanel({ state, actions }: VersionExperimentPane
               onStartEmbed={() => actions.startEmbed(v.versionTag)}
               onActivate={() => actions.activate(v.versionTag)}
               onDelete={() => actions.deleteVersion(v.versionTag)}
+              onReEnrich={() => actions.reEnrich(v.versionTag)}
+              onResetEnrich={() => actions.resetVersionEnrich(v.versionTag)}
             />
           ))
         )}

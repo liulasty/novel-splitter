@@ -277,6 +277,22 @@ public class SceneRepositoryJpaImpl implements SceneRepository {
     }
 
     @Override
+    public long countActiveByNovelIdAndVersion(String novelId, String version) {
+        return jpaSceneRepository.countActiveByNovelIdAndVersion(novelId, version);
+    }
+
+    @Override
+    public long countEnrichedByNovelIdAndVersion(String novelId, String version) {
+        return jpaSceneRepository.countEnrichedByNovelIdAndVersion(novelId, version);
+    }
+
+    @Override
+    @Transactional
+    public int clearEnrichMetadata(String novelId, String version) {
+        return jpaSceneRepository.clearEnrichMetadata(novelId, version);
+    }
+
+    @Override
     public PagedResult<Scene> findLightweightScenes(PageQuery pageQuery) {
         Page<Scene> page = jpaSceneRepository.findLightweightScenes(toPageable(pageQuery))
                 .map(dto -> {

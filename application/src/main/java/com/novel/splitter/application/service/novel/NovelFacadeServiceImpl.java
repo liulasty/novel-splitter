@@ -11,6 +11,7 @@ import com.novel.splitter.application.model.dto.CreateVersionRequest;
 import com.novel.splitter.application.model.dto.NovelVersionDto;
 import com.novel.splitter.application.mapper.DtoMapper;
 import com.novel.splitter.application.service.download.DownloadService;
+import com.novel.splitter.application.service.enrich.EnrichConsistencyService;
 import com.novel.splitter.application.service.enrich.ReEnrichService;
 import com.novel.splitter.application.service.knowledge.KnowledgeBaseService;
 import com.novel.splitter.application.service.task.TaskService;
@@ -107,6 +108,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
     private final NovelVersionService novelVersionService;
     private final KnowledgeBaseService knowledgeBaseService;
     private final ReEnrichService reEnrichService;
+    private final EnrichConsistencyService enrichConsistencyService;
 
     @Override
     public List<NovelStatRecordDto> getNovelStats() {
@@ -389,6 +391,9 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         String nid = novelId.trim();
         String v = normalizeVersion(version);
 
+        // 全有或全无：enrich 状态必须是 0% 或 100%，中间状态拒绝向量化
+        enrichConsistencyService.ensureEmbeddable(nid, v);
+
         String taskId = UUID.randomUUID().toString();
         taskService.createEmbedTaskWithNovelAdmission(taskId, nid, v, chunkSize, chunkOverlap);
 
@@ -590,7 +595,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         Novel novel = novelService.getNovelById(id);
         String activeTag = novel != null ? novel.getActiveVersionTag() : null;
         return novelVersionRepository.findByNovelId(id).stream()
-                .map(v -> toVersionDto(v, activeTag))
+                .map(v -> toVersionDto(v, activeTag, enrichProgressOf(id, v.getVersionTag())))
                 .collect(Collectors.toList());
     }
 
@@ -628,7 +633,8 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
                 .build();
         novelVersionRepository.save(version);
         log.info("已创建版本 {}/{} strategy={} chunk={}/{}", id, versionTag, strategy, chunkSize, chunkOverlap);
-        return toVersionDto(version, novel != null ? novel.getActiveVersionTag() : null);
+        return toVersionDto(version, novel != null ? novel.getActiveVersionTag() : null,
+                enrichProgressOf(id, version.getVersionTag()));
     }
 
     @Override
@@ -699,6 +705,17 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         reEnrichService.reEnrich(novelId, version);
     }
 
+    @Override
+    public void resetVersionEnrich(String novelId, String versionTag) {
+        if (novelId == null || novelId.isBlank() || versionTag == null || versionTag.isBlank()) {
+            throw new IllegalArgumentException("novelId and versionTag must not be blank");
+        }
+        String id = novelId.trim();
+        String tag = versionTag.trim();
+        int cleared = sceneRepository.clearEnrichMetadata(id, tag);
+        log.info("已清除版本 enrich 数据（回退至 0%）：novelId={} version={} scenes={}", id, tag, cleared);
+    }
+
     private String nextVersionTag(String novelId) {
         int maxNum = 0;
         for (NovelVersion v : novelVersionRepository.findByNovelId(novelId)) {
@@ -730,7 +747,7 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
         return chunkOverlap != null && chunkOverlap >= 0 ? chunkOverlap : defaultChunkOverlap;
     }
 
-    private static NovelVersionDto toVersionDto(NovelVersion v, String activeTag) {
+    private static NovelVersionDto toVersionDto(NovelVersion v, String activeTag, Integer enrichProgress) {
         return NovelVersionDto.builder()
                 .novelId(v.getNovelId())
                 .versionTag(v.getVersionTag())
@@ -747,7 +764,18 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
                 .createdAt(v.getCreatedAt())
                 .updatedAt(v.getUpdatedAt())
                 .active(activeTag != null && activeTag.equals(v.getVersionTag()))
+                .enrichProgress(enrichProgress)
+                .enrichComplete(enrichProgress != null && enrichProgress >= 100)
                 .build();
+    }
+
+    /** 计算某版本的 enrich 完成度（%场景 role 非空）；无场景返回 null。 */
+    private Integer enrichProgressOf(String novelId, String versionTag) {
+        long total = sceneRepository.countActiveByNovelIdAndVersion(novelId, versionTag);
+        if (total <= 0) {
+            return null;
+        }
+        return enrichConsistencyService.progress(novelId, versionTag);
     }
 
     private void applyChunkingParams(SplitTaskMessage message, Integer chunkSize, Integer chunkOverlap) {
