@@ -48,17 +48,18 @@ public class TokenBudgetAllocator {
 
             int sceneTokens = tokenCounter.count(scene.getText());
 
-            // Token 预算（软约束）：超过时记录警告但仍然保留
+            // Token 预算（硬约束）：任一达到上限即停止，保证上下文 ≤ maxContextTokens
             if (currentTokens + sceneTokens > maxTokens) {
-                log.warn("添加场景 {}（{} tokens）超出最大上下文 token 数（{}），"
-                        + "但因 maxScenes={} 尚未达到（{}/{}）而仍然保留。",
-                        scene.getId(), sceneTokens, maxTokens, maxScenes, selected.size(), maxScenes);
+                log.warn("跳过场景 {}（{} tokens）：超出最大上下文 token 数（{}），"
+                        + "已选 {}/{} 场景、当前 {} tokens。",
+                        scene.getId(), sceneTokens, maxTokens, selected.size(), maxScenes, currentTokens);
+                break;
             }
 
             selected.add(scene);
             currentTokens += sceneTokens;
         }
-        
+
         return selected;
     }
 }

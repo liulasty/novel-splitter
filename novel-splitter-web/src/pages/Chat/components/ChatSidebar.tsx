@@ -2,6 +2,20 @@ import { SelectMenu, type SelectMenuOption } from '@/components/ui/select-menu';
 import type { NovelSummaryDto } from '@/api/novelApi';
 import type { SceneSplitProfileDto } from '@/api/knowledgeApi';
 
+/** 参数说明：(?) 圆圈，悬浮显示说明 */
+function ParamHint({ text }: { text: string }) {
+    return (
+        <span className="relative inline-flex group">
+            <span className="w-3.5 h-3.5 rounded-full bg-gray-300 text-white text-[10px] font-bold flex items-center justify-center leading-none cursor-help">
+                ?
+            </span>
+            <span className="absolute left-0 top-full mt-1.5 z-30 hidden group-hover:block w-56 px-2.5 py-1.5 rounded-lg bg-gray-900 text-white text-[11px] leading-relaxed shadow-lg">
+                {text}
+            </span>
+        </span>
+    );
+}
+
 interface ChatSidebarProps {
     state: {
         novels: Array<Pick<NovelSummaryDto, 'novelId' | 'title' | 'status'>> | undefined;
@@ -79,7 +93,10 @@ export function ChatSidebar({ state, actions }: ChatSidebarProps) {
                     {/* TopK */}
                     <div className="space-y-1.5">
                         <div className="flex items-center justify-between">
-                            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">引用数量 TopK</label>
+                            <div className="flex items-center gap-1">
+                                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">引用数量 TopK</label>
+                                <ParamHint text="向量检索返回的候选片段数，仅决定召回范围。最终进入上下文的场景还受『上下文场景上限』与『Token 预算』约束。" />
+                            </div>
                             <span className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-500 to-blue-500 text-white text-xs flex items-center justify-center font-semibold">
                                 {state.topK}
                             </span>
@@ -94,7 +111,10 @@ export function ChatSidebar({ state, actions }: ChatSidebarProps) {
                     {/* MaxScenes */}
                     <div className="space-y-1.5">
                         <div className="flex items-center justify-between">
-                            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">上下文场景上限</label>
+                            <div className="flex items-center gap-1">
+                                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">上下文场景上限</label>
+                                <ParamHint text="最终进入 LLM 上下文的场景块数量上限（硬约束）。实际可用数量还受『Token 预算』约束——token 先到上限即停止。" />
+                            </div>
                             <span className="w-6 h-6 rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 text-white text-xs flex items-center justify-center font-semibold">
                                 {state.maxScenes}
                             </span>
@@ -104,16 +124,20 @@ export function ChatSidebar({ state, actions }: ChatSidebarProps) {
                             onChange={(e) => actions.setMaxScenes(Number(e.target.value))}
                             className="w-full accent-emerald-500"
                         />
+                        <p className="text-[10px] text-gray-400">实际受 Token 预算约束</p>
                     </div>
 
                     {/* MaxContextTokens */}
                     <div className="space-y-1.5">
                         <div className="flex items-center justify-between">
-                            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Token 预算</label>
+                            <div className="flex items-center gap-1">
+                                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Token 预算</label>
+                                <ParamHint text="上下文允许的最大 token 数（硬约束）：超过即停止添加场景，实际上下文不会超出此值。建议按所用模型的上下文窗口设置。" />
+                            </div>
                             <span className="text-xs font-mono text-gray-500">{state.maxContextTokens}</span>
                         </div>
                         <input
-                            type="range" min={1000} max={8000} step={500} value={state.maxContextTokens}
+                            type="range" min={1000} max={16000} step={500} value={state.maxContextTokens}
                             onChange={(e) => actions.setMaxContextTokens(Number(e.target.value))}
                             className="w-full accent-amber-500"
                         />
@@ -122,7 +146,10 @@ export function ChatSidebar({ state, actions }: ChatSidebarProps) {
                     {/* MaxAnswerTokens */}
                     <div className="space-y-1.5">
                         <div className="flex items-center justify-between">
-                            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">回答长度</label>
+                            <div className="flex items-center gap-1">
+                                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">回答长度</label>
+                                <ParamHint text="LLM 回答的最大 token 数；0 表示不限。限制回答长度可降低单次调用耗时与费用。" />
+                            </div>
                             <span className="text-xs font-mono text-gray-500">
                                 {state.maxAnswerTokens > 0 ? state.maxAnswerTokens + '字' : '不限'}
                             </span>

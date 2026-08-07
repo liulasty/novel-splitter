@@ -94,8 +94,9 @@ class StandardContextAssemblerTest {
     @Test
     void testAssemble_TokenBudget() {
         // S1: 60 tokens, S2: 50 tokens. Max 100, maxScenes=5.
-        // maxScenes 是硬约束：未达到场景数上限时即使超 token 预算也保留。
-        
+        // maxScenes 与 maxTokens 均为硬约束，任一先到即停止。
+        // 60+50=110 > 100 → 只装下 S1。
+
         when(tokenCounter.count("S1")).thenReturn(60);
         when(tokenCounter.count("S2")).thenReturn(50);
 
@@ -106,8 +107,7 @@ class StandardContextAssemblerTest {
 
         List<ContextBlock> result = assembler.assemble("q", input, config);
 
-        // maxScenes 为硬约束：未达上限时即使超 token 预算也保留
-        assertEquals(2, result.size());
+        assertEquals(1, result.size());
     }
 
     @Test
