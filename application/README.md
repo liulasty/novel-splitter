@@ -14,7 +14,7 @@
 - 主要依赖：Spring Boot Starter AMQP, MapStruct, Dotenv, Lombok
 
 ## 模块依赖
-- 本模块依赖的内部子模块：`domain`, `batch-processing`, `novelDownloader`, `embedding`, `retrieval`, `context-assembler`, `llm-client`
+- 本模块依赖的内部子模块：`domain`, `batch-processing`, `embedding`, `retrieval`, `context-assembler`, `llm-client`
 - 依赖本模块的内部子模块：`interfaces`
 
 ## 核心组件

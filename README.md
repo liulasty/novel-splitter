@@ -35,7 +35,6 @@
 | `retrieval/` | RAG 检索与查询构建 |
 | `context-assembler/` | 5 阶段上下文组装流水线 |
 | `llm-client/` | DeepSeek/Gemini/Coze/Ollama 统一客户端 |
-| `novelDownloader/` | 网络爬虫（辅助功能） |
 | `novel-splitter-web/` | React 19 前端 |
 
 ## 文档

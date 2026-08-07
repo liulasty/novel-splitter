@@ -2,7 +2,6 @@ package com.novel.splitter.application.service.novel;
 
 import com.novel.splitter.application.model.NovelSummaryListScope;
 import com.novel.splitter.application.model.command.UploadNovelCommand;
-import com.novel.splitter.application.model.dto.DownloadAndIngestRequest;
 import com.novel.splitter.application.model.dto.IngestRequest;
 import com.novel.splitter.application.model.dto.NovelPipelineRequestDto;
 import com.novel.splitter.application.model.dto.NovelSummaryDto;
@@ -66,8 +65,6 @@ public interface NovelFacadeService {
      * 强制重解析章节（清理旧产物后走 Load）；可选自定义章节标题正则。
      */
     TaskSubmitResponseDto reparseChapters(String novelId, ReparseChaptersRequestDto request) throws IOException;
-
-    TaskSubmitResponseDto downloadAndIngest(DownloadAndIngestRequest request) throws IOException;
 
     List<NovelStatRecordDto> getNovelStats();
 

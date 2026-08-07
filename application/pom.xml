@@ -36,10 +36,6 @@
         </dependency>
         <dependency>
             <groupId>com.novel.splitter</groupId>
-            <artifactId>novelDownloader</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.novel.splitter</groupId>
             <artifactId>embedding</artifactId>
         </dependency>
         <dependency>

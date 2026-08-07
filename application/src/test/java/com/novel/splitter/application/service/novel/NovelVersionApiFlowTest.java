@@ -7,7 +7,6 @@ import com.novel.splitter.application.model.dto.ReparseChaptersRequestDto;
 import com.novel.splitter.application.model.dto.TaskSubmitResponseDto;
 import com.novel.splitter.application.orchestration.EmbedPipelineOrchestrator;
 import com.novel.splitter.application.port.out.TaskQueuePort;
-import com.novel.splitter.application.service.download.DownloadService;
 import com.novel.splitter.application.service.enrich.EnrichConsistencyService;
 import com.novel.splitter.application.service.knowledge.KnowledgeBaseService;
 import com.novel.splitter.application.service.task.TaskService;
@@ -57,7 +56,6 @@ class NovelVersionApiFlowTest {
     @Mock private NovelCacheRepository novelCacheRepository;
     @Mock private TaskService taskService;
     @Mock private TaskQueuePort taskQueuePort;
-    @Mock private DownloadService downloadService;
     @Mock private SceneRepository sceneRepository;
     @Mock private ChapterRepository chapterRepository;
     @Mock private DtoMapper dtoMapper;

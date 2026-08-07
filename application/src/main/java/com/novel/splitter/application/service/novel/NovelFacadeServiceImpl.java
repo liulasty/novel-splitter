@@ -10,7 +10,6 @@ import com.novel.splitter.application.model.dto.NovelSummaryDto;
 import com.novel.splitter.application.model.dto.CreateVersionRequest;
 import com.novel.splitter.application.model.dto.NovelVersionDto;
 import com.novel.splitter.application.mapper.DtoMapper;
-import com.novel.splitter.application.service.download.DownloadService;
 import com.novel.splitter.application.service.enrich.EnrichConsistencyService;
 import com.novel.splitter.application.service.enrich.ReEnrichService;
 import com.novel.splitter.application.service.knowledge.KnowledgeBaseService;
@@ -22,7 +21,6 @@ import com.novel.splitter.domain.enums.RecognitionStrategyType;
 import com.novel.splitter.domain.enums.SplitStrategy;
 import com.novel.splitter.domain.enums.TaskType;
 import com.novel.splitter.domain.enums.VersionStatus;
-import com.novel.splitter.application.model.dto.DownloadAndIngestRequest;
 import com.novel.splitter.application.model.dto.IngestRequest;
 import com.novel.splitter.domain.model.Novel;
 import com.novel.splitter.domain.model.NovelVersion;
@@ -100,7 +98,6 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
     private final TaskService taskService;
     private final TaskQueuePort taskQueuePort;
     private final EmbedPipelineOrchestrator embedPipelineOrchestrator;
-    private final DownloadService downloadService;
     private final SceneRepository sceneRepository;
     private final ChapterRepository chapterRepository;
     private final DtoMapper dtoMapper;
@@ -517,30 +514,6 @@ public class NovelFacadeServiceImpl implements NovelFacadeService {
                 false);
     }
 
-    @Override
-    public TaskSubmitResponseDto downloadAndIngest(DownloadAndIngestRequest request) throws IOException {
-        log.info("接收到下载并入库请求: url={}, name={}", request.getUrl(), request.getName());
-        
-        // 1. 同步下载，得到落盘文件名
-        String relativePath = downloadService.downloadNovel(request.getUrl(), request.getName());
-
-        // 2. 下载后先创建 Novel 资源，再统一走 novelId 驱动 pipeline
-        String novelId = novelService.createNovelFromStoredFile(relativePath, request.getName(), null, "downloaded from " + request.getUrl());
-
-        NovelPipelineRequestDto pipelineRequest = new NovelPipelineRequestDto();
-        pipelineRequest.setVersion(request.getVersion());
-        pipelineRequest.setMaxScenes(request.getMaxScenes());
-        pipelineRequest.setSplitEntry(request.getSplitEntry());
-        pipelineRequest.setChunkSize(request.getChunkSize());
-        pipelineRequest.setChunkOverlap(request.getChunkOverlap());
-        pipelineRequest.setChapterTitleRegex(request.getChapterTitleRegex());
-        if (request.getStages() == null || request.getStages().isEmpty()) {
-            pipelineRequest.setStages(List.of("SPLIT", "EMBED"));
-        } else {
-            pipelineRequest.setStages(request.getStages());
-        }
-        return pipeline(novelId, pipelineRequest);
-    }
 
     @Override
     public List<com.novel.splitter.application.model.dto.ChapterDto> getChapters(String novelId) {

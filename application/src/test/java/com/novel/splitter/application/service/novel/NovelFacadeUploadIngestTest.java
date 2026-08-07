@@ -5,7 +5,6 @@ import com.novel.splitter.application.model.command.UploadNovelCommand;
 import com.novel.splitter.application.model.dto.NovelUploadResponseDto;
 import com.novel.splitter.application.orchestration.EmbedPipelineOrchestrator;
 import com.novel.splitter.application.port.out.TaskQueuePort;
-import com.novel.splitter.application.service.download.DownloadService;
 import com.novel.splitter.application.service.knowledge.KnowledgeBaseService;
 import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.domain.enums.TaskType;
@@ -44,7 +43,6 @@ class NovelFacadeUploadIngestTest {
     @Mock private NovelCacheRepository novelCacheRepository;
     @Mock private TaskService taskService;
     @Mock private TaskQueuePort taskQueuePort;
-    @Mock private DownloadService downloadService;
     @Mock private SceneRepository sceneRepository;
     @Mock private ChapterRepository chapterRepository;
     @Mock private DtoMapper dtoMapper;

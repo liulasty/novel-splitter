@@ -20,7 +20,6 @@ const SUB_GROUPS: Record<string, SubGroup[]> = {
     { label: 'Ingestion', match: (k: string) => k.startsWith('splitter.ingestion.') },
     { label: 'Rule', match: (k: string) => k.startsWith('splitter.rule.') },
     { label: 'Embed', match: (k: string) => k.startsWith('splitter.embed.') },
-    { label: 'Downloader', match: (k: string) => k.startsWith('splitter.downloader.') },
     { label: 'RabbitMQ', match: (k: string) => k.startsWith('splitter.rabbitmq.') },
     { label: 'Storage', match: (k: string) => k.startsWith('splitter.storage.') },
   ],

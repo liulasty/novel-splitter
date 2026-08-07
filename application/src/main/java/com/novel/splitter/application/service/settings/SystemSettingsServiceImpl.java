@@ -82,7 +82,7 @@ public class SystemSettingsServiceImpl implements SystemSettingsService {
         if (key.startsWith("embedding.") || key.startsWith("chroma.")) return "embedding_chroma";
         if (key.startsWith("llm.")) return "llm";
         if (key.startsWith("splitter.ingestion") || key.startsWith("splitter.rule")
-                || key.startsWith("splitter.embed") || key.startsWith("splitter.downloader")
+                || key.startsWith("splitter.embed")
                 || key.startsWith("splitter.rabbitmq") || key.startsWith("splitter.storage"))
             return "splitter";
         if (key.startsWith("assembler.")) return "assembler";

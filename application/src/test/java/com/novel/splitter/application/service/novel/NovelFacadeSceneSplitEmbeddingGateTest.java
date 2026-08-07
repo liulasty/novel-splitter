@@ -6,7 +6,6 @@ import com.novel.splitter.application.model.dto.SceneSplitRequestDto;
 import com.novel.splitter.application.model.dto.SplitRetryRequestDto;
 import com.novel.splitter.application.orchestration.EmbedPipelineOrchestrator;
 import com.novel.splitter.application.port.out.TaskQueuePort;
-import com.novel.splitter.application.service.download.DownloadService;
 import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.domain.enums.NovelStatus;
 import com.novel.splitter.domain.model.Novel;
@@ -49,8 +48,6 @@ class NovelFacadeSceneSplitEmbeddingGateTest {
     private TaskService taskService;
     @Mock
     private TaskQueuePort taskQueuePort;
-    @Mock
-    private DownloadService downloadService;
     @Mock
     private SceneRepository sceneRepository;
     @Mock

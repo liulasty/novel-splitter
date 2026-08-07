@@ -126,7 +126,6 @@ export default function SystemPage() {
     const recentTasks = tasks?.slice(0, 6) ?? [];
 
     const INGEST_PIPELINE = [
-        { label: "下载/读取", module: "novelDownloader" },
         { label: "切分", module: "splitter" },
         { label: "校验", module: "validation" },
         { label: "向量化", module: "embedding" },

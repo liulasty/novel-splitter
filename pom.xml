@@ -26,7 +26,6 @@
         <module>retrieval</module>
         <module>context-assembler</module>
         <module>llm-client</module>
-        <module>novelDownloader</module>
     </modules>
 
     <properties>
@@ -94,11 +93,6 @@
             <dependency>
                 <groupId>com.novel.splitter</groupId>
                 <artifactId>validation</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.novel.splitter</groupId>
-                <artifactId>novelDownloader</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

@@ -14,7 +14,7 @@
 
 ## 模块依赖
 - 本模块依赖的内部子模块：`domain`
-- 依赖本模块的内部子模块：`application`, `interfaces`, `batch-processing`, `novelDownloader`
+- 依赖本模块的内部子模块：`application`, `interfaces`, `batch-processing`
 
 ## 核心组件
 | 组件名称 | 类型 | 核心职责 |

@@ -87,7 +87,6 @@ embedding/         — ONNX Runtime (BGE-Small-ZH), Tokenizer/Vocabulary, Chroma
 retrieval/         — RAG: RagFacade, VectorRetrievalService, AnswerPolicyClassifier, RetrievalQueryBuilder
 context-assembler/ — 5-stage: ReScorer → Deduplicator → Merger → TokenBudgetAllocator → FinalAssembly
 llm-client/        — LlmClient interface, DeepSeek/Gemini/Coze/Ollama clients, RobustLlmClient (retry+circuit)
-novelDownloader/   — Jsoup-based scraper, DownloaderFactory, SiteRule
 novel-splitter-web/— React 19 + Vite + Zustand + TanStack Query + TailwindCSS 4
 ```
 

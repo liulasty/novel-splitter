@@ -4,7 +4,6 @@ import com.novel.splitter.application.mapper.DtoMapper;
 import com.novel.splitter.application.model.dto.ChapterDto;
 import com.novel.splitter.application.orchestration.EmbedPipelineOrchestrator;
 import com.novel.splitter.application.port.out.TaskQueuePort;
-import com.novel.splitter.application.service.download.DownloadService;
 import com.novel.splitter.application.service.task.TaskService;
 import com.novel.splitter.domain.enums.NovelStatus;
 import com.novel.splitter.domain.model.Novel;
@@ -37,7 +36,6 @@ class NovelFacadeServiceSceneReadTest {
     @Mock private NovelCacheRepository novelCacheRepository;
     @Mock private TaskService taskService;
     @Mock private TaskQueuePort taskQueuePort;
-    @Mock private DownloadService downloadService;
     @Mock private SceneRepository sceneRepository;
     @Mock private ChapterRepository chapterRepository;
     @Mock private DtoMapper dtoMapper;
