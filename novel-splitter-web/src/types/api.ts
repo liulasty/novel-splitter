@@ -74,6 +74,7 @@ export interface VectorRecord {
 export interface ContextBlock {
   chunkId: string;
   content: string;
+  prefixContext?: string | null;
   sceneMetadata?: Record<string, any>;
   tokenCount: number;
   rank?: number;

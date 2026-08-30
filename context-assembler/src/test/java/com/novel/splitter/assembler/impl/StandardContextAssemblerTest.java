@@ -167,7 +167,7 @@ class StandardContextAssemblerTest {
     }
 
     @Test
-    void testAssemble_prefixContextOnlyForIsolatedBlock() {
+    void testAssemble_prefixContextCarriedWhenPresent() {
         config.setExpandRadius(-1); // setUp 已禁用扩展
         when(tokenCounter.count(anyString())).thenReturn(10);
 
@@ -181,8 +181,78 @@ class StandardContextAssemblerTest {
         List<ContextBlock> result = assembler.assemble("q", Arrays.asList(s1, s2), config);
 
         assertEquals(2, result.size());
-        assertNull(result.get(0).getPrefixContext(), "首块不拼接前缀");
-        assertEquals("上文", result.get(1).getPrefixContext(), "孤立块携带 prefixContext");
+        assertNull(result.get(0).getPrefixContext(), "场景无前缀则块不带前缀");
+        assertEquals("上文", result.get(1).getPrefixContext(), "场景有前缀则块携带 prefixContext");
+    }
+
+    @Test
+    void testAssemble_firstBlockCarriesPrefixContext() {
+        config.setExpandRadius(-1);
+        when(tokenCounter.count(anyString())).thenReturn(10);
+
+        // 首块：没有前一块，但场景本身存了 prefixContext，必须携带
+        Scene s1 = createScene("1", "A", 1, 1, 0.9);
+        s1.setEndParagraphIndex(1);
+        s1.setPrefixContext("上文");
+
+        List<ContextBlock> result = assembler.assemble("q", Collections.singletonList(s1), config);
+
+        assertEquals(1, result.size());
+        assertEquals("上文", result.get(0).getPrefixContext(), "首块也应携带 prefixContext");
+    }
+
+    @Test
+    void testAssemble_contiguousBlockCarriesPrefixContext() {
+        config.setExpandRadius(-1);
+        when(tokenCounter.count(anyString())).thenReturn(10);
+
+        // 与前一块段落连续的块：即使无 gap，存了前缀也必须携带
+        Scene s1 = createScene("1", "A", 1, 1, 0.9);
+        s1.setEndParagraphIndex(1);
+        Scene s2 = createScene("2", "B", 1, 2, 0.8); // start=2 = s1.end(1)+1，无 gap
+        s2.setStartParagraphIndex(2);
+        s2.setEndParagraphIndex(2);
+        s2.setPrefixContext("上文2");
+
+        List<ContextBlock> result = assembler.assemble("q", Arrays.asList(s1, s2), config);
+
+        assertEquals(2, result.size());
+        assertEquals("上文2", result.get(1).getPrefixContext(), "连续块也应携带 prefixContext");
+    }
+
+    @Test
+    void testAssemble_mergedScenePreservesPrefixContext() {
+        config.setEnableMerge(true);
+        config.setMaxChunkLength(1000);
+        config.setExpandRadius(-1);
+        when(tokenCounter.count(anyString())).thenReturn(10);
+
+        Scene s1 = createScene("1", "Part1", 1, 1, 0.9);
+        s1.setEndParagraphIndex(1);
+        s1.setPrefixContext("上文");
+        Scene s2 = createScene("2", "Part2", 1, 2, 0.8);
+        s2.setStartParagraphIndex(2);
+        s2.setEndParagraphIndex(2);
+
+        List<ContextBlock> result = assembler.assemble("q", Arrays.asList(s1, s2), config);
+
+        assertEquals(1, result.size());
+        assertEquals("上文", result.get(0).getPrefixContext(), "合并场景应保留首个子场景的 prefixContext");
+    }
+
+    @Test
+    void testAssemble_blankPrefixContext_staysNull() {
+        config.setExpandRadius(-1);
+        when(tokenCounter.count(anyString())).thenReturn(10);
+
+        Scene s1 = createScene("1", "A", 1, 1, 0.9);
+        s1.setEndParagraphIndex(1);
+        s1.setPrefixContext("   ");
+
+        List<ContextBlock> result = assembler.assemble("q", Collections.singletonList(s1), config);
+
+        assertEquals(1, result.size());
+        assertNull(result.get(0).getPrefixContext(), "空白前缀应归一化为 null");
     }
 
     @Test

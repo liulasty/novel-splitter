@@ -94,6 +94,8 @@ public class SceneMerger {
         merged.setEndParagraphIndex(s2.getEndParagraphIndex());
         merged.setText(mergedText);
         merged.setWordCount(s1.getWordCount() + s2.getWordCount());
+        // 保留首个子场景的前缀，合并块仍可作为衔接参考
+        merged.setPrefixContext(s1.getPrefixContext());
         
         // 合并分数 (取最大值或平均值)
         double score1 = s1.getScore() != null ? s1.getScore() : 0.0;

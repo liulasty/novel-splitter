@@ -75,13 +75,13 @@ public class StandardContextAssembler implements ContextAssembler {
                 .thenComparingInt(Scene::getStartParagraphIndex));
 
         List<ContextBlock> blocks = new ArrayList<>();
-        Scene prev = null;
         for (Scene scene : finalScenes) {
             int tokens = tokenCounter.count(scene.getText());
             int rank = rankMap.getOrDefault(scene.getId(), 0);
 
-            // 与上一块有段落 gap 的孤立块携带 prefixContext，供 LLM 序列化补上文
-            boolean isolated = prev != null && isGap(prev, scene);
+            // 场景存了前缀就携带，供 LLM 序列化补上文（effectiveContent 会按非空拼 [上文接续]）
+            String prefixContext = scene.getPrefixContext() != null && !scene.getPrefixContext().isBlank()
+                    ? scene.getPrefixContext() : null;
 
             Map<String, Object> metadata = new HashMap<>();
             if (scene.getMetadata() != null) {
@@ -106,14 +106,13 @@ public class StandardContextAssembler implements ContextAssembler {
             blocks.add(ContextBlock.builder()
                     .chunkId(scene.getId())
                     .content(scene.getText())
-                    .prefixContext(isolated ? scene.getPrefixContext() : null)
+                    .prefixContext(prefixContext)
                     .sceneMetadata(scene.getMetadata())
                     .tokenCount(tokens)
                     .rank(rank)
                     .score(scene.getScore() != null ? scene.getScore() : 0.0)
                     .metadata(metadata)
                     .build());
-            prev = scene;
         }
 
         // 输出日志
@@ -127,10 +126,5 @@ public class StandardContextAssembler implements ContextAssembler {
                 originalCount, dedupCount, mergedCount, finalCount, totalTokens, truncatedCount);
 
         return blocks;
-    }
-
-    /** 孤立块：与上一块首尾有段落 gap（paragraphIndex 不连续），需要前缀补上下文 */
-    private boolean isGap(Scene prev, Scene cur) {
-        return cur.getStartParagraphIndex() > prev.getEndParagraphIndex() + 1;
     }
 }

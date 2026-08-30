@@ -3,8 +3,14 @@ import { novelApi } from '@/api/novelApi';
 import { ragApi } from '@/api/ragApi';
 import { chromaAdminApi } from '@/api/chromaAdminApi';
 import type { ChromaCollection } from '@/api/chromaAdminApi';
-import type { RagDebugResponse, ChatRequest } from '@/types/api';
+import type { RagDebugResponse, ChatRequest, ContextBlock } from '@/types/api';
 import { estimateTokens } from '@/utils/tokenEstimator';
+
+/** 与后端 ContextBlock.effectiveContent() 保持一致：非空前缀时拼上 [上文接续]/[正文] 标记 */
+const effectiveContent = (b: ContextBlock): string => {
+    const p = b.prefixContext;
+    return p && p.trim() ? `[上文接续]\n${p}\n[正文]\n${b.content}` : b.content;
+};
 import { toast } from 'sonner';
 import { CollapseCard } from '@/components/ui/collapse-card';
 import { SelectMenu, type SelectMenuOption } from '@/components/ui/select-menu';
@@ -142,7 +148,7 @@ export default function RagDebugPage() {
         if (contextBlocks?.length) {
             parts.push(`[Context]\n${contextBlocks.map((b, i) => {
                 const title = (b.sceneMetadata as any)?.chapterTitle || b.metadata?.chapterTitle || '';
-                return `--- Block ${i + 1}${title ? ` (${title})` : ''} [${b.chunkId}] ---\n${b.content}`;
+                return `--- Block ${i + 1}${title ? ` (${title})` : ''} [${b.chunkId}] ---\n${effectiveContent(b)}`;
             }).join('\n\n')}`);
         }
         parts.push(`[User Question]\n${userQuestion}`);
@@ -427,6 +433,12 @@ function ContextTab({ result }: { result: RagDebugResponse }) {
                     }
                     className="border border-[#E2DDD4] bg-white hover:border-[#D1D5DB]"
                 >
+                    {b.prefixContext && b.prefixContext.trim() && (
+                        <div className="mb-2 rounded-md border border-[#D97706]/30 bg-[#D97706]/10 p-2">
+                            <div className="mb-1 text-[11px] font-semibold text-[#D97706]" style={mono}>[上文接续]</div>
+                            <p className="whitespace-pre-wrap text-xs leading-relaxed text-[#B45309]" style={mono}>{b.prefixContext}</p>
+                        </div>
+                    )}
                     <p className="whitespace-pre-wrap text-sm leading-relaxed text-[#374151]">{b.content}</p>
                 </CollapseCard>
             ))}
@@ -464,7 +476,7 @@ function PromptTab({ result, prompt, totalTokens }: { result: RagDebugResponse; 
                     { label: 'System Instruction', content: fp.systemInstruction, icon: 'SYS' },
                     { label: 'User Question', content: fp.userQuestion, icon: 'Q' },
                     { label: 'Output Constraint', content: fp.outputConstraint, icon: 'OUT' },
-                    { label: 'Assembled Context', content: fp.contextBlocks.map(b => b.content).join('\n\n'), icon: 'CTX' },
+                    { label: 'Assembled Context', content: fp.contextBlocks.map(b => effectiveContent(b)).join('\n\n'), icon: 'CTX' },
                 ].map(s => (
                     <CollapseCard key={s.label}
                         title={
